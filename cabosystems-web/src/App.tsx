@@ -9,12 +9,14 @@ import { InvitationsModal } from './components/modals/InvitationsModal';
 import { InviteUserModal } from './components/modals/InviteUserModal';
 import { AdminLoginModal } from './components/modals/AdminLoginModal';
 import { AdminEditProfileModal } from './components/modals/AdminEditProfileModal';
-import { SidebarProvider } from './context/SidebarContext';
+import { SidebarProvider, useSidebar } from './context/SidebarContext';
 import { AdminAuthProvider } from './context/AdminAuthContext';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { AppHeader } from './components/layout/AppHeader';
+import { ChatView } from './components/chat/ChatView';
 
 function DashboardContent() {
+  const { activeItem } = useSidebar();
   const [workers, setWorkers] = useState<LiveWorker[]>([]);
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -202,18 +204,22 @@ function DashboardContent() {
           offlineCount={offlineCount}
         />
 
-        {/* 3. 100% Full-Screen GPS Radar Map (Dominant Hero Component) */}
+        {/* 3. Main View: GPS Radar Map or Team Group Chat */}
         <main className="flex-1 min-h-0 p-3 lg:p-3.5 overflow-hidden relative flex flex-col">
-          <div className="flex-1 h-full w-full rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden relative">
-            <LiveMap
-              workers={filteredWorkers}
-              selectedWorkerId={selectedWorkerId}
-              onSelectWorker={handleSelectWorker}
-              focusTrigger={focusTrigger}
-              onRefresh={() => fetchFleet(true)}
-              isRefreshing={isRefreshing}
-            />
-          </div>
+          {activeItem === 'chat' ? (
+            <ChatView />
+          ) : (
+            <div className="flex-1 h-full w-full rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden relative">
+              <LiveMap
+                workers={filteredWorkers}
+                selectedWorkerId={selectedWorkerId}
+                onSelectWorker={handleSelectWorker}
+                focusTrigger={focusTrigger}
+                onRefresh={() => fetchFleet(true)}
+                isRefreshing={isRefreshing}
+              />
+            </div>
+          )}
         </main>
       </div>
 

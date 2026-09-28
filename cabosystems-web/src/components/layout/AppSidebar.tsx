@@ -58,7 +58,17 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const navItems = [
+  interface NavItem {
+    id: string;
+    name: string;
+    icon: React.ReactNode;
+    badge?: string;
+    badgeColor?: string;
+    disabled?: boolean;
+    action: () => void;
+  }
+
+  const navItems: NavItem[] = [
     {
       id: 'radar',
       name: 'Radar Satelital',
@@ -99,10 +109,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
       id: 'chat',
       name: 'Chat de Equipo',
       icon: <ChatIcon size={20} className="shrink-0" />,
-      badge: 'Pronto',
-      badgeColor: 'bg-slate-100 text-slate-400 border border-slate-200/60 font-medium',
-      disabled: true,
-      action: () => {},
+      badge: 'En Vivo',
+      badgeColor: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-bold',
+      action: () => setActiveItem('chat'),
     },
   ];
 
