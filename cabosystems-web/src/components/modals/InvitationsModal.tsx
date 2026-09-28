@@ -8,7 +8,6 @@ import {
   Trash2,
   X,
   Check,
-  Copy,
   AlertCircle,
   AlertTriangle,
   RefreshCw,
@@ -105,15 +104,6 @@ export const InvitationsModal: React.FC<InvitationsModalProps> = ({
     } finally {
       setResendingInviteId(null);
     }
-  };
-
-  // Copiar link al portapapeles
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setGlobalBanner({
-      type: 'success',
-      text: 'Enlace de registro copiado al portapapeles.',
-    });
   };
 
   // Revocar invitación
@@ -239,7 +229,6 @@ export const InvitationsModal: React.FC<InvitationsModalProps> = ({
                     </tr>
                   ) : (
                     invitaciones.map((inv) => {
-                      const link = `cabosystemsmobile://register?token=${inv.token}&email=${encodeURIComponent(inv.email)}`;
                       const isPending = inv.estado === 'pendiente';
 
                       return (
@@ -277,14 +266,6 @@ export const InvitationsModal: React.FC<InvitationsModalProps> = ({
                                   >
                                     <Mail size={13} className={resendingInviteId === inv.id ? 'spin' : ''} />
                                     <span>{resendingInviteId === inv.id ? 'Reenviando...' : 'Reenviar Mail'}</span>
-                                  </button>
-                                  <button
-                                    className="action-btn copy"
-                                    onClick={() => handleCopy(link)}
-                                    title="Copiar enlace de registro móvil"
-                                  >
-                                    <Copy size={13} />
-                                    <span>Copiar Link</span>
                                   </button>
                                   <button
                                     className="action-btn delete"
