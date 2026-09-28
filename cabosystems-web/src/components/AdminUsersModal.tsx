@@ -734,7 +734,6 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                       </tr>
                     ) : (
                       invitaciones.map((inv) => {
-                        const link = `cabosystemsmobile://register?token=${inv.token}&email=${encodeURIComponent(inv.email)}`;
                         const isPending = inv.estado === 'pendiente';
 
                         return (
@@ -772,14 +771,6 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                                     >
                                       <Mail size={13} className={resendingInviteId === inv.id ? 'spin' : ''} />
                                       <span>{resendingInviteId === inv.id ? 'Reenviando...' : 'Reenviar Mail'}</span>
-                                    </button>
-                                    <button
-                                      className="action-btn copy"
-                                      onClick={() => handleCopy(link)}
-                                      title="Copiar enlace de registro"
-                                    >
-                                      <Copy size={13} />
-                                      <span>Copiar Link</span>
                                     </button>
                                     <button
                                       className="action-btn delete"
