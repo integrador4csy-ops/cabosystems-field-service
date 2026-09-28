@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100;200;300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
+    <style type="text/tailwindcss">
+      @theme inline {
+        --color-background: var(--background);
+        --color-foreground: var(--foreground);
+        --color-primary: var(--primary);
+        --color-primary-foreground: var(--primary-foreground);
+        --color-secondary: var(--secondary);
+        --color-secondary-foreground: var(--secondary-foreground);
+        --color-muted: var(--muted);
+        --color-muted-foreground: var(--muted-foreground);
+        --color-accent: var(--accent);
+        --color-accent-foreground: var(--accent-foreground);
+        --color-destructive: var(--destructive);
+        --color-card: var(--card);
+        --color-card-foreground: var(--card-foreground);
+        --color-popover: var(--popover);
+        --color-popover-foreground: var(--popover-foreground);
+        --color-border: var(--border);
+        --color-input: var(--input);
+        --color-ring: var(--ring);
+        --color-chart-1: var(--chart-1);
+        --color-chart-2: var(--chart-2);
+        --color-chart-3: var(--chart-3);
+        --color-chart-4: var(--chart-4);
+        --color-chart-5: var(--chart-5);
+
+        --font-font-sans: var(--font-sans);
+        --font-font-heading: var(--font-heading);
+        --font-font-serif: var(--font-serif);
+        --font-font-mono: var(--font-mono);
+      }
+
+      @theme {
+        --radius-xs: calc(var(--radius) - 8px);
+        --radius-sm: calc(var(--radius) - 4px);
+        --radius-md: calc(var(--radius) - 2px);
+        --radius-lg: var(--radius);
+        --radius-xl: calc(var(--radius) + 4px);
+        --radius-2xl: calc(var(--radius) + 8px);
+        --radius-3xl: calc(var(--radius) + 16px);
+        --radius-4xl: calc(var(--radius) + 24px);
+      }
+
+      * {
+        corner-shape: var(--shape, round);
+      }
+
+      .rounded-full,
+      .rounded-none,
+      .rounded-t-full,
+      .rounded-t-none,
+      .rounded-r-full,
+      .rounded-r-none,
+      .rounded-b-full,
+      .rounded-b-none,
+      .rounded-l-full,
+      .rounded-l-none,
+      .rounded-s-full,
+      .rounded-s-none,
+      .rounded-e-full,
+      .rounded-e-none,
+      .rounded-tl-full,
+      .rounded-tl-none,
+      .rounded-tr-full,
+      .rounded-tr-none,
+      .rounded-bl-full,
+      .rounded-bl-none,
+      .rounded-br-full,
+      .rounded-br-none,
+      .rounded-ss-full,
+      .rounded-ss-none,
+      .rounded-se-full,
+      .rounded-se-none,
+      .rounded-es-full,
+      .rounded-es-none,
+      .rounded-ee-full,
+      .rounded-ee-none {
+        corner-shape: round;
+      }
+
+      @utility rounded-* {
+        border-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-t-* {
+        border-top-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-top-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-r-* {
+        border-top-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-bottom-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-b-* {
+        border-bottom-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-bottom-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-l-* {
+        border-top-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-bottom-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-tl-* {
+        border-top-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-tr-* {
+        border-top-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-bl-* {
+        border-bottom-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-br-* {
+        border-bottom-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-s-* {
+        border-start-start-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-end-start-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-e-* {
+        border-start-end-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-end-end-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-ss-* {
+        border-start-start-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-se-* {
+        border-start-end-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-es-* {
+        border-end-start-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-ee-* {
+        border-end-end-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+
+      :root {
+        --shape: squircle;
+        --shape-multiplier: 1;
+
+        --background: #343e48;
+        --foreground: #ffffff;
+        --primary: #f78c26;
+        --primary-foreground: #ffffff;
+        --secondary: #46515d;
+        --secondary-foreground: #ffffff;
+        --muted: #56616d;
+        --muted-foreground: #b9c1c8;
+        --accent: #f78c26;
+        --accent-foreground: #ffffff;
+        --destructive: #d9534f;
+        --card: #3d4853;
+        --card-foreground: #ffffff;
+        --popover: #2d363f;
+        --popover-foreground: #ffffff;
+        --border: #71808d;
+        --input: #2f3943;
+        --ring: #f78c26;
+        --chart-1: #f78c26;
+        --chart-2: #ffffff;
+        --chart-3: #8fa1ae;
+        --chart-4: #5e7180;
+        --chart-5: #d96f18;
+
+        --font-sans: "Montserrat";
+        --font-heading: "Montserrat";
+        --font-serif: "Playfair Display";
+        --font-mono: "JetBrains Mono";
+
+        --radius: 0.75rem;
+      }
+
+      @supports (corner-shape: squircle) {
+        :root {
+          --shape-multiplier: 2.5;
+        }
+      }
+
+      /* Prevent layout shift for icons without explicit dimensions */
+      iconify-icon:not([width]):not([height]) {
+        display: inline-block;
+        width: 1em;
+        height: 1em;
+      }
+
+      /* Hide scrollbars */
+      *,
+      *::before,
+      *::after {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      *::-webkit-scrollbar {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main
+      style="font-family: var(--font-sans)"
+      class="min-h-screen bg-background text-foreground pb-24"
+    >
+      <header
+        class="sticky top-0 z-30 border-b border-border/40 bg-background/95 px-5 py-4 backdrop-blur"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <div
+              class="size-8 rounded-lg bg-primary flex items-center justify-center shadow-md shadow-primary/20"
+            >
+              <iconify-icon
+                icon="solar:home-2-bold"
+                class="text-primary-foreground"
+                width="16"
+                height="16"
+              ></iconify-icon>
+            </div>
+            <div>
+              <span class="font-heading text-xs font-bold tracking-[0.14em] text-foreground"
+                >CABO<span class="text-primary">SYSTEMS</span></span
+              >
+            </div>
+          </div>
+          <div class="relative max-w-[190px] flex-1">
+            <button
+              type="button"
+              class="flex h-10 w-full items-center justify-between rounded-lg border border-border/70 bg-secondary/80 px-3 text-left text-xs font-medium text-foreground"
+            >
+              <span class="truncate">All Projects</span
+              ><iconify-icon
+                icon="solar:alt-arrow-down-linear"
+                class="text-muted-foreground"
+                width="16"
+                height="16"
+              ></iconify-icon>
+            </button>
+          </div>
+          <div class="flex items-center">
+            <img
+              alt="Technician profile avatar"
+              src="https://randomuser.me/api/portraits/men/32.jpg"
+              class="size-9 rounded-full border-2 border-primary object-cover"
+            />
+          </div>
+        </div>
+      </header>
+      <section class="px-5 pt-6 pb-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              Thursday, Oct 24
+            </p>
+            <h1 class="font-heading text-2xl font-bold">Hello, Alex</h1>
+          </div>
+          <div class="rounded-xl border border-border/60 bg-card px-3 py-2 text-right">
+            <span class="block text-[10px] uppercase tracking-wider text-muted-foreground"
+              >Today</span
+            ><span class="font-heading text-sm font-bold text-primary">3 Tasks</span>
+          </div>
+        </div>
+      </section>
+      <section class="px-5 mb-5">
+        <div class="grid grid-cols-3 gap-2.5">
+          <div class="rounded-xl border border-primary/50 bg-primary/10 p-3 text-center">
+            <span class="font-heading text-lg font-bold text-primary">1</span
+            ><span class="mt-1 block text-[11px] font-medium text-foreground">In Progress</span>
+          </div>
+          <div class="rounded-xl border border-border/60 bg-card p-3 text-center">
+            <span class="font-heading text-lg font-bold text-muted-foreground">1</span
+            ><span class="mt-1 block text-[11px] font-medium text-muted-foreground">Pending</span>
+          </div>
+          <div class="rounded-xl border border-border/60 bg-card p-3 text-center">
+            <span class="font-heading text-lg font-bold text-muted-foreground">1</span
+            ><span class="mt-1 block text-[11px] font-medium text-muted-foreground">Completed</span>
+          </div>
+        </div>
+      </section>
+      <section class="px-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2
+            class="font-heading text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+          >
+            Today's schedule
+          </h2>
+          <span class="text-xs text-primary font-medium">Sorted by time</span>
+        </div>
+        <article
+          class="relative overflow-hidden rounded-2xl border-2 border-primary bg-card p-5 shadow-lg shadow-black/20"
+        >
+          <div class="mb-3 flex items-start justify-between gap-2">
+            <span
+              class="inline-flex items-center gap-1.5 rounded-md bg-primary/15 px-2.5 py-1 text-[11px] font-semibold text-primary"
+              ><span class="size-1.5 rounded-full bg-primary animate-pulse"></span>In Progress</span
+            ><span class="text-xs font-semibold text-muted-foreground">10:00 AM</span>
+          </div>
+          <h3 class="font-heading text-lg font-bold text-foreground">
+            Crestron Lighting Control Commissioning
+          </h3>
+          <div class="mt-3 space-y-2 text-xs">
+            <div class="flex items-center gap-2 text-foreground font-medium">
+              <iconify-icon
+                icon="solar:user-linear"
+                class="text-primary"
+                width="16"
+                height="16"
+              ></iconify-icon
+              ><span>Villa Serena Residence</span>
+            </div>
+            <div class="flex items-start gap-2 text-muted-foreground">
+              <iconify-icon
+                icon="solar:map-point-linear"
+                class="text-primary shrink-0 mt-0.5"
+                width="16"
+                height="16"
+              ></iconify-icon
+              ><span>4480 Ocean Boulevard, Suite 12, Cabo San Lucas</span>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-border/60 flex items-center justify-between">
+            <span class="text-xs text-muted-foreground">Audio / Lighting Integration</span
+            ><a href="#" class="inline-flex items-center gap-1 text-xs font-bold text-primary"
+              >View details<iconify-icon
+                icon="solar:arrow-right-linear"
+                width="16"
+                height="16"
+              ></iconify-icon
+            ></a>
+          </div>
+        </article>
+        <article class="rounded-2xl border border-border/70 bg-card p-5">
+          <div class="mb-3 flex items-start justify-between gap-2">
+            <span
+              class="inline-flex items-center gap-1.5 rounded-md bg-secondary px-2.5 py-1 text-[11px] font-medium text-muted-foreground"
+              >Pending</span
+            ><span class="text-xs font-semibold text-muted-foreground">02:00 PM</span>
+          </div>
+          <h3 class="font-heading text-lg font-semibold text-foreground">
+            4K Cinema Projector Calibration
+          </h3>
+          <div class="mt-3 space-y-2 text-xs">
+            <div class="flex items-center gap-2 text-foreground font-medium">
+              <iconify-icon
+                icon="solar:user-linear"
+                class="text-muted-foreground"
+                width="16"
+                height="16"
+              ></iconify-icon
+              ><span>Pacific Palisades Estate</span>
+            </div>
+            <div class="flex items-start gap-2 text-muted-foreground">
+              <iconify-icon
+                icon="solar:map-point-linear"
+                class="text-muted-foreground shrink-0 mt-0.5"
+                width="16"
+                height="16"
+              ></iconify-icon
+              ><span>120 Palm Canyon Way, Palmilla</span>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-border/60 flex items-center justify-between">
+            <span class="text-xs text-muted-foreground">Home Theater Setup</span
+            ><a
+              href="#"
+              class="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground"
+              >View details<iconify-icon
+                icon="solar:arrow-right-linear"
+                width="16"
+                height="16"
+              ></iconify-icon
+            ></a>
+          </div>
+        </article>
+        <article class="rounded-2xl border border-border/50 bg-card/60 p-5 opacity-80">
+          <div class="mb-3 flex items-start justify-between gap-2">
+            <span
+              class="inline-flex items-center gap-1.5 rounded-md bg-muted/60 px-2.5 py-1 text-[11px] font-medium text-muted-foreground"
+              ><iconify-icon
+                icon="solar:check-circle-bold"
+                class="text-muted-foreground"
+                width="12"
+                height="12"
+              ></iconify-icon
+              >Completed</span
+            ><span class="text-xs font-semibold text-muted-foreground">08:30 AM</span>
+          </div>
+          <h3
+            class="font-heading text-base font-semibold text-muted-foreground line-through decoration-border"
+          >
+            Outdoor Mesh Access Points Diagnostic
+          </h3>
+          <div class="mt-3 space-y-2 text-xs">
+            <div class="flex items-center gap-2 text-muted-foreground">
+              <iconify-icon
+                icon="solar:user-linear"
+                class="text-muted-foreground"
+                width="16"
+                height="16"
+              ></iconify-icon
+              ><span>The Ridge Club Resort</span>
+            </div>
+            <div class="flex items-start gap-2 text-muted-foreground">
+              <iconify-icon
+                icon="solar:map-point-linear"
+                class="text-muted-foreground shrink-0 mt-0.5"
+                width="16"
+                height="16"
+              ></iconify-icon
+              ><span>89 Punta Ballena Dr</span>
+            </div>
+          </div>
+        </article>
+      </section>
+      <nav
+        class="fixed bottom-0 left-0 right-0 z-40 border-t border-border/60 bg-background/95 px-4 py-2.5 backdrop-blur"
+      >
+        <div class="flex items-center justify-around">
+          <a href="#" class="flex flex-1 flex-col items-center gap-1 text-primary"
+            ><iconify-icon icon="solar:home-smile-bold" width="24" height="24"></iconify-icon
+            ><span class="text-[10px] font-semibold">Tasks</span></a
+          ><a
+            href="#"
+            class="flex flex-1 flex-col items-center gap-1 text-muted-foreground hover:text-foreground"
+            ><iconify-icon icon="solar:calendar-linear" width="24" height="24"></iconify-icon
+            ><span class="text-[10px] font-medium">Schedule</span></a
+          ><a
+            href="#"
+            class="flex flex-1 flex-col items-center gap-1 text-muted-foreground hover:text-foreground"
+            ><iconify-icon icon="solar:chat-round-dots-linear" width="24" height="24"></iconify-icon
+            ><span class="text-[10px] font-medium">Chat</span></a
+          ><a
+            href="#"
+            class="flex flex-1 flex-col items-center gap-1 text-muted-foreground hover:text-foreground"
+            ><iconify-icon icon="solar:user-circle-linear" width="24" height="24"></iconify-icon
+            ><span class="text-[10px] font-medium">Profile</span></a
+          >
+        </div>
+      </nav>
+    </main>
+  </body>
+</html>

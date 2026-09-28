@@ -1,0 +1,444 @@
+/* Life360 Marker & Radar Map Styles */
+
+/* Base container for marker */
+.life360-marker-container {
+  position: relative;
+  width: 56px;
+  height: 68px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.life360-marker-container:hover {
+  transform: scale(1.12);
+  z-index: 1000 !important;
+}
+
+/* Offline / Disconnected State */
+.life360-marker-container.is-offline {
+  filter: grayscale(100%) opacity(0.72);
+}
+
+.life360-marker-container.is-offline .life360-avatar-bubble {
+  border-color: #94a3b8 !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25) !important;
+}
+
+.life360-marker-container.is-offline .life360-bubble-pointer {
+  border-top-color: #94a3b8 !important;
+}
+
+.life360-marker-container.is-offline .life360-accuracy-halo {
+  background: rgba(148, 163, 184, 0.2) !important;
+  border-color: rgba(148, 163, 184, 0.4) !important;
+  animation: none !important;
+}
+
+/* Accuracy Halo (Background soft circle) */
+.life360-accuracy-halo {
+  position: absolute;
+  bottom: 0px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: rgba(247, 140, 38, 0.22);
+  border: 1.5px solid rgba(247, 140, 38, 0.45);
+  pointer-events: none;
+  animation: life360Pulse 2.8s infinite ease-in-out;
+  z-index: 1;
+}
+
+@keyframes life360Pulse {
+  0% {
+    transform: translateX(-50%) scale(0.88);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateX(-50%) scale(1.15);
+    opacity: 0.25;
+  }
+  100% {
+    transform: translateX(-50%) scale(0.88);
+    opacity: 0.6;
+  }
+}
+
+/* Top Time Badge Pill */
+.life360-time-badge {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ffffff;
+  color: #343e48;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 5;
+}
+
+.life360-time-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #10b981;
+}
+
+.life360-time-badge.offline .life360-time-dot {
+  background-color: #94a3b8;
+}
+
+/* Life360 Top Place & Dwell Badge (Like Life360 app!) */
+.life360-place-pill {
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(8px);
+  color: #1e293b;
+  padding: 2.5px 8px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 28;
+  pointer-events: none;
+}
+
+.life360-place-pill .life360-place-icon {
+  font-size: 10px;
+}
+
+.life360-place-pill .life360-place-text {
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: 0.2px;
+  color: #1e293b;
+}
+
+/* Avatar Bubble and Pointer */
+.life360-avatar-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 3;
+  margin-top: 0px;
+}
+
+/* Directional Heading Cone / Navigation Pointer */
+.life360-heading-cone {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  margin-left: -11px;
+  width: 22px;
+  height: 22px;
+  transform-origin: 11px 36px;
+  pointer-events: none;
+  z-index: 25;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.5));
+}
+
+.life360-avatar-status-dot {
+  position: absolute;
+  bottom: 2px;
+  right: -3px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2.5px solid #ffffff;
+  z-index: 30;
+}
+
+.life360-avatar-status-dot.online {
+  background-color: #10b981;
+  box-shadow: 0 0 8px #10b981, 0 2px 4px rgba(0, 0, 0, 0.45);
+}
+
+.life360-avatar-status-dot.offline {
+  background-color: #94a3b8;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+.life360-avatar-bubble {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 3.5px solid #f78c26;
+  background-color: #343e48;
+  box-shadow: 0 4px 14px rgba(247, 140, 38, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.life360-avatar-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.life360-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.life360-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #f78c26 0%, #343e48 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Speech Bubble Downward Pointer */
+.life360-bubble-pointer {
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 8px solid #f78c26;
+  margin-top: -1px;
+}
+
+/* Top-Right Status Mini-Badge (Driving / Stopped) */
+.life360-speed-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #343e48;
+  border: 1.5px solid #ffffff;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+  z-index: 4;
+}
+
+/* Battery Pill */
+.life360-battery-pill {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 1.5px 7px;
+  display: flex;
+  align-items: center;
+  gap: 3.5px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #334155;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  border: 1.5px solid #e2e8f0;
+  z-index: 6;
+  white-space: nowrap;
+}
+
+.life360-battery-pill.is-charging {
+  background: #fff7ed;
+  color: #ea580c;
+  border-color: #f78c26;
+  box-shadow: 0 2px 8px rgba(247, 140, 38, 0.35);
+}
+
+.life360-battery-pill svg {
+  flex-shrink: 0;
+}
+
+/* CaboSystems Floating Hover Card (Leaflet Tooltip override) */
+.leaflet-tooltip.cabosystems-hover-card {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  transition: opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.leaflet-tooltip.cabosystems-hover-card::before {
+  display: none !important;
+}
+
+.hover-card-inner {
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid #e2e8f0 !important;
+  border-top: 3px solid #f78c26 !important;
+  border-radius: 18px !important;
+  padding: 16px 18px !important;
+  width: max-content !important;
+  min-width: 280px;
+  max-width: 360px;
+  box-sizing: border-box !important;
+  box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.12), 0 10px 15px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.02) !important;
+  color: #343e48 !important;
+  font-family: 'Outfit', sans-serif !important;
+  user-select: none;
+}
+
+.hover-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+
+.hover-card-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid #f78c26;
+  object-fit: cover;
+  background: #fff7ed;
+  flex-shrink: 0;
+}
+
+.hover-card-avatar-fallback {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid #f78c26;
+  background: #fff7ed;
+  color: #f78c26;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.hover-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.hover-card-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #343e48 !important;
+  margin: 0;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.hover-card-subtitle {
+  font-size: 11px;
+  color: #64748b !important;
+  margin-top: 2px;
+  word-break: break-word;
+}
+
+.hover-card-badges {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.hover-card-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2.5px 8px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.hover-card-badge.role {
+  background: #fff7ed !important;
+  color: #c2410c !important;
+  border: 1px solid #fed7aa !important;
+}
+
+.hover-card-badge.online {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 1px solid #a7f3d0 !important;
+}
+
+.hover-card-badge.offline {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+.hover-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 4px 0;
+  color: #334155 !important;
+}
+
+.hover-card-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #64748b !important;
+  font-weight: 500;
+}
+
+.hover-card-value {
+  font-weight: 600;
+  color: #343e48 !important;
+}
+
+.hover-card-footer {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #64748b !important;
+}

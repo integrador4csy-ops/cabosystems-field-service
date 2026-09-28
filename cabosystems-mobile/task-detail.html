@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TaskDetail</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100;200;300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
+    <style type="text/tailwindcss">
+      @theme inline {
+        --color-background: var(--background);
+        --color-foreground: var(--foreground);
+        --color-primary: var(--primary);
+        --color-primary-foreground: var(--primary-foreground);
+        --color-secondary: var(--secondary);
+        --color-secondary-foreground: var(--secondary-foreground);
+        --color-muted: var(--muted);
+        --color-muted-foreground: var(--muted-foreground);
+        --color-accent: var(--accent);
+        --color-accent-foreground: var(--accent-foreground);
+        --color-destructive: var(--destructive);
+        --color-card: var(--card);
+        --color-card-foreground: var(--card-foreground);
+        --color-popover: var(--popover);
+        --color-popover-foreground: var(--popover-foreground);
+        --color-border: var(--border);
+        --color-input: var(--input);
+        --color-ring: var(--ring);
+        --color-chart-1: var(--chart-1);
+        --color-chart-2: var(--chart-2);
+        --color-chart-3: var(--chart-3);
+        --color-chart-4: var(--chart-4);
+        --color-chart-5: var(--chart-5);
+
+        --font-font-sans: var(--font-sans);
+        --font-font-heading: var(--font-heading);
+        --font-font-serif: var(--font-serif);
+        --font-font-mono: var(--font-mono);
+      }
+
+      @theme {
+        --radius-xs: calc(var(--radius) - 8px);
+        --radius-sm: calc(var(--radius) - 4px);
+        --radius-md: calc(var(--radius) - 2px);
+        --radius-lg: var(--radius);
+        --radius-xl: calc(var(--radius) + 4px);
+        --radius-2xl: calc(var(--radius) + 8px);
+        --radius-3xl: calc(var(--radius) + 16px);
+        --radius-4xl: calc(var(--radius) + 24px);
+      }
+
+      * {
+        corner-shape: var(--shape, round);
+      }
+
+      .rounded-full,
+      .rounded-none,
+      .rounded-t-full,
+      .rounded-t-none,
+      .rounded-r-full,
+      .rounded-r-none,
+      .rounded-b-full,
+      .rounded-b-none,
+      .rounded-l-full,
+      .rounded-l-none,
+      .rounded-s-full,
+      .rounded-s-none,
+      .rounded-e-full,
+      .rounded-e-none,
+      .rounded-tl-full,
+      .rounded-tl-none,
+      .rounded-tr-full,
+      .rounded-tr-none,
+      .rounded-bl-full,
+      .rounded-bl-none,
+      .rounded-br-full,
+      .rounded-br-none,
+      .rounded-ss-full,
+      .rounded-ss-none,
+      .rounded-se-full,
+      .rounded-se-none,
+      .rounded-es-full,
+      .rounded-es-none,
+      .rounded-ee-full,
+      .rounded-ee-none {
+        corner-shape: round;
+      }
+
+      @utility rounded-* {
+        border-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-t-* {
+        border-top-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-top-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-r-* {
+        border-top-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-bottom-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-b-* {
+        border-bottom-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-bottom-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-l-* {
+        border-top-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-bottom-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-tl-* {
+        border-top-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-tr-* {
+        border-top-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-bl-* {
+        border-bottom-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-br-* {
+        border-bottom-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-s-* {
+        border-start-start-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-end-start-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-e-* {
+        border-start-end-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-end-end-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-ss-* {
+        border-start-start-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-se-* {
+        border-start-end-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-es-* {
+        border-end-start-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-ee-* {
+        border-end-end-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+
+      :root {
+        --shape: squircle;
+        --shape-multiplier: 1;
+
+        --background: #343e48;
+        --foreground: #ffffff;
+        --primary: #f78c26;
+        --primary-foreground: #ffffff;
+        --secondary: #46515d;
+        --secondary-foreground: #ffffff;
+        --muted: #56616d;
+        --muted-foreground: #b9c1c8;
+        --accent: #f78c26;
+        --accent-foreground: #ffffff;
+        --destructive: #d9534f;
+        --card: #3d4853;
+        --card-foreground: #ffffff;
+        --popover: #2d363f;
+        --popover-foreground: #ffffff;
+        --border: #71808d;
+        --input: #2f3943;
+        --ring: #f78c26;
+        --chart-1: #f78c26;
+        --chart-2: #ffffff;
+        --chart-3: #8fa1ae;
+        --chart-4: #5e7180;
+        --chart-5: #d96f18;
+
+        --font-sans: "Montserrat";
+        --font-heading: "Montserrat";
+        --font-serif: "Playfair Display";
+        --font-mono: "JetBrains Mono";
+
+        --radius: 0.75rem;
+      }
+
+      @supports (corner-shape: squircle) {
+        :root {
+          --shape-multiplier: 2.5;
+        }
+      }
+
+      /* Prevent layout shift for icons without explicit dimensions */
+      iconify-icon:not([width]):not([height]) {
+        display: inline-block;
+        width: 1em;
+        height: 1em;
+      }
+
+      /* Hide scrollbars */
+      *,
+      *::before,
+      *::after {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      *::-webkit-scrollbar {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main
+      style="font-family: var(--font-sans)"
+      class="min-h-screen bg-background text-foreground pb-28"
+    >
+      <header
+        class="sticky top-0 z-30 flex items-center justify-between border-b border-border/50 bg-background/95 px-5 py-4 backdrop-blur"
+      >
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            class="flex size-9 items-center justify-center rounded-lg border border-border/70 bg-card text-foreground"
+            aria-label="Go back"
+          >
+            <iconify-icon icon="solar:arrow-left-linear" width="20" height="20"></iconify-icon>
+          </button>
+          <div>
+            <span class="text-[10px] uppercase tracking-wider text-muted-foreground"
+              >Task #CS-8924</span
+            >
+            <h1 class="font-heading text-base font-bold leading-none">Task Details</h1>
+          </div>
+        </div>
+        <span
+          class="inline-flex items-center gap-1.5 rounded-md bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary"
+          ><span class="size-1.5 rounded-full bg-primary animate-pulse"></span>In Progress</span
+        >
+      </header>
+      <div class="relative h-44 w-full overflow-hidden border-b border-border/60 bg-card">
+        <img
+          alt="Client location map"
+          src="https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/IMizAOZdqWe/components/F1a5Hg5FHtB.jpeg"
+          class="h-full w-full object-cover opacity-85"
+        />
+        <div
+          class="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent"
+        ></div>
+        <div
+          class="absolute bottom-3 left-4 right-4 flex items-center justify-between rounded-xl border border-border/60 bg-background/90 px-3.5 py-2 backdrop-blur"
+        >
+          <div class="flex items-center gap-2">
+            <iconify-icon
+              icon="solar:map-point-wave-bold"
+              class="text-primary"
+              width="20"
+              height="20"
+            ></iconify-icon
+            ><span class="text-xs font-medium text-foreground">4480 Ocean Boulevard, Suite 12</span>
+          </div>
+          <button type="button" class="flex items-center gap-1 text-xs font-bold text-primary">
+            <span>Directions</span
+            ><iconify-icon
+              icon="solar:square-top-down-linear"
+              width="16"
+              height="16"
+            ></iconify-icon>
+          </button>
+        </div>
+      </div>
+      <div class="space-y-6 px-5 pt-5">
+        <section class="rounded-2xl border border-border/70 bg-card p-5">
+          <div class="flex items-start justify-between">
+            <div>
+              <span class="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary"
+                >Luxury Residential</span
+              >
+              <h2 class="font-heading text-xl font-bold text-foreground mt-1">
+                Crestron Lighting Control Commissioning
+              </h2>
+            </div>
+          </div>
+          <div class="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-4">
+            <div>
+              <span class="block text-[10px] uppercase tracking-wider text-muted-foreground"
+                >Client Name</span
+              ><span class="mt-0.5 text-sm font-semibold text-foreground"
+                >Villa Serena Residence</span
+              >
+            </div>
+            <div>
+              <span class="block text-[10px] uppercase tracking-wider text-muted-foreground"
+                >Contact Person</span
+              ><span class="mt-0.5 text-sm font-semibold text-foreground"
+                >Marcus Vance (Estate Mgr)</span
+              >
+            </div>
+            <div>
+              <span class="block text-[10px] uppercase tracking-wider text-muted-foreground"
+                >Scheduled Window</span
+              ><span class="mt-0.5 text-sm font-semibold text-foreground">10:00 AM â 01:30 PM</span>
+            </div>
+            <div>
+              <span class="block text-[10px] uppercase tracking-wider text-muted-foreground"
+                >Gate Code</span
+              ><span class="mt-0.5 font-mono text-sm font-semibold text-primary">#4819</span>
+            </div>
+          </div>
+        </section>
+        <section class="rounded-2xl border border-border/70 bg-card p-5">
+          <h3
+            class="font-heading text-sm font-bold uppercase tracking-[0.1em] text-muted-foreground mb-3 flex items-center gap-2"
+          >
+            <iconify-icon
+              icon="solar:document-text-linear"
+              class="text-primary"
+              width="16"
+              height="16"
+            ></iconify-icon
+            >Scope &amp; Instructions
+          </h3>
+          <p class="text-sm leading-relaxed text-card-foreground">
+            Perform comprehensive firmware flash on the Horizon keypad matrix across main living
+            areas. Pair the Lutron shade integration module with the master Crestron 4-Series
+            control processor. Verify architectural night-scene recall on all 6 zones.
+          </p>
+        </section>
+        <section class="rounded-2xl border border-border/70 bg-card p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h3
+              class="font-heading text-sm font-bold uppercase tracking-[0.1em] text-muted-foreground flex items-center gap-2"
+            >
+              <iconify-icon
+                icon="solar:box-minimalistic-linear"
+                class="text-primary"
+                width="16"
+                height="16"
+              ></iconify-icon
+              >Materials &amp; Hardware
+            </h3>
+            <span class="text-xs font-semibold text-primary">4 Items assigned</span>
+          </div>
+          <ul class="divide-y divide-border/60 text-sm">
+            <li class="py-2.5 flex items-center justify-between">
+              <div>
+                <div class="font-semibold text-foreground">Crestron DIN-4DIMFLV4</div>
+                <div class="text-[11px] text-muted-foreground">4-channel 0-10V dimming module</div>
+              </div>
+              <span class="rounded-md bg-secondary px-2 py-1 text-xs font-mono font-medium"
+                >Qty: 2</span
+              >
+            </li>
+            <li class="py-2.5 flex items-center justify-between">
+              <div>
+                <div class="font-semibold text-foreground">CAT6A Shielded Patch Cables</div>
+                <div class="text-[11px] text-muted-foreground">1.5m molded slim profile</div>
+              </div>
+              <span class="rounded-md bg-secondary px-2 py-1 text-xs font-mono font-medium"
+                >Qty: 6</span
+              >
+            </li>
+            <li class="py-2.5 flex items-center justify-between">
+              <div>
+                <div class="font-semibold text-foreground">Horizon Keypad Faceplates</div>
+                <div class="text-[11px] text-muted-foreground">Brushed bronze finish</div>
+              </div>
+              <span class="rounded-md bg-secondary px-2 py-1 text-xs font-mono font-medium"
+                >Qty: 4</span
+              >
+            </li>
+            <li class="py-2.5 flex items-center justify-between">
+              <div>
+                <div class="font-semibold text-foreground">12V DC Din-Rail Power Supply</div>
+                <div class="text-[11px] text-muted-foreground">Ultra-quiet linear regulator</div>
+              </div>
+              <span class="rounded-md bg-secondary px-2 py-1 text-xs font-mono font-medium"
+                >Qty: 1</span
+              >
+            </li>
+          </ul>
+        </section>
+      </div>
+      <div
+        class="fixed bottom-0 left-0 right-0 z-40 border-t border-border/60 bg-background/95 p-4 backdrop-blur"
+      >
+        <button
+          type="button"
+          class="flex h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-primary font-heading text-base font-bold tracking-wide text-primary-foreground shadow-xl shadow-primary/25 transition-transform active:scale-[0.99]"
+        >
+          <iconify-icon icon="solar:camera-bold" width="20" height="20"></iconify-icon>Start On-Site
+          Check-In
+        </button>
+      </div>
+    </main>
+  </body>
+</html>
