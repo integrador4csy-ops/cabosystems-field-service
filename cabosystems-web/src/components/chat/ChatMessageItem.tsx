@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Smile,
   Trash2,
@@ -27,6 +27,8 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   onDeleteMessage,
 }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+
   const isMe = message.remitente_id === currentUserId;
   const canDelete = isMe || isGlobalAdmin;
 
@@ -46,6 +48,18 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
     minute: '2-digit',
   });
 
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showEmojiPicker]);
+
   // Aggregate reactions by emoji
   const reactionCounts: { [emoji: string]: { count: number; hasMe: boolean; names: string[] } } = {};
   (message.reacciones || []).forEach((r) => {
@@ -63,11 +77,11 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
 
   return (
     <div
-      className={`group relative flex gap-2.5 my-2.5 transition-all ${
+      className={`group relative flex gap-2.5 my-3 transition-all ${
         isMe ? 'flex-row-reverse' : 'flex-row'
       }`}
     >
-      {/* Avatar (for incoming messages or me) */}
+      {/* Avatar (for incoming messages) */}
       {!isMe ? (
         <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-orange-100 text-[#f78c26] text-xs font-bold shrink-0 overflow-hidden mt-1 shadow-2xs">
           {senderProfile?.avatar_url ? (
@@ -83,7 +97,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
       ) : null}
 
       {/* Message Bubble Container */}
-      <div className={`flex flex-col max-w-[78%] sm:max-w-[70%] md:max-w-[62%] ${isMe ? 'items-end' : 'items-start'}`}>
+      <div className={`flex flex-col max-w-[82%] sm:max-w-[72%] md:max-w-[64%] relative ${isMe ? 'items-end' : 'items-start'}`}>
         {/* Sender Name & Role (only for other users) */}
         {!isMe && (
           <div className="flex items-center gap-1.5 mb-1 px-1">
@@ -96,27 +110,32 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
           </div>
         )}
 
-        {/* Bubble Body */}
-        <div className="relative group/bubble">
-          {/* Action Toolbar on Hover */}
+        {/* Bubble Body with Action Toolbar attached at top edge */}
+        <div className="relative">
+          {/* Action Toolbar on Hover (attached directly on top border of bubble) */}
           <div
-            className={`absolute top-0 -translate-y-1/2 z-10 hidden group-hover/bubble:flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-md ${
-              isMe ? 'right-full mr-2' : 'left-full ml-2'
-            }`}
+            ref={toolbarRef}
+            className={`absolute -top-3.5 z-20 items-center gap-1 rounded-full border border-slate-200 bg-white p-0.5 shadow-md transition-all ${
+              isMe ? 'right-2' : 'left-2'
+            } ${showEmojiPicker ? 'flex opacity-100 pointer-events-auto' : 'hidden group-hover:flex'}`}
           >
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:text-[#f78c26] hover:bg-orange-50 transition-colors"
-                title="Reaccionar"
+                className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:text-[#f78c26] hover:bg-orange-50 transition-colors cursor-pointer"
+                title="Reaccionar con emoji"
               >
-                <Smile size={13} />
+                <Smile size={14} />
               </button>
 
               {/* Emoji Picker Popup */}
               {showEmojiPicker && (
-                <div className="absolute bottom-full mb-1 flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1.5 shadow-xl z-20 animate-in fade-in zoom-in-95 duration-100">
+                <div
+                  className={`absolute bottom-full mb-1.5 z-30 flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-150 ${
+                    isMe ? 'right-0' : 'left-0'
+                  }`}
+                >
                   {QUICK_EMOJIS.map((emoji) => (
                     <button
                       key={emoji}
@@ -126,6 +145,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                         setShowEmojiPicker(false);
                       }}
                       className="flex h-7 w-7 items-center justify-center rounded-full text-sm hover:scale-125 hover:bg-slate-100 transition-all cursor-pointer"
+                      title={emoji}
                     >
                       {emoji}
                     </button>
@@ -138,10 +158,10 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
               <button
                 type="button"
                 onClick={() => onDeleteMessage(message.id)}
-                className="flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                className="flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                 title="Eliminar mensaje"
               >
-                <Trash2 size={12} />
+                <Trash2 size={13} />
               </button>
             )}
           </div>
