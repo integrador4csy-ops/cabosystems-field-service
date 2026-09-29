@@ -77,7 +77,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
 
   return (
     <div
-      className={`group/msg relative flex gap-2 my-2.5 items-end transition-all ${
+      className={`group/msg relative flex gap-2.5 my-3 items-end transition-all ${
         isMe ? 'flex-row-reverse' : 'flex-row'
       }`}
     >
@@ -96,8 +96,8 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
         </div>
       ) : null}
 
-      {/* Message Bubble Container (Bubble + Sender + Time) */}
-      <div className={`flex flex-col max-w-[78%] sm:max-w-[70%] md:max-w-[62%] ${isMe ? 'items-end' : 'items-start'}`}>
+      {/* Message Bubble Container */}
+      <div className={`flex flex-col max-w-[80%] sm:max-w-[72%] md:max-w-[64%] relative ${isMe ? 'items-end' : 'items-start'}`}>
         {/* Sender Name & Role (only for other users) */}
         {!isMe && (
           <div className="flex items-center gap-1.5 mb-1 px-1">
@@ -110,8 +110,62 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
           </div>
         )}
 
-        {/* Bubble Body */}
+        {/* Bubble Body with Action Toolbar in corner */}
         <div className="relative">
+          {/* Action Toolbar on Hover (anchored on the corner sticking out away from timestamp) */}
+          <div
+            ref={toolbarRef}
+            className={`absolute -bottom-3 z-20 items-center gap-1 rounded-full border border-slate-200 bg-white p-0.5 shadow-md transition-all ${
+              isMe ? '-left-3' : '-right-3'
+            } ${showEmojiPicker ? 'flex opacity-100 pointer-events-auto' : 'hidden group-hover/msg:flex'}`}
+          >
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:text-[#f78c26] hover:bg-orange-50 transition-colors cursor-pointer"
+                title="Reaccionar con emoji"
+              >
+                <Smile size={14} />
+              </button>
+
+              {/* Emoji Picker Popup */}
+              {showEmojiPicker && (
+                <div
+                  className={`absolute bottom-full mb-1.5 z-30 flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-150 ${
+                    isMe ? 'left-0' : 'right-0'
+                  }`}
+                >
+                  {QUICK_EMOJIS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => {
+                        onToggleReaction(message.id, emoji);
+                        setShowEmojiPicker(false);
+                      }}
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-sm hover:scale-125 hover:bg-slate-100 transition-all cursor-pointer"
+                      title={emoji}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {canDelete && (
+              <button
+                type="button"
+                onClick={() => onDeleteMessage(message.id)}
+                className="flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                title="Eliminar mensaje"
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
+          </div>
+
           {/* Type: Image */}
           {message.tipo === 'imagen' && message.media_url && (
             <div
@@ -202,64 +256,6 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
             ))}
           </div>
         )}
-      </div>
-
-      {/* Action Toolbar: Placed directly beside the message bubble (to the left for own messages, to the right for others) with ZERO overlap */}
-      <div
-        ref={toolbarRef}
-        className={`relative self-center shrink-0 mb-4 transition-all duration-150 ${
-          showEmojiPicker
-            ? 'opacity-100 pointer-events-auto'
-            : 'opacity-0 pointer-events-none group-hover/msg:opacity-100 group-hover/msg:pointer-events-auto'
-        }`}
-      >
-        <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-md">
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="flex h-7 w-7 items-center justify-center rounded-full text-slate-500 hover:text-[#f78c26] hover:bg-orange-50 transition-colors cursor-pointer"
-              title="Reaccionar con emoji"
-            >
-              <Smile size={15} />
-            </button>
-
-            {/* Emoji Picker Popup */}
-            {showEmojiPicker && (
-              <div
-                className={`absolute bottom-full mb-2 z-30 flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-150 ${
-                  isMe ? 'right-0' : 'left-0'
-                }`}
-              >
-                {QUICK_EMOJIS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    type="button"
-                    onClick={() => {
-                      onToggleReaction(message.id, emoji);
-                      setShowEmojiPicker(false);
-                    }}
-                    className="flex h-7 w-7 items-center justify-center rounded-full text-sm hover:scale-125 hover:bg-slate-100 transition-all cursor-pointer"
-                    title={emoji}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {canDelete && (
-            <button
-              type="button"
-              onClick={() => onDeleteMessage(message.id)}
-              className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-              title="Eliminar mensaje"
-            >
-              <Trash2 size={14} />
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );
