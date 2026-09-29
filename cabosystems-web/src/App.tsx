@@ -10,10 +10,11 @@ import { InviteUserModal } from './components/modals/InviteUserModal';
 import { AdminLoginModal } from './components/modals/AdminLoginModal';
 import { AdminEditProfileModal } from './components/modals/AdminEditProfileModal';
 import { SidebarProvider, useSidebar } from './context/SidebarContext';
-import { AdminAuthProvider } from './context/AdminAuthContext';
+import { AdminAuthProvider, useAdminAuth } from './context/AdminAuthContext';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { AppHeader } from './components/layout/AppHeader';
 import { ChatView } from './components/chat/ChatView';
+import { AuthSplitScreen } from './components/auth/AuthSplitScreen';
 
 function DashboardContent() {
   const { activeItem } = useSidebar();
@@ -250,12 +251,39 @@ function DashboardContent() {
   );
 }
 
+function AppContent() {
+  const { user, loading } = useAdminAuth();
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-3">
+          <img
+            src="/logo-cabosystems-icon.svg"
+            alt="CaboSystems"
+            className="h-12 w-12 animate-pulse object-contain"
+          />
+          <span className="text-xs font-bold text-slate-400">Cargando CaboSystems...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthSplitScreen />;
+  }
+
+  return (
+    <SidebarProvider>
+      <DashboardContent />
+    </SidebarProvider>
+  );
+}
+
 export function App() {
   return (
     <AdminAuthProvider>
-      <SidebarProvider>
-        <DashboardContent />
-      </SidebarProvider>
+      <AppContent />
     </AdminAuthProvider>
   );
 }
