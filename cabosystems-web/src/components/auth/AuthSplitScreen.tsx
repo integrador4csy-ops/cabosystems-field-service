@@ -38,7 +38,7 @@ export const AuthSplitScreen: React.FC = () => {
     <div className="relative min-h-screen w-screen bg-white font-sans text-slate-800 antialiased overflow-hidden flex">
       {/* 1. Left Column: Sign In Form (TailAdmin Style) */}
       <div className="flex w-full lg:w-1/2 flex-col justify-between p-6 sm:p-12 lg:p-16 z-10 overflow-y-auto">
-        {/* Top: Mobile Logo & Header */}
+        {/* Top: Header Brand */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <img
@@ -57,9 +57,9 @@ export const AuthSplitScreen: React.FC = () => {
           <div className="mb-8">
             <div className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 mb-3">
               <ShieldCheck size={14} className="text-[#f78c26]" />
-              <span>Acceso Administrativo</span>
+              <span className="font-heading">Acceso Administrativo</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#343e48] tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-heading font-extrabold text-[#343e48] tracking-tight">
               Iniciar Sesión
             </h1>
             <p className="mt-2 text-xs sm:text-sm text-slate-500 font-medium leading-relaxed">
@@ -68,7 +68,7 @@ export const AuthSplitScreen: React.FC = () => {
           </div>
 
           {errorMsg && (
-            <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-xs font-semibold text-rose-700 animate-in fade-in slide-in-from-top-2 duration-150">
+            <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-xs font-semibold text-rose-700 animate-in fade-in slide-from-top-2 duration-150">
               <p className="font-bold">Error de acceso</p>
               <p className="mt-0.5 text-rose-600 font-medium">{errorMsg}</p>
             </div>
@@ -120,7 +120,7 @@ export const AuthSplitScreen: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                   title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -174,18 +174,18 @@ export const AuthSplitScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Right Column: TailAdmin Dark Branding & Hero Grid (50% Split) */}
-      <div className="hidden lg:flex w-1/2 h-full bg-[#1a2232] relative flex-col items-center justify-center p-12 text-white select-none overflow-hidden">
+      {/* 2. Right Column: CaboSystems Orange Branding & Hero Grid (50% Split) */}
+      <div className="hidden lg:flex w-1/2 h-full bg-gradient-to-br from-[#f78c26] via-[#f78c26] to-[#ea580c] relative flex-col items-center justify-center p-12 text-white select-none overflow-hidden">
         {/* SVG Decorative Background Grids */}
         <GridShape />
 
-        {/* Ambient Glow */}
-        <div className="absolute h-96 w-96 rounded-full bg-[#f78c26]/10 blur-3xl pointer-events-none" />
+        {/* Subtle Ambient Radial Glow */}
+        <div className="absolute h-96 w-96 rounded-full bg-white/10 blur-3xl pointer-events-none" />
 
         {/* Hero Content Container */}
         <div className="relative z-10 max-w-md text-center flex flex-col items-center">
-          {/* Official Big Logo */}
-          <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-3xl bg-white/10 border border-white/15 p-4 backdrop-blur-md shadow-2xl">
+          {/* White Card holding the Official Logo */}
+          <div className="mb-6 flex h-28 w-28 items-center justify-center rounded-3xl bg-white shadow-2xl p-5 border border-white/40 ring-4 ring-white/20 transition-transform duration-300 hover:scale-105">
             <img
               src="/logo-cabosystems-icon.svg"
               alt="CaboSystems"
@@ -193,27 +193,29 @@ export const AuthSplitScreen: React.FC = () => {
             />
           </div>
 
-          <h2 className="text-2xl font-extrabold text-white tracking-tight">
+          {/* Title in Montserrat */}
+          <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-white tracking-tight drop-shadow-xs">
             CaboSystems Field Service
           </h2>
 
-          <p className="mt-3 text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
+          {/* Subtitle */}
+          <p className="mt-3 text-xs sm:text-sm text-white/95 font-medium leading-relaxed drop-shadow-2xs">
             Plataforma centralizada de telemetría satelital en vivo, radar de cuadrillas y comunicación técnica en tiempo real.
           </p>
 
           {/* Feature Badges */}
           <div className="mt-8 grid grid-cols-3 gap-3 w-full">
-            <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-xs">
-              <Radio size={18} className="text-[#f78c26]" />
-              <span className="text-[11px] font-bold text-slate-200">Radar GPS</span>
+            <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/25 bg-white/15 p-3 backdrop-blur-md shadow-xs hover:bg-white/20 transition-all">
+              <Radio size={20} className="text-white" />
+              <span className="text-[11px] font-bold text-white">Radar GPS</span>
             </div>
-            <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-xs">
-              <MessageSquare size={18} className="text-[#f78c26]" />
-              <span className="text-[11px] font-bold text-slate-200">Chat Técnico</span>
+            <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/25 bg-white/15 p-3 backdrop-blur-md shadow-xs hover:bg-white/20 transition-all">
+              <MessageSquare size={20} className="text-white" />
+              <span className="text-[11px] font-bold text-white">Chat Técnico</span>
             </div>
-            <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-xs">
-              <MapPin size={18} className="text-[#f78c26]" />
-              <span className="text-[11px] font-bold text-slate-200">En Tiempo Real</span>
+            <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/25 bg-white/15 p-3 backdrop-blur-md shadow-xs hover:bg-white/20 transition-all">
+              <MapPin size={20} className="text-white" />
+              <span className="text-[11px] font-bold text-white">En Tiempo Real</span>
             </div>
           </div>
         </div>

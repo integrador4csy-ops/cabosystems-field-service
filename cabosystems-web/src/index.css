@@ -3,6 +3,7 @@
 
 @theme {
   --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-heading: 'Montserrat', 'Outfit', sans-serif;
 
   --breakpoint-2xsm: 375px;
   --breakpoint-xsm: 425px;
