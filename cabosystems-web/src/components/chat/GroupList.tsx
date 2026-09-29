@@ -89,7 +89,7 @@ export const GroupList: React.FC<GroupListProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full w-full md:w-80 lg:w-96 border-r border-slate-200 bg-white select-none shrink-0">
+    <div className="flex flex-col h-full w-full bg-white select-none">
       {/* 1. Header with Title & Action Button */}
       <div className="p-4 border-b border-slate-100 flex items-center justify-between">
         <div>

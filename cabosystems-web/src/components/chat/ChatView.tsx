@@ -74,52 +74,56 @@ export const ChatView: React.FC = () => {
   const selectedGroup = groups.find((g) => g.id === selectedGroupId) || null;
 
   return (
-    <div className="flex h-full w-full rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-      {/* 1. Left Sidebar: Group Conversations List */}
-      <GroupList
-        groups={groups}
-        selectedGroupId={selectedGroupId}
-        onSelectGroup={setSelectedGroupId}
-        onOpenCreateGroup={() => setIsCreateModalOpen(true)}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        isGlobalAdmin={isGlobalAdmin}
-        loading={loading}
-      />
-
-      {/* 2. Main Area: Active Chat Conversation or Empty Welcome State */}
-      {selectedGroup ? (
-        <ChatConversation
-          key={selectedGroup.id}
-          group={selectedGroup}
-          currentUserId={currentUserId}
+    <div className="flex h-full w-full gap-3.5 lg:gap-4.5 overflow-hidden">
+      {/* 1. Left Card: Group Conversations List (Standalone Floating Card) */}
+      <div className="w-80 lg:w-96 shrink-0 h-full rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden flex flex-col">
+        <GroupList
+          groups={groups}
+          selectedGroupId={selectedGroupId}
+          onSelectGroup={setSelectedGroupId}
+          onOpenCreateGroup={() => setIsCreateModalOpen(true)}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
           isGlobalAdmin={isGlobalAdmin}
-          onOpenInfo={() => setIsInfoDrawerOpen(true)}
-          onGroupChanged={loadGroups}
+          loading={loading}
         />
-      ) : (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50/50">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-[#f78c26] mb-4 shadow-xs">
-            <MessageSquare size={32} />
+      </div>
+
+      {/* 2. Right Card: Active Chat Conversation (Standalone Floating Card) */}
+      <div className="flex-1 min-w-0 h-full rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden flex flex-col">
+        {selectedGroup ? (
+          <ChatConversation
+            key={selectedGroup.id}
+            group={selectedGroup}
+            currentUserId={currentUserId}
+            isGlobalAdmin={isGlobalAdmin}
+            onOpenInfo={() => setIsInfoDrawerOpen(true)}
+            onGroupChanged={loadGroups}
+          />
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50/50">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-[#f78c26] mb-4 shadow-xs">
+              <MessageSquare size={32} />
+            </div>
+            <h3 className="text-base font-bold text-[#343e48]">
+              Chat Grupal CaboSystems
+            </h3>
+            <p className="mt-1.5 text-xs text-slate-500 max-w-sm leading-relaxed">
+              Selecciona un grupo de trabajo en la columna izquierda o crea uno nuevo para coordinar instalaciones, compartir evidencias fotográficas y videos técnicos con el equipo de campo.
+            </p>
+            {isGlobalAdmin && (
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(true)}
+                className="mt-5 flex items-center gap-2 rounded-xl bg-[#f78c26] hover:bg-[#ea580c] px-4 py-2.5 text-xs font-bold text-white shadow-xs transition-all cursor-pointer"
+              >
+                <Plus size={15} strokeWidth={2.5} />
+                <span>Crear Primer Grupo</span>
+              </button>
+            )}
           </div>
-          <h3 className="text-base font-bold text-[#343e48]">
-            Chat Grupal CaboSystems
-          </h3>
-          <p className="mt-1.5 text-xs text-slate-500 max-w-sm leading-relaxed">
-            Selecciona un grupo de trabajo en la columna izquierda o crea uno nuevo para coordinar instalaciones, compartir evidencias fotográficas y videos técnicos con el equipo de campo.
-          </p>
-          {isGlobalAdmin && (
-            <button
-              type="button"
-              onClick={() => setIsCreateModalOpen(true)}
-              className="mt-5 flex items-center gap-2 rounded-xl bg-[#f78c26] hover:bg-[#ea580c] px-4 py-2.5 text-xs font-bold text-white shadow-xs transition-all cursor-pointer"
-            >
-              <Plus size={15} strokeWidth={2.5} />
-              <span>Crear Primer Grupo</span>
-            </button>
-          )}
-        </div>
-      )}
+        )}
+      </div>
 
       {/* 3. Create Group Modal */}
       <CreateGroupModal
