@@ -112,11 +112,11 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
 
         {/* Bubble Body with Action Toolbar in corner */}
         <div className="relative">
-          {/* Action Toolbar on Hover (anchored on the corner sticking out away from timestamp) */}
+          {/* Action Toolbar on Hover (anchored slightly further down and outward on the corner) */}
           <div
             ref={toolbarRef}
-            className={`absolute -bottom-3 z-20 items-center gap-1 rounded-full border border-slate-200 bg-white p-0.5 shadow-md transition-all ${
-              isMe ? '-left-3' : '-right-3'
+            className={`absolute -bottom-5 z-20 items-center gap-1 rounded-full border border-slate-200 bg-white p-0.5 shadow-md transition-all ${
+              isMe ? '-left-6' : '-right-6'
             } ${showEmojiPicker ? 'flex opacity-100 pointer-events-auto' : 'hidden group-hover/msg:flex'}`}
           >
             <div className="relative">
