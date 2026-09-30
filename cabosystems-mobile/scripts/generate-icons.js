@@ -62,34 +62,34 @@ async function createIcons() {
   }
 
   // Generate full unified CaboSystems Field Service Logos
-  const fullSvgWhite = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 160" width="1000" height="320">
+  const fullSvgWhite = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 168" width="1000" height="336">
   <defs>
     <style>
       .cls-1{fill:#FFFFFF;fill-rule:evenodd;}
       .cls-2{fill:#f78c26;fill-rule:evenodd;}
-      .st-text{font-family:'Montserrat',sans-serif,Arial;font-weight:800;font-size:22px;fill:#f78c26;letter-spacing:6px;}
+      .st-text{font-family:'Montserrat',sans-serif,Arial;font-weight:800;font-size:26px;fill:#f78c26;letter-spacing:8px;}
     </style>
   </defs>
-  <g transform="translate(11.2, 10)">
+  <g transform="translate(11.2, 8)">
     ${paths}
   </g>
-  <text x="250" y="146" text-anchor="middle" class="st-text">FIELD SERVICE</text>
+  <text x="250" y="153" text-anchor="middle" class="st-text">FIELD SERVICE</text>
 </svg>`;
 
   const pathsDark = paths
     .replace(/class="cls-1"/g, 'style="fill:#161c22;fill-rule:evenodd;"')
     .replace(/class="cls-2"/g, 'style="fill:#f78c26;fill-rule:evenodd;"');
 
-  const fullSvgDark = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 160" width="1000" height="320">
+  const fullSvgDark = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 168" width="1000" height="336">
   <defs>
     <style>
-      .st-text{font-family:'Montserrat',sans-serif,Arial;font-weight:800;font-size:22px;fill:#f78c26;letter-spacing:6px;}
+      .st-text{font-family:'Montserrat',sans-serif,Arial;font-weight:800;font-size:26px;fill:#f78c26;letter-spacing:8px;}
     </style>
   </defs>
-  <g transform="translate(11.2, 10)">
+  <g transform="translate(11.2, 8)">
     ${pathsDark}
   </g>
-  <text x="250" y="146" text-anchor="middle" class="st-text">FIELD SERVICE</text>
+  <text x="250" y="153" text-anchor="middle" class="st-text">FIELD SERVICE</text>
 </svg>`;
 
   fs.writeFileSync('./assets/images/Logo-CaboSystems-Field-Service-White.svg', fullSvgWhite, 'utf8');

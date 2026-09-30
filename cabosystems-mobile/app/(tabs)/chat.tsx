@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,10 @@ import {
   TextInput,
   ActivityIndicator,
   RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import {
   Search,
@@ -20,27 +20,70 @@ import {
   Users,
   Video,
   Shield,
-  Clock,
   Sparkles,
   Camera,
+  ChevronRight,
+  X,
 } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius } from '@/constants/Theme';
+import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { useAuth } from '@/lib/auth';
 import { getMyChatGroups } from '@/lib/chatApi';
 import type { ChatGroup } from '@/types/database';
 
+const LOGO_DARK = require('@/assets/images/Logo-CaboSystems-Field-Service-Dark.png');
+
+function getInitials(name: string): string {
+  if (!name) return 'CS';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+function formatChatTime(dateString: string): string {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const now = new Date();
+  const isToday =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  if (isToday) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday =
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear();
+
+  if (isYesterday) {
+    return 'Ayer';
+  }
+
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+type ChatFilter = 'todos' | 'recientes' | 'evidencias';
+
 export default function ChatTabScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
   const { profile } = useAuth();
 
   const [groups, setGroups] = useState<ChatGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState<ChatFilter>('todos');
 
   const isGlobalAdmin =
-    profile?.rol === 'admin' || profile?.rol === 'supervisor_instalacion';
+    profile?.rol === 'admin' ||
+    profile?.rol === 'supervisor_instalacion' ||
+    profile?.rol === 'aux_operaciones';
 
   const loadGroups = async () => {
     if (!profile?.id) return;
@@ -66,20 +109,59 @@ export default function ChatTabScreen() {
     loadGroups();
   };
 
-  const filteredGroups = groups.filter((g) => {
-    const q = searchQuery.toLowerCase();
-    return (
-      g.nombre.toLowerCase().includes(q) ||
-      (g.descripcion && g.descripcion.toLowerCase().includes(q))
-    );
-  });
+  // Conteo para las cápsulas de filtro
+  const stats = useMemo(() => {
+    const recientes = groups.filter((g) => !!g.ultimo_mensaje).length;
+    const evidencias = groups.filter(
+      (g) =>
+        g.solo_multimedia ||
+        g.ultimo_mensaje?.tipo === 'imagen' ||
+        g.ultimo_mensaje?.tipo === 'video'
+    ).length;
+    return {
+      todos: groups.length,
+      recientes,
+      evidencias,
+    };
+  }, [groups]);
+
+  // Lista filtrada
+  const filteredGroups = useMemo(() => {
+    return groups.filter((g) => {
+      // 1. Filtro por buscador
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesName = g.nombre.toLowerCase().includes(q);
+        const matchesDesc = g.descripcion && g.descripcion.toLowerCase().includes(q);
+        const matchesLastMsg =
+          g.ultimo_mensaje?.contenido &&
+          g.ultimo_mensaje.contenido.toLowerCase().includes(q);
+        if (!matchesName && !matchesDesc && !matchesLastMsg) {
+          return false;
+        }
+      }
+
+      // 2. Filtro por cápsula activa
+      if (filter === 'recientes') {
+        return !!g.ultimo_mensaje;
+      }
+      if (filter === 'evidencias') {
+        return (
+          g.solo_multimedia ||
+          g.ultimo_mensaje?.tipo === 'imagen' ||
+          g.ultimo_mensaje?.tipo === 'video'
+        );
+      }
+      return true;
+    });
+  }, [groups, searchQuery, filter]);
 
   const renderLastMessagePreview = (group: ChatGroup) => {
     const lastMsg = group.ultimo_mensaje;
     if (!lastMsg) {
       return (
         <Text style={styles.emptyMsgText} numberOfLines={1}>
-          Sin mensajes aún · ¡Comienza la conversación!
+          Sin mensajes aún · Toca para abrir
         </Text>
       );
     }
@@ -89,7 +171,7 @@ export default function ChatTabScreen() {
     if (lastMsg.tipo === 'imagen') {
       return (
         <View style={styles.mediaPreviewRow}>
-          <Camera size={13} color={Colors.primary} />
+          <Camera size={13} color={Colors.primary} strokeWidth={2.2} />
           <Text style={styles.mediaPreviewText} numberOfLines={1}>
             {sender}: Foto de evidencia
           </Text>
@@ -100,7 +182,7 @@ export default function ChatTabScreen() {
     if (lastMsg.tipo === 'video') {
       return (
         <View style={styles.mediaPreviewRow}>
-          <Video size={13} color={Colors.primary} />
+          <Video size={13} color={Colors.primary} strokeWidth={2.2} />
           <Text style={styles.mediaPreviewText} numberOfLines={1}>
             {sender}: Video técnico
           </Text>
@@ -111,9 +193,9 @@ export default function ChatTabScreen() {
     if (lastMsg.tipo === 'sticker') {
       return (
         <View style={styles.mediaPreviewRow}>
-          <Sparkles size={13} color={Colors.primary} />
+          <Sparkles size={13} color={Colors.primary} strokeWidth={2.2} />
           <Text style={styles.mediaPreviewText} numberOfLines={1}>
-            {sender}: Sticker de WhatsApp
+            {sender}: Sticker
           </Text>
         </View>
       );
@@ -129,34 +211,35 @@ export default function ChatTabScreen() {
 
   const renderGroupItem = ({ item }: { item: ChatGroup }) => {
     const lastMsgTime = item.ultimo_mensaje
-      ? new Date(item.ultimo_mensaje.created_at).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        })
+      ? formatChatTime(item.ultimo_mensaje.created_at)
       : '';
 
     const isAdminOfGroup = item.mi_rol === 'admin';
+    const initials = getInitials(item.nombre);
 
     return (
       <Pressable
-        style={({ pressed }) => [styles.groupCard, pressed && { opacity: 0.85 }]}
+        style={({ pressed }) => [styles.groupCard, pressed && styles.groupCardPressed]}
         onPress={() => router.push(`/chat/${item.id}` as any)}
       >
         {/* Avatar */}
         <View style={styles.avatarWrapper}>
           {item.foto_url ? (
-            <Image source={{ uri: item.foto_url }} style={styles.avatarImage} contentFit="cover" />
+            <Image
+              source={{ uri: item.foto_url }}
+              style={styles.avatarImage}
+              contentFit="cover"
+              transition={200}
+            />
           ) : (
             <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarLetter}>
-                {item.nombre.charAt(0).toUpperCase()}
-              </Text>
+              <Text style={styles.avatarInitials}>{initials}</Text>
             </View>
           )}
 
           {isAdminOfGroup && (
             <View style={styles.adminMiniBadge}>
-              <Shield size={10} color="#ffffff" />
+              <Shield size={9} color="#FFFFFF" strokeWidth={2.4} />
             </View>
           )}
         </View>
@@ -170,18 +253,25 @@ export default function ChatTabScreen() {
             {!!lastMsgTime && <Text style={styles.timeText}>{lastMsgTime}</Text>}
           </View>
 
-          {/* Badges de atributos */}
+          {/* Badges de Atributos */}
           <View style={styles.badgesRow}>
-            {item.solo_multimedia && (
+            {item.solo_multimedia ? (
               <View style={styles.multimediaBadge}>
-                <Video size={10} color={Colors.primary} />
-                <Text style={styles.multimediaBadgeText}>Solo Multimedia</Text>
+                <Camera size={10.5} color={Colors.primary} strokeWidth={2.2} />
+                <Text style={styles.multimediaBadgeText}>Evidencias</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.membersCountBadge}>
+              <Users size={10.5} color={Colors.textSecondary} strokeWidth={2} />
+              <Text style={styles.membersCountText}>{item.miembros_count || 1} miembros</Text>
+            </View>
+
+            {isAdminOfGroup && (
+              <View style={styles.roleTag}>
+                <Text style={styles.roleTagText}>Admin</Text>
               </View>
             )}
-            <View style={styles.membersCountBadge}>
-              <Users size={10} color={Colors.textSecondary} />
-              <Text style={styles.membersCountText}>{item.miembros_count} miembros</Text>
-            </View>
           </View>
 
           {/* Vista previa último mensaje */}
@@ -189,94 +279,209 @@ export default function ChatTabScreen() {
             {renderLastMessagePreview(item)}
           </View>
         </View>
+
+        {/* Indicador flecha derecha */}
+        <View style={styles.arrowContainer}>
+          <ChevronRight size={17} color={Colors.textDisabled} strokeWidth={2.2} />
+        </View>
       </Pressable>
     );
   };
 
+  const renderListHeader = () => (
+    <View style={styles.listHeaderContainer}>
+      {/* Título de la Sección */}
+      <View style={styles.sectionHeading}>
+        <Text style={styles.sectionTitle}>Canales de Comunicación</Text>
+        <Text style={styles.sectionSubtitle}>
+            Coordinación técnica y reportes de cuadrilla 
+        </Text>
+      </View>
+
+      {/* Buscador TailAdmin con Botón Limpiar */}
+      <View style={styles.searchContainer}>
+        <Search size={16} color={Colors.textMuted} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar canal, proyecto o mensaje..."
+          placeholderTextColor={Colors.textMuted}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
+          autoCorrect={false}
+        />
+        {searchQuery.length > 0 && (
+          <Pressable
+            onPress={() => setSearchQuery('')}
+            hitSlop={8}
+            style={styles.clearSearchBtn}
+          >
+            <X size={15} color={Colors.textSecondary} />
+          </Pressable>
+        )}
+      </View>
+
+      {/* Cápsulas de Filtro (Todas visibles sin deslizar, naranja y letras blancas al estar activas) */}
+      <View style={styles.filterPillsContainer}>
+        <Pressable
+          style={({ pressed }) => [
+            styles.filterPill,
+            filter === 'todos' && styles.filterPillActive,
+            pressed && { opacity: 0.8 },
+          ]}
+          onPress={() => setFilter('todos')}
+        >
+          <Text
+            style={[
+              styles.filterPillText,
+              filter === 'todos' && styles.filterPillTextActive,
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            Todos ({stats.todos})
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.filterPill,
+            filter === 'recientes' && styles.filterPillActive,
+            pressed && { opacity: 0.8 },
+          ]}
+          onPress={() => setFilter('recientes')}
+        >
+          <Text
+            style={[
+              styles.filterPillText,
+              filter === 'recientes' && styles.filterPillTextActive,
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            Recientes ({stats.recientes})
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.filterPill,
+            filter === 'evidencias' && styles.filterPillActive,
+            pressed && { opacity: 0.8 },
+          ]}
+          onPress={() => setFilter('evidencias')}
+        >
+          <Text
+            style={[
+              styles.filterPillText,
+              filter === 'evidencias' && styles.filterPillTextActive,
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            Evidencias ({stats.evidencias})
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <View style={styles.emptyIconBox}>
+        <MessageSquare size={30} color={Colors.primary} strokeWidth={2.2} />
+      </View>
+      <Text style={styles.emptyTitle}>
+        {searchQuery ? 'Sin canales encontrados' : 'Sin grupos activos'}
+      </Text>
+      <Text style={styles.emptySubtitle}>
+        {searchQuery
+          ? `No hay canales que coincidan con "${searchQuery}". Intenta con otro término.`
+          : filter !== 'todos'
+          ? 'No hay conversaciones activas en esta sección. Cambia de filtro para ver otros grupos.'
+          : isGlobalAdmin
+          ? 'Crea un nuevo canal de cuadrilla para coordinar las labores y enviar reportes técnicos.'
+          : 'Tu supervisor te asignará a los canales correspondientes a tus proyectos.'}
+      </Text>
+      {searchQuery || filter !== 'todos' ? (
+        <Pressable
+          style={({ pressed }) => [styles.resetFilterBtn, pressed && { opacity: 0.85 }]}
+          onPress={() => {
+            setSearchQuery('');
+            setFilter('todos');
+          }}
+        >
+          <Text style={styles.resetFilterBtnText}>Ver todos los canales</Text>
+        </Pressable>
+      ) : isGlobalAdmin ? (
+        <Pressable
+          style={({ pressed }) => [styles.emptyActionBtn, pressed && { opacity: 0.85 }]}
+          onPress={() => router.push('/chat/new-group' as any)}
+        >
+          <Plus size={15} color="#FFFFFF" strokeWidth={2.6} />
+          <Text style={styles.emptyActionText}>Crear Primer Canal</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+
   return (
     <View style={styles.container}>
-      {/* Header Glass CSY */}
-      <View style={[styles.headerWrapper, { paddingTop: insets.top }]}>
-        <BlurView tint="dark" intensity={70} style={StyleSheet.absoluteFill} />
-        <View style={styles.headerOverlay} />
-        <View style={styles.headerContent}>
-          <View style={styles.titleGroup}>
-            <Text style={styles.headerTitle}>GRUPOS DE TRABAJO</Text>
-            <Text style={styles.headerSubtitle}>
-              {groups.length} {groups.length === 1 ? 'grupo' : 'grupos'} activos
-            </Text>
+      {/* Top Navbar Minimalista con Logo Oficial CSY pegado a la izquierda */}
+      <View style={styles.headerWrapper}>
+        <SafeAreaView edges={['top']} style={styles.safeArea}>
+          <View style={[styles.navContainer, isTablet && styles.navContainerTablet]}>
+            <View style={styles.logoGroup}>
+              <Image
+                source={LOGO_DARK}
+                style={[styles.logo, isTablet && styles.logoTablet]}
+                contentFit="contain"
+                contentPosition="left center"
+                priority="high"
+              />
+            </View>
+
+            {isGlobalAdmin ? (
+              <Pressable
+                style={({ pressed }) => [styles.newGroupBtn, pressed && { opacity: 0.85 }]}
+                onPress={() => router.push('/chat/new-group' as any)}
+                hitSlop={8}
+              >
+                <Plus size={15} color="#FFFFFF" strokeWidth={2.8} />
+                <Text style={styles.newGroupBtnText}>Nuevo Chat</Text>
+              </Pressable>
+            ) : (
+              <View style={styles.channelBadge}>
+                <MessageSquare size={13} color={Colors.primary} strokeWidth={2.4} />
+                <Text style={styles.channelBadgeText}>Canales CSY</Text>
+              </View>
+            )}
           </View>
-
-          {/* Botón de crear grupo (Solo admins) */}
-          {isGlobalAdmin && (
-            <Pressable
-              style={({ pressed }) => [styles.newGroupBtn, pressed && { opacity: 0.8 }]}
-              onPress={() => router.push('/chat/new-group' as any)}
-            >
-              <Plus size={16} color="#ffffff" strokeWidth={3} />
-              <Text style={styles.newGroupBtnText}>Crear</Text>
-            </Pressable>
-          )}
-        </View>
-
-        {/* Buscador */}
-        <View style={styles.searchContainer}>
-          <Search size={15} color={Colors.textSecondary} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar grupo o proyecto..."
-            placeholderTextColor={Colors.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
+        </SafeAreaView>
       </View>
 
       {/* Lista de Grupos */}
       {loading ? (
         <View style={styles.centerLoading}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Cargando chats del equipo...</Text>
+          <Text style={styles.loadingText}>Cargando canales del equipo...</Text>
         </View>
       ) : (
         <FlatList
           data={filteredGroups}
           keyExtractor={(item) => item.id}
           renderItem={renderGroupItem}
+          ListHeaderComponent={renderListHeader}
+          ListEmptyComponent={renderEmptyState}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
+              colors={[Colors.primary]}
               tintColor={Colors.primary}
             />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <View style={styles.emptyIconBox}>
-                <MessageSquare size={42} color={Colors.textMuted} />
-              </View>
-              <Text style={styles.emptyTitle}>
-                {searchQuery ? 'Sin resultados' : 'Sin grupos asignados'}
-              </Text>
-              <Text style={styles.emptySubtitle}>
-                {searchQuery
-                  ? 'No se encontraron grupos que coincidan con tu búsqueda.'
-                  : isGlobalAdmin
-                  ? 'Crea un nuevo grupo de trabajo e invita a los técnicos con el botón superior.'
-                  : 'Tu supervisor te agregará a los grupos correspondientes a tu área de instalación.'}
-              </Text>
-              {isGlobalAdmin && !searchQuery && (
-                <Pressable
-                  style={({ pressed }) => [styles.emptyActionBtn, pressed && { opacity: 0.85 }]}
-                  onPress={() => router.push('/chat/new-group' as any)}
-                >
-                  <Plus size={16} color="#ffffff" strokeWidth={2.5} />
-                  <Text style={styles.emptyActionText}>Crear Primer Grupo</Text>
-                </Pressable>
-              )}
-            </View>
           }
         />
       )}
@@ -287,116 +492,195 @@ export default function ChatTabScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.backgroundAlt,
+    backgroundColor: Colors.background,
   },
   headerWrapper: {
-    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    paddingBottom: Spacing.sm,
+    borderBottomColor: Colors.border,
+    ...Shadow.xs,
+    zIndex: 10,
   },
-  headerOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+  safeArea: {
+    backgroundColor: '#FFFFFF',
   },
-  headerContent: {
-    height: 60,
+  navContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
+    paddingLeft: 10,
+    paddingRight: Spacing.md,
+    height: 72,
+    minHeight: 72,
   },
-  titleGroup: {
-    gap: 2,
+  navContainerTablet: {
+    paddingLeft: Spacing.md,
+    paddingRight: Spacing.xl,
+    height: 78,
+    minHeight: 78,
   },
-  headerTitle: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 16,
-    color: Colors.textWhite,
-    letterSpacing: 1.5,
+  logoGroup: {
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    transform: [{ translateY: -3 }],
   },
-  headerSubtitle: {
-    fontFamily: 'Montserrat_400Regular',
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.70)',
+  logo: {
+    width: 220,
+    height: 54,
+  },
+  logoTablet: {
+    width: 250,
+    height: 60,
   },
   newGroupBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: BorderRadius.sm,
-    gap: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 7.5,
+    borderRadius: BorderRadius.full,
+    gap: 5,
+    ...Shadow.xs,
   },
   newGroupBtnText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 12.5,
+    color: '#FFFFFF',
+  },
+  channelBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 11,
+    paddingVertical: 6.5,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: Colors.borderBrand,
+    gap: 5,
+  },
+  channelBadgeText: {
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 12,
-    color: '#ffffff',
+    color: Colors.primaryDark,
+  },
+  listContent: {
+    paddingHorizontal: Spacing.md,
+    paddingBottom: 110,
+    gap: Spacing.sm,
+  },
+  listHeaderContainer: {
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xs,
+  },
+  sectionHeading: {
+    marginBottom: Spacing.sm,
+  },
+  sectionTitle: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 21,
+    color: Colors.text,
+    letterSpacing: -0.3,
+  },
+  sectionSubtitle: {
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 12.5,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    marginHorizontal: Spacing.md,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
-    borderRadius: BorderRadius.md,
-    height: 40,
+    borderRadius: BorderRadius.lg,
+    height: 44,
     gap: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: Colors.border,
+    marginBottom: Spacing.sm,
+    ...Shadow.xs,
   },
   searchInput: {
     flex: 1,
     height: '100%',
-    color: Colors.textWhite,
-    fontFamily: 'Montserrat_400Regular',
-    fontSize: 13,
+    color: Colors.text,
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 13.5,
   },
-  listContent: {
-    padding: Spacing.md,
-    gap: 10,
-    paddingBottom: 100,
+  clearSearchBtn: {
+    padding: 4,
+  },
+  filterPillsContainer: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: Spacing.xs,
+    marginBottom: Spacing.xs,
+    width: '100%',
+  },
+  filterPill: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 7.5,
+    paddingHorizontal: 2,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  filterPillActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  filterPillText: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 11.5,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
+  filterPillTextActive: {
+    color: '#FFFFFF',
   },
   groupCard: {
     flexDirection: 'row',
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.md,
-    padding: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: 13,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.10)',
+    borderColor: Colors.border,
     gap: 12,
     alignItems: 'center',
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
+    ...Shadow.xs,
+  },
+  groupCardPressed: {
+    backgroundColor: '#FDF8F3',
+    borderColor: Colors.borderBrand,
   },
   avatarWrapper: {
     position: 'relative',
   },
   avatarImage: {
-    width: 50,
-    height: 50,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   avatarPlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: BorderRadius.full,
-    backgroundColor: 'rgba(247, 140, 38, 0.12)',
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1.2,
+    borderColor: '#FED7AA',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarLetter: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 20,
+  avatarInitials: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 17,
     color: Colors.primary,
+    letterSpacing: 0.5,
   },
   adminMiniBadge: {
     position: 'absolute',
@@ -404,8 +688,8 @@ const styles = StyleSheet.create({
     right: -2,
     backgroundColor: Colors.primary,
     borderRadius: BorderRadius.full,
-    padding: 3,
-    borderWidth: 1.5,
+    padding: 3.5,
+    borderWidth: 2,
     borderColor: '#FFFFFF',
   },
   groupInfo: {
@@ -415,135 +699,174 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   groupName: {
     flex: 1,
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 14,
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 15,
     color: Colors.text,
     marginRight: 8,
   },
   timeText: {
-    fontFamily: 'Montserrat_400Regular',
-    fontSize: 10,
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 11,
     color: Colors.textMuted,
   },
   badgesRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 6,
+    marginBottom: 5,
   },
   multimediaBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(247, 140, 38, 0.10)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 5,
     borderWidth: 0.8,
-    borderColor: 'rgba(247, 140, 38, 0.3)',
+    borderColor: Colors.borderBrand,
   },
   multimediaBadgeText: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 9,
-    color: Colors.primary,
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 10,
+    color: Colors.primaryDark,
   },
   membersCountBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(52, 62, 72, 0.06)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#EAECF0',
   },
   membersCountText: {
-    fontFamily: 'Montserrat_500Medium',
-    fontSize: 9,
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 10,
+    color: Colors.textSecondary,
+  },
+  roleTag: {
+    backgroundColor: '#F2F4F7',
+    paddingHorizontal: 6,
+    paddingVertical: 2.5,
+    borderRadius: 5,
+  },
+  roleTagText: {
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 9.5,
     color: Colors.textSecondary,
   },
   lastMessageContainer: {
-    marginTop: 2,
+    marginTop: 1,
   },
   lastMsgText: {
-    fontFamily: 'Montserrat_400Regular',
-    fontSize: 12,
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 12.5,
     color: Colors.textSecondary,
   },
   lastMsgSender: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     color: Colors.text,
   },
   emptyMsgText: {
-    fontFamily: 'Montserrat_400Regular',
-    fontSize: 11,
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 12,
     color: Colors.textMuted,
     fontStyle: 'italic',
   },
   mediaPreviewRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 4.5,
   },
   mediaPreviewText: {
-    fontFamily: 'Montserrat_600SemiBold',
-    fontSize: 11,
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 12,
     color: Colors.primary,
+  },
+  arrowContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingLeft: 2,
   },
   centerLoading: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   loadingText: {
-    fontFamily: 'Montserrat_400Regular',
-    fontSize: 13,
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 13.5,
     color: Colors.textSecondary,
   },
   emptyContainer: {
-    paddingVertical: 60,
+    paddingVertical: 48,
     alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginTop: Spacing.sm,
+    ...Shadow.xs,
   },
   emptyIconBox: {
-    width: 80,
-    height: 80,
-    borderRadius: BorderRadius.full,
-    backgroundColor: 'rgba(52, 62, 72, 0.06)',
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: Colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: Spacing.md,
   },
   emptyTitle: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 16,
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 16.5,
     color: Colors.text,
-    marginBottom: 8,
+    marginBottom: 6,
+    textAlign: 'center',
   },
   emptySubtitle: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 13,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 19,
-    marginBottom: 20,
+    marginBottom: 18,
+    maxWidth: 290,
+  },
+  resetFilterBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.primaryLight,
+    borderWidth: 1,
+    borderColor: Colors.borderBrand,
+  },
+  resetFilterBtnText: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 13,
+    color: Colors.primary,
   },
   emptyActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.primary,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
     borderRadius: BorderRadius.md,
-    gap: 8,
+    gap: 6,
   },
   emptyActionText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 13,
-    color: '#ffffff',
+    color: '#FFFFFF',
   },
 });

@@ -7,12 +7,17 @@ import {
   Pressable,
   Modal,
   RefreshControl,
+  TextInput,
+  ActivityIndicator,
+  Alert,
   useWindowDimensions,
+  KeyboardAvoidingView,
+  Platform,
+  Switch,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
-import { BlurView } from 'expo-blur';
 import {
   User,
   Mail,
@@ -23,12 +28,30 @@ import {
   ChevronRight,
   HelpCircle,
   Check,
+  Camera,
+  KeyRound,
+  Lock,
+  Eye,
+  EyeOff,
+  X,
+  Fingerprint,
+  ScanFace,
 } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius, Animation } from '@/constants/Theme';
+import { Colors, Spacing, BorderRadius, Shadow, Animation } from '@/constants/Theme';
 import { useAuth } from '@/lib/auth';
 import { useHeaderHeight } from '@/components/HeaderCaboSystems';
+import { supabase } from '@/lib/supabase';
+import { pickImageSafe } from '@/lib/mediaPicker';
+import { uploadAvatarImage } from '@/lib/avatarUpload';
+import {
+  getBiometricStatus,
+  isBiometricAuthEnabled,
+  getBiometricCredentials,
+  setBiometricCredentials,
+  authenticateWithBiometrics,
+} from '@/lib/biometrics';
 
-const LOGO_URL = 'https://csy.mx/wp-content/uploads/2024/03/Logo-CSY-Cabo-Systems-White-Hz.svg';
+const LOGO_DARK = require('@/assets/images/Logo-CaboSystems-Field-Service-Dark.png');
 
 function getInitials(name: string): string {
   if (!name) return 'CS';
@@ -42,7 +65,7 @@ const ROLE_LABELS: Record<string, string> = {
   supervisor_instalacion: 'Supervisor de Instalación',
   instalador: 'Técnico Instalador',
   aux_instalacion: 'Auxiliar de Instalación',
-  integrador: 'Especialista Integrador',
+  integrador: 'Integrador',
   aux_integracion: 'Auxiliar de Integración',
   infraestructura: 'Técnico de Infraestructura',
   aux_infraestructura: 'Auxiliar de Infraestructura',
@@ -54,7 +77,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export default function ProfileScreen() {
-  const { profile, user, signOut, refreshProfile } = useAuth();
+  const { profile, user, session, signOut, refreshProfile } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -66,7 +89,7 @@ export default function ProfileScreen() {
   const [imageError, setImageError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Foto de perfil: Priorizar la guardada en la base de datos (profiles.avatar_url) antes de metadata de registro
+  // Foto de perfil: Priorizar la guardada en la base de datos (profiles.avatar_url)
   const avatarUrl =
     profile?.avatar_url ||
     user?.user_metadata?.avatar_url ||
@@ -86,6 +109,189 @@ export default function ProfileScreen() {
     }
   };
 
+  const isAdmin =
+    profile?.rol === 'admin' ||
+    profile?.rol === 'supervisor_instalacion' ||
+    profile?.rol === 'aux_operaciones';
+
+  // Subida de Foto de Perfil
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const handleChangeAvatar = async () => {
+    if (!user?.id) return;
+    try {
+      const uri = await pickImageSafe({
+        mediaTypes: 'images',
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!uri) return;
+
+      setUploadingAvatar(true);
+      const publicUrl = await uploadAvatarImage(uri, user.id);
+      if (!publicUrl) {
+        Alert.alert('Error', 'No se pudo subir la foto de perfil. Intenta de nuevo.');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      await refreshProfile();
+      Alert.alert('Éxito', 'Foto de perfil actualizada correctamente.');
+    } catch (err: any) {
+      console.error('Error updating avatar:', err);
+      Alert.alert('Error', err?.message || 'Error al actualizar foto de perfil.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  // Cambio de Contraseña
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  // Biometría (Huella / Face ID)
+  const [biometricsEnabled, setBiometricsEnabled] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricLabel, setBiometricLabel] = useState('Huella Dactilar');
+  const [biometryType, setBiometryType] = useState<'fingerprint' | 'facial' | 'iris' | 'generic'>('generic');
+
+  // Modal para confirmación de contraseña al activar biometría
+  const [bioPasswordModalVisible, setBioPasswordModalVisible] = useState(false);
+  const [bioConfirmPassword, setBioConfirmPassword] = useState('');
+  const [showBioPassword, setShowBioPassword] = useState(false);
+  const [bioLoading, setBioLoading] = useState(false);
+  const [bioError, setBioError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadBiometrics() {
+      const status = await getBiometricStatus();
+      setBiometricAvailable(status.available && status.enrolled);
+      setBiometricLabel(status.label);
+      setBiometryType(status.biometryType);
+      const isEnabled = await isBiometricAuthEnabled();
+      setBiometricsEnabled(isEnabled);
+    }
+    loadBiometrics();
+  }, []);
+
+  const handleToggleBiometrics = async (value: boolean) => {
+    if (value) {
+      if (!user?.email) {
+        Alert.alert('Error', 'No se pudo obtener la información de tu cuenta.');
+        return;
+      }
+
+      // Verificar si ya tenemos la contraseña almacenada de forma segura
+      const creds = await getBiometricCredentials();
+      if (creds?.password) {
+        const auth = await authenticateWithBiometrics(`Confirma tu ${biometricLabel} para activar`);
+        if (auth.success) {
+          await setBiometricCredentials(user.email, creds.password, true);
+          setBiometricsEnabled(true);
+          Alert.alert('Acceso Biométrico', `${biometricLabel} activada correctamente para inicio de sesión rápido.`);
+        } else {
+          setBiometricsEnabled(false);
+        }
+      } else {
+        // Solicitar contraseña una sola vez para guardarla cifrada en el dispositivo
+        setBioConfirmPassword('');
+        setBioError(null);
+        setBioPasswordModalVisible(true);
+      }
+    } else {
+      setBiometricsEnabled(false);
+      await setBiometricCredentials(null, null, false);
+      Alert.alert('Acceso Biométrico', 'Se ha desactivado el acceso biométrico en este dispositivo.');
+    }
+  };
+
+  const handleConfirmBioWithPassword = async () => {
+    if (!bioConfirmPassword.trim()) {
+      setBioError('Ingresa tu contraseña actual.');
+      return;
+    }
+    if (!user?.email) return;
+
+    setBioLoading(true);
+    setBioError(null);
+    try {
+      // 1. Validar que la contraseña sea correcta
+      const { error } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: bioConfirmPassword,
+      });
+
+      if (error) {
+        setBioError('La contraseña ingresada es incorrecta.');
+        setBioLoading(false);
+        return;
+      }
+
+      // 2. Solicitar confirmación del sensor biométrico
+      const auth = await authenticateWithBiometrics(`Confirma tu ${biometricLabel} para vincularla`);
+      if (auth.success) {
+        await setBiometricCredentials(user.email, bioConfirmPassword, true);
+        setBiometricsEnabled(true);
+        setBioPasswordModalVisible(false);
+        setBioConfirmPassword('');
+        Alert.alert('Acceso Biométrico', `${biometricLabel} vinculada y activada exitosamente.`);
+      } else {
+        setBioError(auth.error || 'No se completó la verificación biométrica.');
+      }
+    } catch (err: any) {
+      setBioError(err?.message || 'Error al vincular biometría.');
+    } finally {
+      setBioLoading(false);
+    }
+  };
+
+  const handleSavePassword = async () => {
+    setPasswordError(null);
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordError('La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Las contraseñas no coinciden.');
+      return;
+    }
+
+    setUpdatingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (error) {
+        setPasswordError(error.message);
+      } else {
+        // Si tiene biometría activa, actualizar la credencial guardada con la nueva contraseña
+        if (biometricsEnabled && user?.email) {
+          await setBiometricCredentials(user.email, newPassword, true);
+        }
+        setPasswordModalVisible(false);
+        setNewPassword('');
+        setConfirmPassword('');
+        Alert.alert('Contraseña Actualizada', 'Tu nueva contraseña ha sido guardada exitosamente.');
+      }
+    } catch (err: any) {
+      setPasswordError(err?.message || 'Error al actualizar contraseña.');
+    } finally {
+      setUpdatingPassword(false);
+    }
+  };
+
   const rawName =
     profile?.nombre ||
     user?.user_metadata?.full_name ||
@@ -93,7 +299,6 @@ export default function ProfileScreen() {
     user?.email?.split('@')[0] ||
     'Técnico CaboSystems';
 
-  // Si el nombre registrado es un correo electrónico, mostrar el alias antes del @
   const displayName = rawName.includes('@') ? rawName.split('@')[0] : rawName;
   const initials = getInitials(displayName);
   const email = user?.email || '';
@@ -107,26 +312,23 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header Glass CSY idéntico al de Tareas y Agenda */}
+      {/* Header Minimalista en Modo Claro */}
       <View style={styles.headerWrapper}>
-        <BlurView tint="dark" intensity={70} style={StyleSheet.absoluteFill} />
-        <View style={styles.overlayBackground} />
-
         <SafeAreaView edges={['top']} style={styles.safeArea}>
           <View style={[styles.navContainer, isTablet && styles.navContainerTablet]}>
             <View style={styles.logoGroup}>
               <Image
-                source={{ uri: LOGO_URL }}
+                source={LOGO_DARK}
                 style={[styles.logo, isTablet && styles.logoTablet]}
                 contentFit="contain"
+                contentPosition="left center"
                 priority="high"
               />
-              <Text style={[styles.logoSubtext, isTablet && styles.logoSubtextTablet]}>Field Service</Text>
             </View>
 
             <View style={[styles.profilePill, isTablet && styles.profilePillTablet]}>
-              <User color={Colors.primary} size={15} strokeWidth={2.5} />
-              <Text style={styles.profilePillText}>Mi perfil</Text>
+              <User color="#FFFFFF" size={14} strokeWidth={2.5} />
+              <Text style={styles.profilePillText}>Mi Perfil</Text>
             </View>
           </View>
         </SafeAreaView>
@@ -150,7 +352,11 @@ export default function ProfileScreen() {
       >
         {/* Tarjeta de Identidad del Usuario */}
         <View style={styles.identityCard}>
-          <View style={styles.avatarContainer}>
+          <Pressable
+            style={styles.avatarContainer}
+            onPress={handleChangeAvatar}
+            disabled={uploadingAvatar}
+          >
             {avatarUrl && !imageError ? (
               <Image
                 source={{ uri: avatarUrl }}
@@ -164,10 +370,17 @@ export default function ProfileScreen() {
                 <Text style={styles.avatarFallbackText}>{initials}</Text>
               </View>
             )}
-            <View style={styles.googleVerifiedBadge}>
-              <Check size={12} color={Colors.textWhite} strokeWidth={3} />
-            </View>
-          </View>
+
+            {uploadingAvatar ? (
+              <View style={styles.avatarLoadingOverlay}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              </View>
+            ) : (
+              <View style={styles.avatarCameraBadge}>
+                <Camera size={13} color="#FFFFFF" strokeWidth={2.4} />
+              </View>
+            )}
+          </Pressable>
 
           <Text style={styles.userName} numberOfLines={1}>
             {displayName}
@@ -201,13 +414,86 @@ export default function ProfileScreen() {
             onPress={() => router.push('/(tabs)/' as any)}
           >
             <View style={styles.menuIconCircle}>
-              <ClipboardList size={18} color={Colors.primary} />
+              <ClipboardList size={18} color="#FFFFFF" strokeWidth={2.2} />
             </View>
             <View style={styles.menuTexts}>
-              <Text style={styles.menuTitle}>Mis Tareas y Órdenes</Text>
-              <Text style={styles.menuSubtitle}>Consultar asignaciones activas en villa</Text>
+              <Text style={styles.menuTitle}>Mis Órdenes de Servicio</Text>
+              <Text style={styles.menuSubtitle}>Consultar tareas asignadas en villa</Text>
             </View>
-            <ChevronRight size={18} color={Colors.borderDark} />
+            <ChevronRight size={17} color={Colors.textDisabled} />
+          </Pressable>
+
+          {!isAdmin && (
+            <>
+              <View style={styles.menuDivider} />
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.menuItem,
+                  pressed && { opacity: 0.75, transform: [{ scale: Animation.pressScale }] },
+                ]}
+                onPress={() => router.push('/checkin/villa' as any)}
+              >
+                <View style={styles.menuIconCircle}>
+                  <MapPin size={18} color="#FFFFFF" strokeWidth={2.2} />
+                </View>
+                <View style={styles.menuTexts}>
+                  <Text style={styles.menuTitle}>Registrar Check-In / Check-Out</Text>
+                  <Text style={styles.menuSubtitle}>Captura fotográfica y coordenadas GPS</Text>
+                </View>
+                <ChevronRight size={17} color={Colors.textDisabled} />
+              </Pressable>
+            </>
+          )}
+        </View>
+
+        {/* Sección: SOPORTE Y SEGURIDAD */}
+        <Text style={styles.sectionHeading}>SOPORTE Y SEGURIDAD</Text>
+        <View style={styles.menuGroup}>
+          {/* Opción de Acceso Biométrico */}
+          {biometricAvailable && (
+            <>
+              <View style={styles.menuItem}>
+                <View style={styles.menuIconCircle}>
+                  <Fingerprint size={18} color="#FFFFFF" strokeWidth={2.2} />
+                </View>
+                <View style={styles.menuTexts}>
+                  <Text style={styles.menuTitle}>{biometricLabel}</Text>
+                  <Text style={styles.menuSubtitle}>
+                    {biometricsEnabled ? 'Habilitada para acceso rápido' : 'Desactivada'}
+                  </Text>
+                </View>
+                <Switch
+                  value={biometricsEnabled}
+                  onValueChange={handleToggleBiometrics}
+                  trackColor={{ false: '#D0D5DD', true: Colors.primary }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+              <View style={styles.menuDivider} />
+            </>
+          )}
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.menuItem,
+              pressed && { opacity: 0.75, transform: [{ scale: Animation.pressScale }] },
+            ]}
+            onPress={() => {
+              setPasswordError(null);
+              setNewPassword('');
+              setConfirmPassword('');
+              setPasswordModalVisible(true);
+            }}
+          >
+            <View style={styles.menuIconCircle}>
+              <KeyRound size={18} color="#FFFFFF" strokeWidth={2.2} />
+            </View>
+            <View style={styles.menuTexts}>
+              <Text style={styles.menuTitle}>Cambiar Contraseña</Text>
+              <Text style={styles.menuSubtitle}>Actualizar credenciales de acceso</Text>
+            </View>
+            <ChevronRight size={17} color={Colors.textDisabled} />
           </Pressable>
 
           <View style={styles.menuDivider} />
@@ -217,37 +503,16 @@ export default function ProfileScreen() {
               styles.menuItem,
               pressed && { opacity: 0.75, transform: [{ scale: Animation.pressScale }] },
             ]}
-            onPress={() => router.push('/checkin/villa' as any)}
-          >
-            <View style={styles.menuIconCircle}>
-              <MapPin size={18} color={Colors.primary} />
-            </View>
-            <View style={styles.menuTexts}>
-              <Text style={styles.menuTitle}>Registrar Check-In / Salida</Text>
-              <Text style={styles.menuSubtitle}>Captura fotográfica y coordenadas satelitales</Text>
-            </View>
-            <ChevronRight size={18} color={Colors.borderDark} />
-          </Pressable>
-        </View>
-
-        {/* Sección: SOPORTE Y SEGURIDAD */}
-        <Text style={styles.sectionHeading}>SOPORTE Y SEGURIDAD</Text>
-        <View style={styles.menuGroup}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.menuItem,
-              pressed && { opacity: 0.75, transform: [{ scale: Animation.pressScale }] },
-            ]}
             onPress={() => setSupportModalVisible(true)}
           >
             <View style={styles.menuIconCircle}>
-              <HelpCircle size={18} color={Colors.primary} />
+              <HelpCircle size={18} color="#FFFFFF" strokeWidth={2.2} />
             </View>
             <View style={styles.menuTexts}>
               <Text style={styles.menuTitle}>Soporte Operativo CSY</Text>
               <Text style={styles.menuSubtitle}>Ayuda técnica y reportes en campo</Text>
             </View>
-            <ChevronRight size={18} color={Colors.borderDark} />
+            <ChevronRight size={17} color={Colors.textDisabled} />
           </Pressable>
 
           <View style={styles.menuDivider} />
@@ -261,25 +526,25 @@ export default function ProfileScreen() {
             onPress={() => setLogoutModalVisible(true)}
           >
             <View style={[styles.menuIconCircle, styles.logoutIconCircle]}>
-              <LogOut size={18} color={Colors.primary} />
+              <LogOut size={18} color="#FFFFFF" strokeWidth={2.2} />
             </View>
             <View style={styles.menuTexts}>
               <Text style={styles.logoutText}>Cerrar Sesión</Text>
               <Text style={styles.menuSubtitle}>Salir de tu cuenta en este dispositivo</Text>
             </View>
-            <ChevronRight size={18} color={Colors.primary} />
+            <ChevronRight size={17} color={Colors.textDisabled} />
           </Pressable>
         </View>
 
-        {/* Footer Brand con Versión al final */}
+        {/* Footer Minimalista de Marca */}
         <View style={styles.brandFooter}>
           <Text style={styles.brandFooterTitle}>CABOSYSTEMS FIELD SERVICE</Text>
           <Text style={styles.brandFooterCopy}>Tecnología e Integración Residencial • Los Cabos, B.C.S.</Text>
-          <Text style={styles.brandFooterVersion}>Versión 1.0.0 (Native)</Text>
+          <Text style={styles.brandFooterVersion}>Versión 1.1.0 (Native)</Text>
         </View>
       </ScrollView>
 
-      {/* Modal de Confirmación de Cerrar Sesión (Estilo CaboSystems) */}
+      {/* Modal de Confirmación de Cerrar Sesión */}
       <Modal
         visible={logoutModalVisible}
         transparent
@@ -289,16 +554,16 @@ export default function ProfileScreen() {
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <View style={styles.modalIconCircle}>
-              <LogOut size={30} color={Colors.primary} strokeWidth={2.5} />
+              <LogOut size={28} color="#FFFFFF" strokeWidth={2.5} />
             </View>
             <Text style={styles.modalTitle}>¿Cerrar Sesión?</Text>
             <Text style={styles.modalMessage}>
-              Al salir, se suspenderá la sincronización de campo hasta que vuelvas a iniciar sesión con tu cuenta de Google.
+              Al salir, se suspenderá la sincronización de campo hasta que vuelvas a iniciar sesión con tu cuenta.
             </Text>
 
             <View style={styles.modalButtonRow}>
               <Pressable
-                style={({ pressed }) => [
+                style={({ pressed }) => [ 
                   styles.modalCancelBtn,
                   pressed && { opacity: 0.8 },
                 ]}
@@ -321,7 +586,225 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Modal Informativo de Soporte Técnico */}
+      {/* Modal de Cambio de Contraseña  */}
+      <Modal
+        visible={passwordModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !updatingPassword && setPasswordModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalBackdrop}
+        >
+          <View style={styles.passwordModalCard}>
+            <View style={styles.passwordModalHeader}>
+              <View style={styles.passwordHeaderLeft}>
+                <View style={styles.keyIconCircle}>
+                  <KeyRound size={20} color="#FFFFFF" strokeWidth={2.4} />
+                </View>
+                <View>
+                  <Text style={styles.modalFormTitle}>Cambiar Contraseña</Text>
+                  <Text style={styles.modalSubtitle}>Ingresa tu nueva clave de acceso</Text>
+                </View>
+              </View>
+              <Pressable
+                onPress={() => setPasswordModalVisible(false)}
+                disabled={updatingPassword}
+                hitSlop={8}
+                style={styles.modalCloseBtn}
+              >
+                <X size={20} color={Colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            {passwordError ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{passwordError}</Text>
+              </View>
+            ) : null}
+
+            {/* Nueva Contraseña */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>NUEVA CONTRASEÑA</Text>
+              <View style={styles.inputWrapper}>
+                <Lock size={16} color={Colors.textMuted} />
+                <TextInput
+                  style={styles.modalTextInput}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  placeholder="Mínimo 6 caracteres"
+                  placeholderTextColor={Colors.textMuted}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  editable={!updatingPassword}
+                />
+                <Pressable
+                  onPress={() => setShowPassword(!showPassword)}
+                  hitSlop={8}
+                >
+                  {showPassword ? (
+                    <EyeOff size={18} color={Colors.textMuted} />
+                  ) : (
+                    <Eye size={18} color={Colors.textMuted} />
+                  )}
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Confirmar Contraseña */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>CONFIRMAR CONTRASEÑA</Text>
+              <View style={styles.inputWrapper}>
+                <Lock size={16} color={Colors.textMuted} />
+                <TextInput
+                  style={styles.modalTextInput}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="Repite la contraseña"
+                  placeholderTextColor={Colors.textMuted}
+                  secureTextEntry={!showConfirmPassword}
+                  autoCapitalize="none"
+                  editable={!updatingPassword}
+                />
+                <Pressable
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  hitSlop={8}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff size={18} color={Colors.textMuted} />
+                  ) : (
+                    <Eye size={18} color={Colors.textMuted} />
+                  )}
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={styles.passwordModalActions}>
+              <Pressable
+                style={[styles.modalCancelBtn, updatingPassword && { opacity: 0.5 }]}
+                onPress={() => setPasswordModalVisible(false)}
+                disabled={updatingPassword}
+              >
+                <Text style={styles.modalCancelBtnText}>CANCELAR</Text>
+              </Pressable>
+
+              <Pressable
+                style={[styles.modalConfirmBtn, updatingPassword && { opacity: 0.7 }]}
+                onPress={handleSavePassword}
+                disabled={updatingPassword}
+              >
+                {updatingPassword ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalConfirmBtnText}>GUARDAR</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Modal para Vincular Biometría con Contraseña */}
+      <Modal
+        visible={bioPasswordModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !bioLoading && setBioPasswordModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalBackdrop}
+        >
+          <View style={styles.passwordModalCard}>
+            <View style={styles.passwordModalHeader}>
+              <View style={styles.passwordHeaderLeft}>
+                <View style={styles.keyIconCircle}>
+                  {biometryType === 'facial' ? (
+                    <ScanFace size={20} color="#FFFFFF" strokeWidth={2.4} />
+                  ) : (
+                    <Fingerprint size={20} color="#FFFFFF" strokeWidth={2.4} />
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalFormTitle}>Activar {biometricLabel}</Text>
+                  <Text style={styles.modalSubtitle}>
+                    Confirma tu contraseña para guardar el acceso seguro
+                  </Text>
+                </View>
+              </View>
+              <Pressable
+                onPress={() => setBioPasswordModalVisible(false)}
+                disabled={bioLoading}
+                hitSlop={8}
+                style={styles.modalCloseBtn}
+              >
+                <X size={20} color={Colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            {bioError ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{bioError}</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>CONTRASEÑA ACTUAL</Text>
+              <View style={styles.inputWrapper}>
+                <Lock size={16} color={Colors.textMuted} />
+                <TextInput
+                  style={styles.modalTextInput}
+                  value={bioConfirmPassword}
+                  onChangeText={(text) => {
+                    setBioConfirmPassword(text);
+                    if (bioError) setBioError(null);
+                  }}
+                  placeholder="Tu contraseña de CaboSystems"
+                  placeholderTextColor={Colors.textMuted}
+                  secureTextEntry={!showBioPassword}
+                  autoCapitalize="none"
+                  editable={!bioLoading}
+                />
+                <Pressable
+                  onPress={() => setShowBioPassword(!showBioPassword)}
+                  hitSlop={8}
+                >
+                  {showBioPassword ? (
+                    <EyeOff size={18} color={Colors.textMuted} />
+                  ) : (
+                    <Eye size={18} color={Colors.textMuted} />
+                  )}
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={styles.passwordModalActions}>
+              <Pressable
+                style={[styles.modalCancelBtn, bioLoading && { opacity: 0.5 }]}
+                onPress={() => setBioPasswordModalVisible(false)}
+                disabled={bioLoading}
+              >
+                <Text style={styles.modalCancelBtnText}>CANCELAR</Text>
+              </Pressable>
+
+              <Pressable
+                style={[styles.modalConfirmBtn, bioLoading && { opacity: 0.7 }]}
+                onPress={handleConfirmBioWithPassword}
+                disabled={bioLoading}
+              >
+                {bioLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalConfirmBtnText}>CONFIRMAR</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Modal Informativo de Soporte Técnico (TailAdmin Light Mode) */}
       <Modal
         visible={supportModalVisible}
         transparent
@@ -331,7 +814,7 @@ export default function ProfileScreen() {
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <View style={styles.modalIconCircle}>
-              <HelpCircle size={30} color={Colors.primary} strokeWidth={2.5} />
+              <HelpCircle size={28} color="#FFFFFF" strokeWidth={2.5} />
             </View>
             <Text style={styles.modalTitle}>Soporte CaboSystems</Text>
             <Text style={styles.modalMessage}>
@@ -364,51 +847,42 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 100,
-    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  overlayBackground: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    borderBottomColor: Colors.border,
+    ...Shadow.xs,
   },
   safeArea: {
-    backgroundColor: 'transparent',
+    backgroundColor: '#FFFFFF',
   },
   navContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 10,
+    paddingLeft: 10,
+    paddingRight: Spacing.md,
+    height: 72,
     maxWidth: 960,
     width: '100%',
     alignSelf: 'center',
   },
   navContainerTablet: {
-    paddingVertical: 12,
+    height: 78,
+    paddingLeft: Spacing.md,
+    paddingRight: Spacing.xl,
   },
   logoGroup: {
     justifyContent: 'center',
+    alignItems: 'flex-start',
+    transform: [{ translateY: -3 }],
   },
   logo: {
-    width: 120,
-    height: 30,
+    width: 220,
+    height: 54,
   },
   logoTablet: {
-    width: 140,
-    height: 32,
-  },
-  logoSubtext: {
-    fontFamily: 'Montserrat_400Regular',
-    fontSize: 9,
-    color: '#FFFFFF',
-    letterSpacing: 3,
-    marginTop: 2,
-  },
-  logoSubtextTablet: {
-    fontSize: 9,
-    letterSpacing: 3,
+    width: 250,
+    height: 60,
   },
   profilePill: {
     flexDirection: 'row',
@@ -416,21 +890,21 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 6,
     paddingHorizontal: 12,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primary,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: Colors.primary,
+    ...Shadow.xs,
   },
   profilePillTablet: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
   },
   profilePillText: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 13,
     color: '#FFFFFF',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
   scrollView: {
     flex: 1,
@@ -449,53 +923,61 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.border,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
     marginBottom: Spacing.md,
+    ...Shadow.xs,
   },
   avatarContainer: {
     position: 'relative',
     marginBottom: Spacing.md,
   },
   avatarImage: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    borderWidth: 3,
-    borderColor: Colors.primary,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    borderWidth: 2.5,
+    borderColor: Colors.borderBrand,
     backgroundColor: Colors.backgroundAlt,
   },
   avatarFallback: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    backgroundColor: Colors.borderDark,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: Colors.primary,
+    borderWidth: 2,
+    borderColor: Colors.borderBrand,
   },
   avatarFallbackText: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 32,
-    color: Colors.textWhite,
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 30,
+    color: Colors.primary,
     letterSpacing: 1,
   },
-  googleVerifiedBadge: {
+  avatarCameraBadge: {
     position: 'absolute',
     bottom: 2,
     right: 2,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2.5,
-    borderColor: Colors.card,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    ...Shadow.sm,
+  },
+  avatarLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 44,
+    backgroundColor: 'rgba(16, 24, 40, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   userName: {
     fontFamily: 'Outfit_700Bold',
@@ -511,17 +993,16 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 14,
     borderRadius: BorderRadius.full,
-    backgroundColor: `${Colors.primary}15`,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: `${Colors.primary}35`,
+    borderColor: Colors.borderBrand,
     marginBottom: 8,
   },
   roleChipText: {
-    fontFamily: 'Outfit_700Bold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 11,
     color: Colors.primary,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   emailRow: {
     flexDirection: 'row',
@@ -531,12 +1012,12 @@ const styles = StyleSheet.create({
   emailText: {
     fontFamily: 'Outfit_400Regular',
     fontSize: 13,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
   },
   sectionHeading: {
     fontFamily: 'Outfit_700Bold',
     fontSize: 11,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
     letterSpacing: 1,
     marginBottom: Spacing.xs,
     marginLeft: Spacing.xs,
@@ -548,21 +1029,20 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     overflow: 'hidden',
     marginBottom: Spacing.md,
+    ...Shadow.xs,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.md,
+    paddingVertical: 14,
     paddingHorizontal: Spacing.md,
     gap: Spacing.md,
   },
   menuIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: `${Colors.primary}12`,
-    borderWidth: 1,
-    borderColor: `${Colors.primary}25`,
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -576,26 +1056,25 @@ const styles = StyleSheet.create({
   },
   menuSubtitle: {
     fontFamily: 'Outfit_400Regular',
-    fontSize: 11,
-    color: Colors.textMuted,
+    fontSize: 11.5,
+    color: Colors.textSecondary,
     marginTop: 2,
   },
   menuDivider: {
     height: 1,
-    backgroundColor: Colors.border,
+    backgroundColor: Colors.borderLight,
     marginLeft: 62,
   },
   logoutMenuItem: {
     backgroundColor: Colors.card,
   },
   logoutIconCircle: {
-    backgroundColor: `${Colors.primary}15`,
-    borderColor: `${Colors.primary}35`,
+    backgroundColor: Colors.primary,
   },
   logoutText: {
     fontFamily: 'Outfit_600SemiBold',
     fontSize: 14,
-    color: Colors.primary,
+    color: '#000000',
   },
   brandFooter: {
     alignItems: 'center',
@@ -623,50 +1102,46 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(16, 24, 40, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
   },
   modalCard: {
     width: '100%',
-    maxWidth: 340,
-    backgroundColor: '#161c22',
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: '#343e48',
+    maxWidth: 360,
+    backgroundColor: Colors.card,
+    borderRadius: BorderRadius['2xl'],
+    borderWidth: 1,
+    borderColor: Colors.border,
     paddingVertical: 28,
     paddingHorizontal: 22,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.45,
-    shadowRadius: 20,
-    elevation: 12,
+    ...Shadow.lg,
   },
   modalIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(247, 140, 38, 0.15)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(247, 140, 38, 0.4)',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.primary,
+    borderWidth: 1,
+    borderColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   modalTitle: {
     fontFamily: 'Outfit_700Bold',
     fontSize: 18,
-    color: Colors.textWhite,
+    color: Colors.text,
     textAlign: 'center',
     marginBottom: 8,
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
   modalMessage: {
     fontFamily: 'Outfit_400Regular',
     fontSize: 13,
-    color: '#94a3b8',
+    color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 24,
@@ -680,52 +1155,141 @@ const styles = StyleSheet.create({
   modalCancelBtn: {
     flex: 1,
     height: 46,
-    borderRadius: 12,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: '#343e48',
-    backgroundColor: 'rgba(52, 62, 72, 0.25)',
+    borderColor: Colors.border,
+    backgroundColor: Colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalCancelBtnText: {
     fontFamily: 'Outfit_600SemiBold',
     fontSize: 12,
-    color: '#cbd5e1',
-    letterSpacing: 0.8,
+    color: Colors.textSecondary,
+    letterSpacing: 0.5,
   },
   modalConfirmBtn: {
     flex: 1,
     height: 46,
-    borderRadius: 12,
+    borderRadius: BorderRadius.md,
     backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 4,
+    ...Shadow.xs,
   },
   modalConfirmBtnText: {
     fontFamily: 'Outfit_700Bold',
     fontSize: 12,
-    color: Colors.textWhite,
-    letterSpacing: 1,
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   modalFullBtn: {
     width: '100%',
     height: 46,
-    borderRadius: 12,
+    borderRadius: BorderRadius.md,
     backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    ...Shadow.xs,
   },
   modalFullBtnText: {
     fontFamily: 'Outfit_700Bold',
     fontSize: 13,
-    color: Colors.textWhite,
-    letterSpacing: 1,
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  passwordModalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: Colors.card,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.lg,
+    ...Shadow.lg,
+  },
+  passwordModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
+  },
+  passwordHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  keyIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  modalFormTitle: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 16,
+    color: Colors.text,
+  },
+  modalSubtitle: {
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 1,
+  },
+  modalCloseBtn: {
+    padding: 4,
+    borderRadius: BorderRadius.sm,
+  },
+  errorBox: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECDCA',
+    borderRadius: BorderRadius.md,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: Spacing.md,
+  },
+  errorText: {
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 12,
+    color: '#D92D20',
+  },
+  fieldContainer: {
+    marginBottom: Spacing.md,
+  },
+  fieldLabel: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 10.5,
+    color: Colors.textSecondary,
+    letterSpacing: 0.8,
+    marginBottom: 6,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: 12,
+    height: 48,
+    gap: 8,
+  },
+  modalTextInput: {
+    flex: 1,
+    height: '100%',
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 14,
+    color: Colors.text,
+    paddingVertical: 0,
+  },
+  passwordModalActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
   },
 });
-
-

@@ -1,43 +1,48 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const sharp = require('sharp');
 const path = require('path');
 
 const svgPath = path.join(__dirname, '../assets/images/Logo-CSY- Navbar.svg');
 const svgRaw = fs.readFileSync(svgPath, 'utf8');
-const pathsMatch = svgRaw.match(/<g id=Capa_1[^]*[^>]*>([\s\S]*?)<\/g>/);
-const paths = pathsMatch ? pathsMatch[1] : '';
+const pathsMatch = svgRaw.match(/<g [^>]*id=["']?Capa_1[^>]*>([\s\S]*?)<\/g>/);
+const paths = pathsMatch ? pathsMatch[1].trim() : '';
+
+if (!paths) {
+  console.error('ERROR: Could not extract paths from SVG!');
+  process.exit(1);
+}
 
 // 1. Unified SVG White with Orange (ideal for dark backgrounds like the app header)
-const fullSvgWhite = <?xml version=1.0 encoding=UTF-8?>
-<svg xmlns=http://www.w3.org/2000/svg viewBox=0 0 500 160 width=1000 height=320>
+const fullSvgWhite = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 168" width="1000" height="336">
  <style>
  .cls-1 { fill: #FFFFFF; }
  .cls-2 { fill: #f78c26; }
- .st-text { font-family: 'Montserrat', sans-serif, Arial; font-weight: 800; font-size: 22px; fill: #f78c26; letter-spacing: 6px; }
+ .st-text { font-family: 'Montserrat', sans-serif, Arial; font-weight: 800; font-size: 26px; fill: #f78c26; letter-spacing: 8px; }
  </style>
- <g transform=translate(11.2, 10)>
- 
+ <g transform="translate(11.2, 8)">
+ ${paths}
  </g>
- <text x=250 y=146 text-anchor=middle class=st-text>FIELD SERVICE</text>
-</svg>;
+ <text x="250" y="153" text-anchor="middle" class="st-text">FIELD SERVICE</text>
+</svg>`;
 
 // 2. Unified SVG Dark with Orange (ideal for light backgrounds, papers, presentations)
 const pathsDark = paths
- .replace(/class=cls-1/g, 'class=cls-dark')
- .replace(/class=cls-2/g, 'class=cls-2');
+ .replace(/class="cls-1"/g, 'class="cls-dark"')
+ .replace(/class="cls-2"/g, 'class="cls-2"');
 
-const fullSvgDark = <?xml version=1.0 encoding=UTF-8?>
-<svg xmlns=http://www.w3.org/2000/svg viewBox=0 0 500 160 width=1000 height=320>
+const fullSvgDark = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 168" width="1000" height="336">
  <style>
  .cls-dark { fill: #161c22; }
  .cls-2 { fill: #f78c26; }
- .st-text { font-family: 'Montserrat', sans-serif, Arial; font-weight: 800; font-size: 22px; fill: #f78c26; letter-spacing: 6px; }
+ .st-text { font-family: 'Montserrat', sans-serif, Arial; font-weight: 800; font-size: 26px; fill: #f78c26; letter-spacing: 8px; }
  </style>
- <g transform=translate(11.2, 10)>
- 
+ <g transform="translate(11.2, 8)">
+ ${pathsDark}
  </g>
- <text x=250 y=146 text-anchor=middle class=st-text>FIELD SERVICE</text>
-</svg>;
+ <text x="250" y="153" text-anchor="middle" class="st-text">FIELD SERVICE</text>
+</svg>`;
 
 const outDir = path.join(__dirname, '../assets/images');
 const whiteSvgPath = path.join(outDir, 'Logo-CaboSystems-Field-Service-White.svg');

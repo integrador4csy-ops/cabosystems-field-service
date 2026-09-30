@@ -12,14 +12,15 @@ import {
   Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Mail, Lock, ArrowLeft, CheckCircle, AlertCircle, Eye, EyeOff, KeyRound } from 'lucide-react-native';
-import CaboLogo from '@/components/CaboLogo';
 import { Colors, Spacing, BorderRadius } from '@/constants/Theme';
 import { useAuth, formatAuthError } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     mode?: string;
     token?: string;
@@ -185,7 +186,13 @@ export default function ResetPasswordScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      {/* Barra superior con botón volver fijado arriba */}
+      <View
+        style={[
+          styles.topBar,
+          { paddingTop: Math.max(insets.top + Spacing.sm, Spacing.md) },
+        ]}
+      >
         <Pressable
           style={styles.backButton}
           onPress={() => router.replace('/(auth)')}
@@ -194,12 +201,17 @@ export default function ResetPasswordScreen() {
           <ArrowLeft size={18} color={Colors.text} />
           <Text style={styles.backButtonText}>Volver al Login</Text>
         </Pressable>
+      </View>
 
-        <View style={styles.logoContainer}>
-          <CaboLogo width={180} textColor={Colors.text} />
-          <Text style={styles.logoSubtext}>RECUPERACIÓN DE CUENTA</Text>
-        </View>
-
+      {/* Contenedor central con la tarjeta en el medio */}
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: insets.bottom + Spacing.xl },
+        ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.card}>
           <Text style={styles.title}>
             {isSettingNewPassword ? 'Nueva Contraseña' : '¿Olvidaste tu contraseña?'}
@@ -222,7 +234,7 @@ export default function ResetPasswordScreen() {
               <CheckCircle size={36} color={Colors.primary} style={{ marginBottom: 10 }} />
               <Text style={styles.successTitle}>Correo Enviado</Text>
               <Text style={styles.successText}>
-                Hemos enviado un correo a <Text style={{ fontFamily: 'Montserrat_700Bold', color: Colors.text }}>{email}</Text> con las instrucciones y el código de seguridad.
+                Hemos enviado un correo a <Text style={{ fontFamily: 'Outfit_700Bold', color: Colors.text }}>{email}</Text> con las instrucciones y el código de seguridad.
               </Text>
 
               {/* Separador */}
@@ -396,7 +408,7 @@ export default function ResetPasswordScreen() {
             <Text style={styles.modalTitle}>¡Contraseña Actualizada!</Text>
 
             <Text style={styles.modalSubtitle}>
-              Tu contraseña de acceso en <Text style={{ fontFamily: 'Montserrat_700Bold', color: Colors.text }}>CaboSystems</Text> ha sido cambiada correctamente. Ya puedes iniciar sesión con tus nuevas credenciales.
+              Tu contraseña de acceso en <Text style={{ fontFamily: 'Outfit_700Bold', color: Colors.text }}>CaboSystems</Text> ha sido cambiada correctamente. Ya puedes iniciar sesión con tus nuevas credenciales.
             </Text>
 
             <Pressable
@@ -417,11 +429,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  topBar: {
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.xs,
+    maxWidth: 480,
+    width: '100%',
+    alignSelf: 'center',
+  },
   content: {
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.xl,
     maxWidth: 480,
     width: '100%',
     alignSelf: 'center',
@@ -430,39 +448,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: Spacing.lg,
+    alignSelf: 'flex-start',
   },
   backButtonText: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 13,
     color: Colors.text,
   },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: Spacing.xl,
-  },
-  logoSubtext: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 11,
-    color: Colors.primary,
-    letterSpacing: 3,
-    marginTop: Spacing.sm,
-  },
   card: {
-    backgroundColor: Colors.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: BorderRadius.lg,
     padding: Spacing.xl,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#E4E7EC',
+    shadowColor: Colors.text,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   title: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 22,
     color: Colors.text,
     marginBottom: 4,
   },
   subtitle: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 13,
     color: Colors.textSecondary,
     marginBottom: Spacing.lg,
@@ -471,9 +483,9 @@ const styles = StyleSheet.create({
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(247, 140, 38, 0.1)',
+    backgroundColor: '#FFF7ED',
     borderWidth: 1,
-    borderColor: 'rgba(247, 140, 38, 0.4)',
+    borderColor: '#FED7AA',
     borderRadius: BorderRadius.md,
     padding: 10,
     marginBottom: Spacing.md,
@@ -484,7 +496,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     flex: 1,
-    fontFamily: 'Montserrat_500Medium',
+    fontFamily: 'Outfit_500Medium',
     fontSize: 12,
     color: Colors.text,
     lineHeight: 16,
@@ -494,13 +506,13 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
   },
   successTitle: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 18,
     color: Colors.text,
     marginBottom: 6,
   },
   successText: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 13,
     color: Colors.textSecondary,
     textAlign: 'center',
@@ -517,10 +529,10 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: Colors.border,
+    backgroundColor: '#E4E7EC',
   },
   dividerText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 10,
     color: Colors.textMuted,
     letterSpacing: 1,
@@ -530,7 +542,7 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   cancelLinkText: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 12.5,
     color: Colors.textMuted,
     textDecorationLine: 'underline',
@@ -539,7 +551,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   inputLabel: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 12,
     color: Colors.text,
     marginBottom: 6,
@@ -548,10 +560,10 @@ const styles = StyleSheet.create({
     position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: '#F9FAFB',
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#E4E7EC',
     paddingHorizontal: 12,
   },
   inputIcon: {
@@ -559,7 +571,7 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    fontFamily: 'Montserrat_500Medium',
+    fontFamily: 'Outfit_500Medium',
     fontSize: 14,
     color: Colors.text,
     paddingVertical: Spacing.md,
@@ -578,52 +590,52 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   submitButtonText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 14,
     color: '#ffffff',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(9, 11, 15, 0.8)',
+    backgroundColor: 'rgba(16, 24, 40, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.xl,
   },
   modalCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     padding: Spacing.xl + 6,
     width: '100%',
     maxWidth: 360,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.25,
+    borderColor: '#E4E7EC',
+    shadowColor: Colors.text,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
     shadowRadius: 20,
-    elevation: 12,
+    elevation: 8,
   },
   modalIconContainer: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: 'rgba(247, 140, 38, 0.12)',
+    backgroundColor: '#FFF7ED',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.lg,
   },
   modalTitle: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 20,
     color: Colors.text,
     textAlign: 'center',
     marginBottom: 8,
   },
   modalSubtitle: {
-    fontFamily: 'Montserrat_500Medium',
+    fontFamily: 'Outfit_500Medium',
     fontSize: 13,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 19,
     marginBottom: Spacing.xl,
@@ -637,12 +649,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 3,
   },
   modalButtonText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 13.5,
     color: '#ffffff',
     textTransform: 'uppercase',

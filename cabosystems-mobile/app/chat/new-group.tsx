@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { pickImageSafe } from '@/lib/mediaPicker';
 import {
@@ -25,7 +24,7 @@ import {
   Check,
   Video,
 } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius } from '@/constants/Theme';
+import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { useAuth } from '@/lib/auth';
 import { createChatGroup, getAllProfilesForInvite } from '@/lib/chatApi';
 import type { Profile } from '@/types/database';
@@ -128,17 +127,15 @@ export default function NewGroupScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header Glass CSY */}
+      {/* Header Minimalist Light Mode */}
       <View style={[styles.headerWrapper, { paddingTop: insets.top }]}>
-        <BlurView tint="dark" intensity={70} style={StyleSheet.absoluteFill} />
-        <View style={styles.headerOverlay} />
         <View style={styles.headerContent}>
           <Pressable
             onPress={() => router.back()}
             style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
             hitSlop={10}
           >
-            <ArrowLeft size={22} color={Colors.textWhite} />
+            <ArrowLeft size={22} color={Colors.text} />
           </Pressable>
 
           <Text style={styles.headerTitle}>NUEVO GRUPO</Text>
@@ -153,7 +150,7 @@ export default function NewGroupScreen() {
             ]}
           >
             {creating ? (
-              <ActivityIndicator size="small" color={Colors.primary} />
+              <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <Text style={styles.createActionText}>Crear</Text>
             )}
@@ -303,17 +300,14 @@ export default function NewGroupScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.backgroundAlt,
+    backgroundColor: '#F9FAFB',
   },
   headerWrapper: {
-    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: '#E4E7EC',
     zIndex: 10,
-  },
-  headerOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    ...Shadow.xs,
   },
   headerContent: {
     height: 56,
@@ -329,19 +323,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 14,
-    color: Colors.textWhite,
-    letterSpacing: 1.5,
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 15,
+    color: Colors.text,
+    letterSpacing: 0.8,
   },
   createActionBtn: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.sm,
+    borderRadius: 8,
   },
   createActionText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 13,
     color: '#ffffff',
   },
@@ -353,17 +347,13 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   card: {
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.10)',
+    borderColor: '#E4E7EC',
     padding: Spacing.md,
     marginBottom: Spacing.lg,
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
+    ...Shadow.xs,
   },
   photoRow: {
     flexDirection: 'row',
@@ -379,7 +369,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(247, 140, 38, 0.10)',
+    backgroundColor: '#FFF7ED',
   },
   groupAvatar: {
     width: '100%',
@@ -390,7 +380,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   photoText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 9,
     color: Colors.primary,
   },
@@ -399,26 +389,26 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   nameInput: {
-    backgroundColor: Colors.backgroundAlt,
-    borderRadius: BorderRadius.md,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     color: Colors.text,
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 14,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.12)',
+    borderColor: '#E4E7EC',
   },
   descInput: {
-    backgroundColor: Colors.backgroundAlt,
-    borderRadius: BorderRadius.md,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
     color: Colors.text,
-    fontFamily: 'Montserrat_400Regular',
-    fontSize: 12,
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 12.5,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.12)',
+    borderColor: '#E4E7EC',
   },
   switchBox: {
     flexDirection: 'row',
@@ -427,7 +417,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 14,
     borderTopWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.08)',
+    borderColor: '#E4E7EC',
   },
   switchInfo: {
     flex: 1,
@@ -439,16 +429,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   switchLabel: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 13,
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 13.5,
     color: Colors.text,
   },
   switchDesc: {
-    fontFamily: 'Montserrat_400Regular',
-    fontSize: 11,
-    color: Colors.textMuted,
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 11.5,
+    color: Colors.textSecondary,
     marginTop: 3,
-    lineHeight: 15,
+    lineHeight: 16,
   },
   membersSection: {
     gap: 12,
@@ -459,32 +449,28 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 12,
     color: Colors.primary,
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
     paddingHorizontal: 12,
     gap: 8,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.12)',
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-    elevation: 1,
+    borderColor: '#E4E7EC',
+    ...Shadow.xs,
   },
   searchInput: {
     flex: 1,
     height: 42,
     color: Colors.text,
-    fontFamily: 'Montserrat_400Regular',
-    fontSize: 13,
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 13.5,
   },
   profilesList: {
     gap: 8,
@@ -492,32 +478,28 @@ const styles = StyleSheet.create({
   profileItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.10)',
+    borderColor: '#E4E7EC',
     gap: 12,
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-    elevation: 1,
+    ...Shadow.xs,
   },
   profileItemSelected: {
     borderColor: Colors.primary,
-    backgroundColor: 'rgba(247, 140, 38, 0.06)',
+    backgroundColor: '#FFF7ED',
   },
   avatarCircle: {
     width: 38,
     height: 38,
     borderRadius: BorderRadius.full,
-    backgroundColor: 'rgba(52, 62, 72, 0.08)',
+    backgroundColor: '#F2F4F7',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarLetter: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 15,
     color: Colors.text,
   },
@@ -525,12 +507,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   profileName: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 14,
     color: Colors.text,
   },
   profileRole: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_500Medium',
     fontSize: 11,
     color: Colors.primary,
     marginTop: 2,
@@ -540,7 +522,7 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 6,
     borderWidth: 1.5,
-    borderColor: 'rgba(52, 62, 72, 0.3)',
+    borderColor: '#D0D5DD',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -554,7 +536,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   loadingText: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 12,
     color: Colors.textSecondary,
   },
@@ -563,7 +545,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 13,
     color: Colors.textMuted,
   },

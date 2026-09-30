@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { ClipboardCheck, CheckCircle2, ChevronRight, Sparkles } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
+import { ClipboardCheck, CheckCircle2, ChevronRight } from 'lucide-react-native';
+import { Colors, Spacing, BorderRadius, Shadow, Animation } from '@/constants/Theme';
+import { Badge } from '@/components/ui/Badge';
 import { formatCompletedTime } from '@/lib/dailyForm';
 
 interface DailyFormCardProps {
@@ -21,24 +22,22 @@ export default function DailyFormCard({
 
   if (completed) {
     return (
-      <View style={[styles.card, styles.cardCompleted]}>
+      <View style={[styles.card, styles.cardCompleted, Shadow.xs]}>
         <View style={styles.contentRow}>
           <View style={[styles.iconBox, styles.iconBoxCompleted]}>
-            <CheckCircle2 size={22} color={Colors.text} strokeWidth={2.2} />
+            <CheckCircle2 size={22} color={Colors.success} strokeWidth={2.2} />
           </View>
 
           <View style={styles.infoCol}>
-            <View style={styles.titleRow}>
-              <Text style={styles.titleCompleted}>Formulario Diario Completado</Text>
-            </View>
+            <Text style={styles.titleCompleted}>Reporte Diario de Campo</Text>
             <Text style={styles.subtitleCompleted}>
               Registrado hoy {timeFormatted ? `· ${timeFormatted}` : ''}
             </Text>
           </View>
 
-          <View style={styles.badgeCompleted}>
-            <Text style={styles.badgeTextCompleted}>Completado</Text>
-          </View>
+          <Badge color="success" variant="light" size="sm">
+            Completado
+          </Badge>
         </View>
       </View>
     );
@@ -49,7 +48,11 @@ export default function DailyFormCard({
       style={({ pressed }) => [
         styles.card,
         styles.cardPending,
-        pressed && styles.cardPressed,
+        Shadow.sm,
+        pressed && {
+          transform: [{ scale: Animation.pressScale }],
+          opacity: Animation.pressOpacity,
+        },
       ]}
       onPress={onPress}
       disabled={loading}
@@ -69,11 +72,8 @@ export default function DailyFormCard({
           </Text>
         </View>
 
-        <View style={styles.actionRow}>
-          <View style={styles.badgePending}>
-            <Text style={styles.badgeTextPending}>Llenar</Text>
-          </View>
-          <ChevronRight size={18} color={Colors.primary} />
+        <View style={styles.chevronContainer}>
+          <ChevronRight size={22} color={Colors.primary} strokeWidth={2.4} />
         </View>
       </View>
     </Pressable>
@@ -82,26 +82,19 @@ export default function DailyFormCard({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: BorderRadius.lg,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    borderRadius: BorderRadius.lg, // 16px TailAdmin
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     marginBottom: Spacing.md,
+    backgroundColor: Colors.card,
   },
   cardPending: {
-    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: 'rgba(247, 140, 38, 0.40)',
-    ...Shadow.sm,
+    borderColor: Colors.borderBrand, // #FED7AA
   },
   cardCompleted: {
-    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.10)',
-    opacity: 0.92,
-  },
-  cardPressed: {
-    opacity: 0.88,
-    transform: [{ scale: 0.99 }],
+    borderColor: Colors.border, // #E4E7EC
   },
   contentRow: {
     flexDirection: 'row',
@@ -109,17 +102,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: BorderRadius.md,
+    width: 42,
+    height: 42,
+    borderRadius: BorderRadius.md, // 12px
     justifyContent: 'center',
     alignItems: 'center',
   },
   iconBoxPending: {
-    backgroundColor: 'rgba(247, 140, 38, 0.12)',
+    backgroundColor: Colors.primaryLight, // #fff7ed
   },
   iconBoxCompleted: {
-    backgroundColor: 'rgba(52, 62, 72, 0.08)',
+    backgroundColor: Colors.successLight, // #ecfdf3
   },
   infoCol: {
     flex: 1,
@@ -132,13 +125,15 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   titlePending: {
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 13.5,
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 14,
+    lineHeight: 18,
     color: Colors.text,
   },
   titleCompleted: {
     fontFamily: 'Outfit_600SemiBold',
-    fontSize: 13.5,
+    fontSize: 14,
+    lineHeight: 18,
     color: Colors.text,
   },
   pulseDot: {
@@ -148,43 +143,21 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   subtitlePending: {
-    fontFamily: 'Outfit_500Medium',
-    fontSize: 11.5,
-    color: Colors.primary,
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 12,
+    lineHeight: 16,
+    color: Colors.primaryDark,
   },
   subtitleCompleted: {
     fontFamily: 'Outfit_400Regular',
-    fontSize: 11.5,
+    fontSize: 12,
+    lineHeight: 16,
     color: Colors.textMuted,
   },
-  actionRow: {
-    flexDirection: 'row',
+  chevronContainer: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 4,
-  },
-  badgePending: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: BorderRadius.full,
-  },
-  badgeTextPending: {
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 11,
-    color: '#FFFFFF',
-    letterSpacing: 0.3,
-  },
-  badgeCompleted: {
-    backgroundColor: 'rgba(52, 62, 72, 0.08)',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.12)',
-  },
-  badgeTextCompleted: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 10.5,
-    color: Colors.text,
   },
 });

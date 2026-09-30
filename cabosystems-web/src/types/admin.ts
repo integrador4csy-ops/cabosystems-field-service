@@ -12,7 +12,7 @@ export const ROLES_LIST = [
   { id: 'supervisor_instalacion', label: 'Supervisor Instalación' },
   { id: 'instalador', label: 'Técnico Instalador' },
   { id: 'aux_instalacion', label: 'Auxiliar Instalación' },
-  { id: 'integrador', label: 'Especialista Integrador' },
+  { id: 'integrador', label: 'Integrador' },
   { id: 'aux_integracion', label: 'Auxiliar Integración' },
   { id: 'infraestructura', label: 'Infraestructura' },
   { id: 'aux_infraestructura', label: 'Auxiliar Infraestructura' },

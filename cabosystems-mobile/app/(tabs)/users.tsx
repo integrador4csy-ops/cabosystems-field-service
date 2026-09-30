@@ -4,14 +4,16 @@ import {
   Text,
   Pressable,
   StyleSheet,
-  FlatList,
   Alert,
   Modal,
   TextInput,
   ActivityIndicator,
   ScrollView,
   Share,
+  RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -20,19 +22,28 @@ import {
   Shield,
   Trash2,
   Edit2,
-  CheckCircle,
   Clock,
   X,
   Share2,
   UserCheck,
   UserX,
   AlertTriangle,
+  User,
+  Users,
+  Briefcase,
+  ChevronDown,
+  Check,
+  Camera,
+  Send,
 } from 'lucide-react-native';
-import { HeaderCaboSystems, useHeaderHeight } from '@/components/HeaderCaboSystems';
-import { Colors, Spacing, BorderRadius } from '@/constants/Theme';
+import { Colors, Spacing, BorderRadius, Shadow, Animation } from '@/constants/Theme';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { pickImageSafe } from '@/lib/mediaPicker';
+import { uploadAvatarImage } from '@/lib/avatarUpload';
 import type { Profile } from '@/types/database';
+
+const LOGO_DARK = require('@/assets/images/Logo-CaboSystems-Field-Service-Dark.png');
 
 interface Invitacion {
   id: string;
@@ -48,7 +59,7 @@ const AVAILABLE_ROLES = [
   { id: 'supervisor_instalacion', label: 'Supervisor Instalación' },
   { id: 'instalador', label: 'Técnico Instalador' },
   { id: 'aux_instalacion', label: 'Auxiliar Instalación' },
-  { id: 'integrador', label: 'Especialista Integrador' },
+  { id: 'integrador', label: 'Integrador' },
   { id: 'aux_integracion', label: 'Auxiliar Integración' },
   { id: 'infraestructura', label: 'Infraestructura' },
   { id: 'aux_infraestructura', label: 'Auxiliar Infraestructura' },
@@ -57,28 +68,40 @@ const AVAILABLE_ROLES = [
   { id: 'aux_operaciones', label: 'Auxiliar Operaciones' },
 ];
 
+type TabType = 'colaboradores' | 'invitaciones';
+
 export default function UsersScreen() {
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
   const [users, setUsers] = useState<Profile[]>([]);
   const [invitaciones, setInvitaciones] = useState<Invitacion[]>([]);
   const [loadingData, setLoadingData] = useState(false);
 
+  // Navegación por Cápsulas
+  const [selectedTab, setSelectedTab] = useState<TabType>('colaboradores');
+
   // Modales
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
+
+  // Modales
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
 
   // Formulario Invitar
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('aux_instalacion');
+  const [inviteRoleDropdownOpen, setInviteRoleDropdownOpen] = useState(false);
   const [sendingInvite, setSendingInvite] = useState(false);
 
-  // Formulario Editar
+  // Formulario Editar Colaborador
   const [editNombre, setEditNombre] = useState('');
   const [editRol, setEditRol] = useState('');
-  const [editActivo, setEditActivo] = useState(true);
+  const [editRoleDropdownOpen, setEditRoleDropdownOpen] = useState(false);
+  const [editAvatarUrl, setEditAvatarUrl] = useState<string | null>(null);
+  const [uploadingEditAvatar, setUploadingEditAvatar] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // Modal de Confirmación Corporativo (Reemplaza native alert)
+  // Modal de Confirmación Corporativo
   const [confirmModal, setConfirmModal] = useState<{
     visible: boolean;
     title: string;
@@ -97,7 +120,6 @@ export default function UsersScreen() {
   const [confirmLoading, setConfirmLoading] = useState(false);
 
   const { profile } = useAuth();
-  const headerHeight = useHeaderHeight();
 
   const isAdmin =
     profile?.rol === 'admin' ||
@@ -130,6 +152,9 @@ export default function UsersScreen() {
     fetchData();
   }, [fetchData]);
 
+  // Filtramos solo colaboradores activos
+  const activeCollaborators = users.filter((u) => u.activo !== false);
+
   // 2. Enviar invitación
   const handleSendInvite = async () => {
     if (!inviteEmail.trim() || !inviteEmail.includes('@')) {
@@ -146,7 +171,7 @@ export default function UsersScreen() {
         Math.floor(Math.random() * 16).toString(16)
       ).join('');
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('invitaciones')
         .insert({
           email: cleanEmail,
@@ -165,9 +190,11 @@ export default function UsersScreen() {
 
       const inviteLink = `cabosystemsmobile://register?token=${token}&email=${encodeURIComponent(cleanEmail)}`;
 
-      setInviteModalVisible(false);
       setInviteEmail('');
-      fetchData();
+      setInviteRoleDropdownOpen(false);
+      setInviteModalVisible(false);
+      await fetchData();
+      setSelectedTab('invitaciones');
 
       Alert.alert(
         '¡Invitación Creada!',
@@ -179,7 +206,7 @@ export default function UsersScreen() {
             onPress: () => {
               Share.share({
                 title: 'Invitación a CaboSystems Field Service',
-                message: `Hola, has sido invitado a CaboSystems Field Service con rol de ${inviteRole}. Descarga la app y regístrate aquí: ${inviteLink}`,
+                message: `Hola, has sido invitado a CaboSystems Field Service con rol de ${AVAILABLE_ROLES.find((r) => r.id === inviteRole)?.label || inviteRole}. Descarga la app y regístrate aquí: ${inviteLink}`,
               });
             },
           },
@@ -197,13 +224,57 @@ export default function UsersScreen() {
     setSelectedUser(user);
     setEditNombre(user.nombre);
     setEditRol(user.rol);
-    setEditActivo(user.activo);
+    setEditAvatarUrl(user.avatar_url || null);
+    setEditRoleDropdownOpen(false);
     setEditModalVisible(true);
   };
 
-  // 4. Guardar edición de usuario
+  // 4. Cambiar foto de perfil del colaborador (como Admin)
+  const handleEditCollaboratorAvatar = async () => {
+    if (!selectedUser) return;
+    try {
+      const uri = await pickImageSafe({
+        mediaTypes: 'images',
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!uri) return;
+
+      setUploadingEditAvatar(true);
+      const publicUrl = await uploadAvatarImage(uri, selectedUser.id);
+      if (!publicUrl) {
+        Alert.alert('Error', 'No se pudo subir la foto de perfil. Intenta de nuevo.');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', selectedUser.id);
+
+      if (error) throw error;
+
+      setEditAvatarUrl(publicUrl);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === selectedUser.id ? { ...u, avatar_url: publicUrl } : u))
+      );
+      Alert.alert('Foto Actualizada', 'La foto de perfil del colaborador ha sido guardada con éxito.');
+    } catch (err: any) {
+      console.error('Error updating collaborator avatar:', err);
+      Alert.alert('Error', err?.message || 'Error al actualizar la foto de perfil.');
+    } finally {
+      setUploadingEditAvatar(false);
+    }
+  };
+
+  // 5. Guardar edición de colaborador
   const handleSaveEdit = async () => {
     if (!selectedUser) return;
+    if (!editNombre.trim()) {
+      Alert.alert('Error', 'El nombre completo no puede estar vacío.');
+      return;
+    }
     setSavingEdit(true);
     try {
       const { error } = await supabase
@@ -211,7 +282,7 @@ export default function UsersScreen() {
         .update({
           nombre: editNombre.trim(),
           rol: editRol,
-          activo: editActivo,
+          avatar_url: editAvatarUrl,
         })
         .eq('id', selectedUser.id);
 
@@ -220,30 +291,28 @@ export default function UsersScreen() {
       } else {
         setEditModalVisible(false);
         fetchData();
-        Alert.alert('Éxito', 'Datos de usuario actualizados correctamente.');
+        Alert.alert('Éxito', 'Datos del colaborador actualizados correctamente.');
       }
     } finally {
       setSavingEdit(false);
     }
   };
 
-  // 5. Expulsar / Desactivar usuario
+  // 6. Expulsar / Desactivar usuario
   const handleExpelUser = (user: Profile) => {
     setConfirmModal({
       visible: true,
-      title: '¿Expulsar Usuario?',
+      title: '¿Desactivar Colaborador?',
       message: `¿Estás seguro de que deseas desactivar a ${user.nombre}? Perderá inmediatamente el acceso al sistema.`,
-      confirmText: 'Expulsar / Desactivar',
+      confirmText: 'Desactivar',
       isDanger: true,
       onConfirm: async () => {
         try {
-          // Intentar con RPC expulsar_usuario
           const { error: rpcErr } = await supabase.rpc('expulsar_usuario', {
             target_user_id: user.id,
           });
 
           if (rpcErr) {
-            // Si el RPC no está aún en Supabase, hacer update directo
             await supabase
               .from('profiles')
               .update({ activo: false })
@@ -256,13 +325,13 @@ export default function UsersScreen() {
 
           fetchData();
         } catch (err: any) {
-          Alert.alert('Error', err?.message || 'No se pudo expulsar al usuario.');
+          Alert.alert('Error', err?.message || 'No se pudo desactivar al colaborador.');
         }
       },
     });
   };
 
-  // 6. Cancelar invitación pendiente
+  // 7. Cancelar invitación pendiente
   const handleRevokeInvite = (invite: Invitacion) => {
     setConfirmModal({
       visible: true,
@@ -284,8 +353,22 @@ export default function UsersScreen() {
   if (!isAdmin) {
     return (
       <View style={styles.container}>
-        <HeaderCaboSystems projects={[]} />
-        <View style={[styles.noAccess, { paddingTop: headerHeight + Spacing.md }]}>
+        <View style={styles.headerWrapper}>
+          <SafeAreaView edges={['top']} style={styles.safeArea}>
+            <View style={[styles.navContainer, isTablet && styles.navContainerTablet]}>
+              <View style={styles.logoGroup}>
+                <Image
+                  source={LOGO_DARK}
+                  style={[styles.logo, isTablet && styles.logoTablet]}
+                  contentFit="contain"
+                  contentPosition="left center"
+                  priority="high"
+                />
+              </View>
+            </View>
+          </SafeAreaView>
+        </View>
+        <View style={styles.noAccess}>
           <Ionicons name="lock-closed-outline" size={48} color={Colors.textMuted} />
           <Text style={styles.noAccessText}>Acceso restringido a administradores</Text>
         </View>
@@ -293,328 +376,548 @@ export default function UsersScreen() {
     );
   }
 
+  const editInitials =
+    (editNombre || selectedUser?.nombre || 'CS')
+      .split(' ')
+      .filter(Boolean)
+      .map((n) => n[0])
+      .join('')
+      .substring(0, 2)
+      .toUpperCase() || 'CS';
+
   return (
     <View style={styles.container}>
-      <HeaderCaboSystems projects={[]} />
-
-      <FlatList
-        data={users}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{
-          paddingTop: headerHeight + Spacing.md,
-          paddingHorizontal: Spacing.md,
-          paddingBottom: 90,
-        }}
-        refreshing={loadingData}
-        onRefresh={fetchData}
-        ListHeaderComponent={
-          <View style={styles.headerArea}>
-            <View style={styles.titleRow}>
-              <View>
-                <Text style={styles.pageTitle}>Control de Personal</Text>
-                <Text style={styles.pageSubtitle}>
-                  {users.length} colaboradores registrados
-                </Text>
-              </View>
-              <Pressable
-                style={({ pressed }) => [styles.inviteBtn, pressed && { opacity: 0.85 }]}
-                onPress={() => setInviteModalVisible(true)}
-              >
-                <UserPlus size={16} color="#ffffff" />
-                <Text style={styles.inviteBtnText}>Invitar</Text>
-              </Pressable>
+      {/* Top Navbar Minimalista con Logo Oficial CSY pegado a la izquierda */}
+      <View style={styles.headerWrapper}>
+        <SafeAreaView edges={['top']} style={styles.safeArea}>
+          <View style={[styles.navContainer, isTablet && styles.navContainerTablet]}>
+            <View style={styles.logoGroup}>
+              <Image
+                source={LOGO_DARK}
+                style={[styles.logo, isTablet && styles.logoTablet]}
+                contentFit="contain"
+                contentPosition="left center"
+                priority="high"
+              />
             </View>
 
-            {/* Sección de Invitaciones Pendientes */}
-            {invitaciones.length > 0 && (
-              <View style={styles.sectionBox}>
-                <View style={styles.sectionHeaderRow}>
-                  <Clock size={16} color={Colors.primary} />
-                  <Text style={styles.sectionTitle}>
-                    INVITACIONES PENDIENTES ({invitaciones.length})
-                  </Text>
-                </View>
-                {invitaciones.map((inv) => (
-                  <View key={inv.id} style={styles.inviteCard}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.inviteEmail}>{inv.email}</Text>
-                      <Text style={styles.inviteMeta}>
-                        Rol asignado:{' '}
-                        <Text style={{ fontWeight: '700', color: Colors.primary }}>
-                          {inv.rol.replace('_', ' ')}
-                        </Text>
-                      </Text>
-                    </View>
-                    <View style={styles.inviteActions}>
-                      <Pressable
-                        style={styles.iconBtn}
-                        onPress={() => {
-                          const link = `cabosystemsmobile://register?token=${inv.token}&email=${encodeURIComponent(inv.email)}`;
-                          Share.share({
-                            title: 'Enlace de Registro',
-                            message: `Completa tu registro en CaboSystems: ${link}`,
-                          });
-                        }}
-                      >
-                        <Share2 size={16} color={Colors.primary} />
-                      </Pressable>
-                      <Pressable
-                        style={styles.iconBtn}
-                        onPress={() => handleRevokeInvite(inv)}
-                      >
-                        <Trash2 size={16} color={Colors.error} />
-                      </Pressable>
-                    </View>
-                  </View>
-                ))}
-              </View>
+            {isAdmin && (
+              <Pressable
+                style={({ pressed }) => [styles.inviteNavBtn, pressed && { opacity: 0.85 }]}
+                onPress={() => setInviteModalVisible(true)}
+                hitSlop={8}
+              >
+                <UserPlus size={15} color="#FFFFFF" strokeWidth={2.6} />
+                <Text style={styles.inviteNavBtnText}>Invitar</Text>
+              </Pressable>
             )}
-
-            <Text style={[styles.sectionTitle, { marginTop: Spacing.md, marginBottom: Spacing.sm }]}>
-              COLABORADORES ({users.length})
-            </Text>
           </View>
-        }
-        renderItem={({ item }) => {
-          const initials = item.nombre
-            .split(' ')
-            .filter(Boolean)
-            .map((n) => n[0])
-            .join('')
-            .substring(0, 2)
-            .toUpperCase() || 'CS';
+        </SafeAreaView>
+      </View>
 
-          return (
-            <View style={[styles.userCard, !item.activo && styles.userCardInactive]}>
-              {/* Avatar */}
-              <View style={styles.avatarWrapper}>
-                {item.avatar_url ? (
-                  <Image source={{ uri: item.avatar_url }} style={styles.avatarImg} />
-                ) : (
-                  <View
-                    style={[
-                      styles.avatarFallback,
-                      { backgroundColor: item.activo ? Colors.primary + '25' : '#94a3b825' },
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: Spacing.md, paddingBottom: 90 },
+        ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={loadingData}
+            onRefresh={fetchData}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Encabezado Principal */}
+        <View style={styles.headerArea}>
+          <Text style={styles.pageTitle}>Gestión de Personal</Text>
+          <Text style={styles.pageSubtitle}>
+            {selectedTab === 'colaboradores'
+              ? `${activeCollaborators.length} colaboradores activos en la plataforma`
+              : `${invitaciones.length} invitaciones pendientes de registro`}
+          </Text>
+        </View>
+
+        {/* Separación por Cápsulas (TailAdmin Light Mode - Ambas visibles sin deslizar) */}
+        <View style={styles.filterPillsContainer}>
+          {/* Cápsula 1: Colaboradores */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.filterPill,
+              selectedTab === 'colaboradores' && styles.filterPillActive,
+              pressed && { opacity: 0.8 },
+            ]}
+            onPress={() => setSelectedTab('colaboradores')}
+          >
+            <Users
+              size={14}
+              color={selectedTab === 'colaboradores' ? '#FFFFFF' : Colors.textSecondary}
+              strokeWidth={2.2}
+            />
+            <Text
+              style={[
+                styles.filterPillText,
+                selectedTab === 'colaboradores' && styles.filterPillTextActive,
+              ]}
+              numberOfLines={1}
+            >
+              Colaboradores ({activeCollaborators.length})
+            </Text>
+          </Pressable>
+
+          {/* Cápsula 2: Invitaciones Pendientes */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.filterPill,
+              selectedTab === 'invitaciones' && styles.filterPillActive,
+              pressed && { opacity: 0.8 },
+            ]}
+            onPress={() => setSelectedTab('invitaciones')}
+          >
+            <Clock
+              size={14}
+              color={selectedTab === 'invitaciones' ? '#FFFFFF' : Colors.textSecondary}
+              strokeWidth={2.2}
+            />
+            <Text
+              style={[
+                styles.filterPillText,
+                selectedTab === 'invitaciones' && styles.filterPillTextActive,
+              ]}
+              numberOfLines={1}
+            >
+              Invitaciones ({invitaciones.length})
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* CONTENIDO DE CÁPSULA 1: COLABORADORES */}
+        {selectedTab === 'colaboradores' && (
+          <View>
+            {activeCollaborators.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <View style={styles.emptyIconCircle}>
+                  <Users size={32} color={Colors.primary} strokeWidth={1.8} />
+                </View>
+                <Text style={styles.emptyTitle}>No hay colaboradores registrados</Text>
+                <Text style={styles.emptySubtitle}>
+                  Comienza enviando una invitación a los técnicos para sumarlos al sistema.
+                </Text>
+                <Pressable
+                  style={styles.emptyActionBtn}
+                  onPress={() => setInviteModalVisible(true)}
+                >
+                  <UserPlus size={15} color="#FFFFFF" strokeWidth={2.2} />
+                  <Text style={styles.emptyActionBtnText}>Invitar Primer Colaborador</Text>
+                </Pressable>
+              </View>
+            ) : (
+              activeCollaborators.map((item) => {
+                const initials =
+                  item.nombre
+                    .split(' ')
+                    .filter(Boolean)
+                    .map((n) => n[0])
+                    .join('')
+                    .substring(0, 2)
+                    .toUpperCase() || 'CS';
+
+                const roleLabel =
+                  AVAILABLE_ROLES.find((r) => r.id === item.rol)?.label ||
+                  item.rol.replace('_', ' ').toUpperCase();
+
+                return (
+                  <Pressable
+                    key={item.id}
+                    style={({ pressed }) => [
+                      styles.userCard,
+                      pressed && { opacity: 0.85 },
                     ]}
+                    onPress={() => openEditModal(item)}
                   >
-                    <Text
-                      style={[
-                        styles.avatarText,
-                        { color: item.activo ? Colors.primary : Colors.textMuted },
-                      ]}
-                    >
-                      {initials}
+                    {/* Avatar con foto o iniciales */}
+                    <View style={styles.avatarWrapper}>
+                      {item.avatar_url ? (
+                        <Image source={{ uri: item.avatar_url }} style={styles.avatarImg} contentFit="cover" />
+                      ) : (
+                        <View style={styles.avatarFallback}>
+                          <Text style={styles.avatarText}>{initials}</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Información */}
+                    <View style={styles.userInfo}>
+                      <Text style={styles.userName} numberOfLines={1}>
+                        {item.nombre}
+                      </Text>
+                      <Text style={styles.userRole}>{roleLabel}</Text>
+                    </View>
+
+                    {/* Acciones */}
+                    <View style={styles.cardActions}>
+                      <Pressable
+                        style={styles.actionBtnEdit}
+                        onPress={() => openEditModal(item)}
+                        hitSlop={8}
+                      >
+                        <Edit2 size={16} color={Colors.text} />
+                      </Pressable>
+
+                      <Pressable
+                        style={styles.actionBtnExpel}
+                        onPress={() => handleExpelUser(item)}
+                        hitSlop={8}
+                      >
+                        <UserX size={16} color={Colors.error} />
+                      </Pressable>
+                    </View>
+                  </Pressable>
+                );
+              })
+            )}
+          </View>
+        )}
+
+        {/* CONTENIDO DE CÁPSULA 2: INVITACIONES PENDIENTES */}
+        {selectedTab === 'invitaciones' && (
+          <View>
+            {invitaciones.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <View style={styles.emptyIconCircle}>
+                  <Clock size={32} color={Colors.primary} strokeWidth={1.8} />
+                </View>
+                <Text style={styles.emptyTitle}>No hay invitaciones pendientes</Text>
+                <Text style={styles.emptySubtitle}>
+                  Todas las invitaciones enviadas han sido aceptadas o no hay registros pendientes.
+                </Text>
+                <Pressable
+                  style={styles.emptyActionBtn}
+                  onPress={() => setInviteModalVisible(true)}
+                >
+                  <UserPlus size={15} color="#FFFFFF" strokeWidth={2.2} />
+                  <Text style={styles.emptyActionBtnText}>Crear Nueva Invitación</Text>
+                </Pressable>
+              </View>
+            ) : (
+              invitaciones.map((inv) => (
+                <View key={inv.id} style={styles.inviteCardTailAdmin}>
+                  <View style={styles.inviteIconCircle}>
+                    <Mail size={18} color={Colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inviteEmail} numberOfLines={1}>
+                      {inv.email}
+                    </Text>
+                    <Text style={styles.inviteMeta}>
+                      Rol:{' '}
+                      <Text style={{ fontFamily: 'Outfit_600SemiBold', color: Colors.primary }}>
+                        {AVAILABLE_ROLES.find((r) => r.id === inv.rol)?.label || inv.rol.replace('_', ' ')}
+                      </Text>
                     </Text>
                   </View>
-                )}
-                <View
-                  style={[
-                    styles.statusIndicator,
-                    { backgroundColor: item.activo ? Colors.success : Colors.error },
-                  ]}
-                />
-              </View>
-
-              {/* Info */}
-              <View style={styles.userInfo}>
-                <View style={styles.userNameRow}>
-                  <Text style={styles.userName} numberOfLines={1}>
-                    {item.nombre}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.statusPill,
-                      item.activo ? styles.statusPillActive : styles.statusPillInactive,
-                    ]}
-                  >
-                    {item.activo ? 'Activo' : 'Inactivo'}
-                  </Text>
+                  <View style={styles.inviteActions}>
+                    <Pressable
+                      style={styles.iconBtn}
+                      onPress={() => {
+                        const link = `cabosystemsmobile://register?token=${inv.token}&email=${encodeURIComponent(inv.email)}`;
+                        Share.share({
+                          title: 'Enlace de Registro',
+                          message: `Completa tu registro en CaboSystems Field Service: ${link}`,
+                        });
+                      }}
+                      hitSlop={8}
+                    >
+                      <Share2 size={16} color={Colors.primary} />
+                    </Pressable>
+                    <Pressable
+                      style={[styles.iconBtn, styles.iconBtnDanger]}
+                      onPress={() => handleRevokeInvite(inv)}
+                      hitSlop={8}
+                    >
+                      <Trash2 size={16} color={Colors.error} />
+                    </Pressable>
+                  </View>
                 </View>
-                <Text style={styles.userRole}>
-                  {item.rol.replace('_', ' ').toUpperCase()}
-                </Text>
-              </View>
+              ))
+            )}
+          </View>
+        )}
 
-              {/* Botones de Control Total */}
-              <View style={styles.cardActions}>
-                <Pressable
-                  style={styles.actionBtnEdit}
-                  onPress={() => openEditModal(item)}
-                  hitSlop={6}
-                >
-                  <Edit2 size={16} color={Colors.text} />
-                </Pressable>
+      </ScrollView>
 
-                {item.activo ? (
-                  <Pressable
-                    style={styles.actionBtnExpel}
-                    onPress={() => handleExpelUser(item)}
-                    hitSlop={6}
-                  >
-                    <UserX size={16} color={Colors.error} />
-                  </Pressable>
-                ) : (
-                  <Pressable
-                    style={styles.actionBtnActivate}
-                    onPress={async () => {
-                      await supabase
-                        .from('profiles')
-                        .update({ activo: true })
-                        .eq('id', item.id);
-                      fetchData();
-                    }}
-                    hitSlop={6}
-                  >
-                    <UserCheck size={16} color={Colors.success} />
-                  </Pressable>
-                )}
-              </View>
-            </View>
-          );
-        }}
-      />
-
-      {/* Modal: Invitar Usuario */}
+      {/* Modal: Invitar Nuevo Colaborador */}
       <Modal
         visible={inviteModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setInviteModalVisible(false)}
+        onRequestClose={() => {
+          if (!sendingInvite) {
+            setInviteModalVisible(false);
+            setInviteRoleDropdownOpen(false);
+          }
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Invitar Colaborador</Text>
-              <Pressable onPress={() => setInviteModalVisible(false)}>
-                <X size={20} color={Colors.textMuted} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={styles.formIconCircle}>
+                  <UserPlus size={20} color={Colors.primary} strokeWidth={2.4} />
+                </View>
+                <View>
+                  <Text style={styles.modalTitle}>Invitar Colaborador</Text>
+                  <Text style={styles.modalSubtitle}>Enlace con token de acceso seguro</Text>
+                </View>
+              </View>
+              <Pressable
+                onPress={() => {
+                  setInviteModalVisible(false);
+                  setInviteRoleDropdownOpen(false);
+                }}
+                disabled={sendingInvite}
+                hitSlop={8}
+                style={styles.modalCloseBtn}
+              >
+                <X size={18} color={Colors.textSecondary} />
               </Pressable>
             </View>
 
-            <Text style={styles.modalSubtitle}>
-              Se enviará una invitación a su correo con el enlace para registrarse en la app.
-            </Text>
-
-            <Text style={styles.fieldLabel}>Correo Electrónico</Text>
-            <View style={styles.modalInputWrapper}>
-              <Mail size={16} color={Colors.textMuted} style={{ marginRight: 8 }} />
-              <TextInput
-                style={styles.modalInput}
-                placeholder="ejemplo@csy.mx"
-                placeholderTextColor={Colors.textMuted}
-                value={inviteEmail}
-                onChangeText={setInviteEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-
-            <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Rol Asignado</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.roleChipsScroll}>
-              <View style={styles.roleChipsRow}>
-                {AVAILABLE_ROLES.map((r) => (
-                  <Pressable
-                    key={r.id}
-                    style={[
-                      styles.roleChip,
-                      inviteRole === r.id && styles.roleChipSelected,
-                    ]}
-                    onPress={() => setInviteRole(r.id)}
-                  >
-                    <Text
-                      style={[
-                        styles.roleChipText,
-                        inviteRole === r.id && styles.roleChipTextSelected,
-                      ]}
-                    >
-                      {r.label}
-                    </Text>
-                  </Pressable>
-                ))}
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+              <Text style={styles.fieldLabel}>CORREO ELECTRÓNICO</Text>
+              <View style={styles.modalInputWrapper}>
+                <Mail size={16} color={Colors.textMuted} style={{ marginRight: 8 }} />
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="ejemplo@cabosystems.com"
+                  placeholderTextColor={Colors.textMuted}
+                  value={inviteEmail}
+                  onChangeText={setInviteEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  editable={!sendingInvite}
+                />
               </View>
-            </ScrollView>
 
-            <Pressable
-              style={[styles.modalSubmitBtn, sendingInvite && { opacity: 0.7 }]}
-              onPress={handleSendInvite}
-              disabled={sendingInvite}
-            >
-              {sendingInvite ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <Text style={styles.modalSubmitBtnText}>Generar y Enviar Invitación</Text>
+              <Text style={[styles.fieldLabel, { marginTop: Spacing.md }]}>ROL ASIGNADO</Text>
+              <Pressable
+                style={styles.dropdownTrigger}
+                onPress={() => setInviteRoleDropdownOpen(!inviteRoleDropdownOpen)}
+                disabled={sendingInvite}
+              >
+                <View style={styles.dropdownTriggerLeft}>
+                  <Briefcase size={16} color={Colors.primary} />
+                  <Text style={styles.dropdownTriggerText}>
+                    {AVAILABLE_ROLES.find((r) => r.id === inviteRole)?.label || 'Seleccionar Rol'}
+                  </Text>
+                </View>
+                <ChevronDown
+                  size={18}
+                  color={Colors.textSecondary}
+                  style={inviteRoleDropdownOpen && { transform: [{ rotate: '180deg' }] }}
+                />
+              </Pressable>
+
+              {inviteRoleDropdownOpen && (
+                <View style={styles.dropdownMenu}>
+                  <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled showsVerticalScrollIndicator>
+                    {AVAILABLE_ROLES.map((r) => {
+                      const isSelected = inviteRole === r.id;
+                      return (
+                        <Pressable
+                          key={r.id}
+                          style={[
+                            styles.dropdownItem,
+                            isSelected && styles.dropdownItemSelected,
+                          ]}
+                          onPress={() => {
+                            setInviteRole(r.id);
+                            setInviteRoleDropdownOpen(false);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.dropdownItemText,
+                              isSelected && styles.dropdownItemTextSelected,
+                            ]}
+                          >
+                            {r.label}
+                          </Text>
+                          {isSelected && <Check size={16} color={Colors.primary} strokeWidth={2.5} />}
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
               )}
-            </Pressable>
+
+              <Pressable
+                style={[
+                  styles.modalSubmitBtn,
+                  { marginTop: Spacing.xl },
+                  sendingInvite && { opacity: 0.7 },
+                ]}
+                onPress={handleSendInvite}
+                disabled={sendingInvite}
+              >
+                {sendingInvite ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Send size={15} color="#FFFFFF" strokeWidth={2.2} />
+                    <Text style={styles.modalSubmitBtnText}>Generar y Enviar Invitación</Text>
+                  </View>
+                )}
+              </Pressable>
+            </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* Modal: Editar Usuario */}
+      {/* Modal: Editar Colaborador (Incluye cambio de foto de perfil) */}
       <Modal
         visible={editModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setEditModalVisible(false)}
+        onRequestClose={() => {
+          if (!savingEdit && !uploadingEditAvatar) {
+            setEditModalVisible(false);
+            setEditRoleDropdownOpen(false);
+          }
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Editar Colaborador</Text>
-              <Pressable onPress={() => setEditModalVisible(false)}>
+              <Pressable
+                onPress={() => {
+                  setEditModalVisible(false);
+                  setEditRoleDropdownOpen(false);
+                }}
+                disabled={savingEdit || uploadingEditAvatar}
+                hitSlop={8}
+              >
                 <X size={20} color={Colors.textMuted} />
               </Pressable>
             </View>
 
-            <Text style={styles.fieldLabel}>Nombre Completo</Text>
-            <TextInput
-              style={[styles.modalInput, styles.modalInputSingle]}
-              value={editNombre}
-              onChangeText={setEditNombre}
-              placeholder="Nombre del técnico"
-              placeholderTextColor={Colors.textMuted}
-            />
-
-            <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Rol</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.roleChipsScroll}>
-              <View style={styles.roleChipsRow}>
-                {AVAILABLE_ROLES.map((r) => (
-                  <Pressable
-                    key={r.id}
-                    style={[
-                      styles.roleChip,
-                      editRol === r.id && styles.roleChipSelected,
-                    ]}
-                    onPress={() => setEditRol(r.id)}
-                  >
-                    <Text
-                      style={[
-                        styles.roleChipText,
-                        editRol === r.id && styles.roleChipTextSelected,
-                      ]}
-                    >
-                      {r.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </ScrollView>
-
-            <View style={styles.toggleRow}>
-              <Text style={styles.fieldLabel}>Estatus de la cuenta</Text>
+            {/* Avatar interactivo para cambiar foto de perfil */}
+            <View style={styles.modalAvatarSection}>
               <Pressable
-                style={[
-                  styles.toggleBtn,
-                  editActivo ? styles.toggleBtnActive : styles.toggleBtnInactive,
-                ]}
-                onPress={() => setEditActivo(!editActivo)}
+                style={styles.modalAvatarContainer}
+                onPress={handleEditCollaboratorAvatar}
+                disabled={uploadingEditAvatar || savingEdit}
               >
-                <Text style={styles.toggleBtnText}>
-                  {editActivo ? 'Activo / Permitido' : 'Inactivo / Bloqueado'}
+                {editAvatarUrl ? (
+                  <Image
+                    source={{ uri: editAvatarUrl }}
+                    style={styles.modalAvatarImage}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <View style={styles.modalAvatarFallback}>
+                    <Text style={styles.modalAvatarFallbackText}>{editInitials}</Text>
+                  </View>
+                )}
+
+                {uploadingEditAvatar ? (
+                  <View style={styles.modalAvatarLoading}>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  </View>
+                ) : (
+                  <View style={styles.modalAvatarBadge}>
+                    <Camera size={14} color="#FFFFFF" strokeWidth={2.4} />
+                  </View>
+                )}
+              </Pressable>
+
+              <Pressable
+                onPress={handleEditCollaboratorAvatar}
+                disabled={uploadingEditAvatar || savingEdit}
+                style={styles.changePhotoBtn}
+              >
+                <Camera size={13} color={Colors.primary} strokeWidth={2.2} />
+                <Text style={styles.changePhotoText}>
+                  {uploadingEditAvatar ? 'Subiendo foto...' : 'Cambiar foto de perfil'}
                 </Text>
               </Pressable>
             </View>
 
+            <Text style={styles.fieldLabel}>NOMBRE COMPLETO</Text>
+            <View style={styles.modalInputWrapper}>
+              <User size={16} color={Colors.textMuted} style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.modalInput}
+                value={editNombre}
+                onChangeText={setEditNombre}
+                placeholder="Nombre del colaborador"
+                placeholderTextColor={Colors.textMuted}
+                editable={!savingEdit}
+              />
+            </View>
+
+            <Text style={[styles.fieldLabel, { marginTop: 14 }]}>ROL ASIGNADO</Text>
             <Pressable
-              style={[styles.modalSubmitBtn, savingEdit && { opacity: 0.7 }]}
+              style={styles.dropdownTrigger}
+              onPress={() => setEditRoleDropdownOpen(!editRoleDropdownOpen)}
+              disabled={savingEdit}
+            >
+              <View style={styles.dropdownTriggerLeft}>
+                <Briefcase size={16} color={Colors.primary} />
+                <Text style={styles.dropdownTriggerText}>
+                  {AVAILABLE_ROLES.find((r) => r.id === editRol)?.label || 'Seleccionar Rol'}
+                </Text>
+              </View>
+              <ChevronDown
+                size={18}
+                color={Colors.textSecondary}
+                style={editRoleDropdownOpen && { transform: [{ rotate: '180deg' }] }}
+              />
+            </Pressable>
+
+            {editRoleDropdownOpen && (
+              <View style={styles.dropdownMenu}>
+                <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled showsVerticalScrollIndicator>
+                  {AVAILABLE_ROLES.map((r) => {
+                    const isSelected = editRol === r.id;
+                    return (
+                      <Pressable
+                        key={r.id}
+                        style={[
+                          styles.dropdownItem,
+                          isSelected && styles.dropdownItemSelected,
+                        ]}
+                        onPress={() => {
+                          setEditRol(r.id);
+                          setEditRoleDropdownOpen(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.dropdownItemText,
+                            isSelected && styles.dropdownItemTextSelected,
+                          ]}
+                        >
+                          {r.label}
+                        </Text>
+                        {isSelected && <Check size={16} color={Colors.primary} strokeWidth={2.5} />}
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
+            <Pressable
+              style={[
+                styles.modalSubmitBtn,
+                { marginTop: Spacing.xl },
+                savingEdit && { opacity: 0.7 },
+              ]}
               onPress={handleSaveEdit}
               disabled={savingEdit}
             >
@@ -628,7 +931,7 @@ export default function UsersScreen() {
         </View>
       </Modal>
 
-      {/* Modal: Confirmación Corporativa (Reemplaza native alert) */}
+      {/* Modal: Confirmación Corporativa */}
       <Modal
         visible={confirmModal.visible}
         transparent
@@ -685,6 +988,71 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  headerWrapper: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    ...Shadow.xs,
+    zIndex: 10,
+  },
+  safeArea: {
+    backgroundColor: '#FFFFFF',
+  },
+  navContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingLeft: 10,
+    paddingRight: Spacing.md,
+    height: 72,
+    minHeight: 72,
+    maxWidth: 960,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  navContainerTablet: {
+    height: 78,
+    minHeight: 78,
+    paddingLeft: Spacing.md,
+    paddingRight: Spacing.xl,
+  },
+  logoGroup: {
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    transform: [{ translateY: -3 }],
+  },
+  logo: {
+    width: 220,
+    height: 54,
+  },
+  logoTablet: {
+    width: 250,
+    height: 60,
+  },
+  inviteNavBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 13,
+    paddingVertical: 7.5,
+    borderRadius: BorderRadius.full,
+    gap: 5,
+    ...Shadow.xs,
+  },
+  inviteNavBtnText: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 12.5,
+    color: '#FFFFFF',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: Spacing.md,
+    maxWidth: 960,
+    width: '100%',
+    alignSelf: 'center',
+  },
   noAccess: {
     flex: 1,
     justifyContent: 'center',
@@ -692,172 +1060,109 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   noAccessText: {
-    fontFamily: 'Montserrat_500Medium',
+    fontFamily: 'Outfit_500Medium',
     fontSize: 14,
     color: Colors.textMuted,
   },
   headerArea: {
-    marginBottom: Spacing.sm,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: Spacing.md,
+    paddingTop: Spacing.xs,
   },
   pageTitle: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 22,
     color: Colors.text,
+    letterSpacing: -0.3,
   },
   pageSubtitle: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 13,
     color: Colors.textSecondary,
     marginTop: 2,
   },
-  inviteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: BorderRadius.md,
-  },
-  inviteBtnText: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 13,
-    color: '#ffffff',
-  },
-  sectionBox: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: Spacing.md,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: Spacing.sm,
-  },
-  sectionTitle: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 11,
-    color: Colors.textMuted,
-    letterSpacing: 1.2,
-  },
-  inviteCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border + '40',
-  },
-  inviteEmail: {
-    fontFamily: 'Montserrat_600SemiBold',
-    fontSize: 13,
-    color: Colors.text,
-  },
-  inviteMeta: {
-    fontFamily: 'Montserrat_400Regular',
-    fontSize: 11,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  inviteActions: {
+  filterPillsContainer: {
     flexDirection: 'row',
     gap: 8,
+    marginBottom: Spacing.md,
+    width: '100%',
   },
-  iconBtn: {
-    padding: 6,
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.sm,
+  filterPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  filterPillActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  filterPillText: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 12,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
+  filterPillTextActive: {
+    color: '#FFFFFF',
   },
   userCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.card,
+    borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     marginBottom: Spacing.sm,
     borderWidth: 1,
     borderColor: Colors.border,
-  },
-  userCardInactive: {
-    opacity: 0.6,
-    borderColor: Colors.error + '40',
+    ...Shadow.xs,
   },
   avatarWrapper: {
-    position: 'relative',
     marginRight: 12,
   },
   avatarImg: {
     width: 44,
     height: 44,
     borderRadius: 22,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.backgroundAlt,
   },
   avatarFallback: {
     width: 44,
     height: 44,
     borderRadius: 22,
+    backgroundColor: Colors.primaryLight,
+    borderWidth: 1,
+    borderColor: Colors.borderBrand,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 14,
-  },
-  statusIndicator: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: Colors.surface,
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 15,
+    color: Colors.primary,
   },
   userInfo: {
     flex: 1,
   },
-  userNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 3,
-  },
   userName: {
-    fontFamily: 'Montserrat_600SemiBold',
-    fontSize: 14,
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 14.5,
     color: Colors.text,
-    flexShrink: 1,
-  },
-  statusPill: {
-    fontSize: 10,
-    fontFamily: 'Montserrat_700Bold',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  statusPillActive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    color: Colors.success,
-  },
-  statusPillInactive: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    color: Colors.error,
+    marginBottom: 2,
   },
   userRole: {
-    fontFamily: 'Montserrat_500Medium',
-    fontSize: 11,
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 11.5,
     color: Colors.textSecondary,
+    letterSpacing: 0.2,
   },
   cardActions: {
     flexDirection: 'row',
@@ -867,157 +1172,353 @@ const styles = StyleSheet.create({
   actionBtnEdit: {
     padding: 7,
     backgroundColor: Colors.background,
-    borderRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   actionBtnExpel: {
     padding: 7,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.errorLight,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
+    borderColor: Colors.errorBorder,
   },
-  actionBtnActivate: {
-    padding: 7,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderRadius: BorderRadius.sm,
+  emptyContainer: {
+    backgroundColor: Colors.card,
+    borderRadius: BorderRadius.xl,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderColor: Colors.border,
+    paddingVertical: 36,
+    paddingHorizontal: Spacing.xl,
+    alignItems: 'center',
+    marginVertical: Spacing.md,
+    ...Shadow.xs,
+  },
+  emptyIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: Colors.borderBrand,
+  },
+  emptyTitle: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 16,
+    color: Colors.text,
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  emptySubtitle: {
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 12.5,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 18,
+  },
+  emptyActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: BorderRadius.md,
+  },
+  emptyActionBtnText: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 12.5,
+    color: '#FFFFFF',
+  },
+  inviteCardTailAdmin: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.card,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 12,
+    ...Shadow.xs,
+  },
+  inviteIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.borderBrand,
+  },
+  inviteEmail: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 13.5,
+    color: Colors.text,
+  },
+  inviteMeta: {
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 11.5,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  inviteActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  iconBtn: {
+    padding: 7,
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  iconBtnDanger: {
+    backgroundColor: Colors.errorLight,
+    borderColor: Colors.errorBorder,
+  },
+  inviteFormCard: {
+    backgroundColor: Colors.card,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadow.sm,
+  },
+  formCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: Spacing.lg,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  formIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.borderBrand,
+  },
+  formTitle: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 17,
+    color: Colors.text,
+  },
+  formSubtitle: {
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+    lineHeight: 16,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: 'rgba(16, 24, 40, 0.45)',
     justifyContent: 'center',
     padding: Spacing.lg,
   },
   modalCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.card,
+    borderRadius: BorderRadius['2xl'],
     padding: Spacing.xl,
     borderWidth: 1,
     borderColor: Colors.border,
+    ...Shadow.lg,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: Spacing.md,
   },
   modalTitle: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 18,
     color: Colors.text,
   },
   modalSubtitle: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 12,
     color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    padding: 6,
+  },
+  modalAvatarSection: {
+    alignItems: 'center',
     marginBottom: Spacing.md,
-    lineHeight: 16,
+  },
+  modalAvatarContainer: {
+    position: 'relative',
+    marginBottom: 6,
+  },
+  modalAvatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    borderColor: Colors.borderBrand,
+    backgroundColor: Colors.backgroundAlt,
+  },
+  modalAvatarFallback: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Colors.borderBrand,
+  },
+  modalAvatarFallbackText: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 26,
+    color: Colors.primary,
+  },
+  modalAvatarBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    ...Shadow.sm,
+  },
+  modalAvatarLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 40,
+    backgroundColor: 'rgba(16, 24, 40, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  changePhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primaryLight,
+  },
+  changePhotoText: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 12,
+    color: Colors.primaryDark,
   },
   fieldLabel: {
-    fontFamily: 'Montserrat_600SemiBold',
-    fontSize: 12,
-    color: Colors.text,
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 10.5,
+    color: Colors.textSecondary,
+    letterSpacing: 0.8,
     marginBottom: 6,
   },
   modalInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#E4E7EC',
     paddingHorizontal: 12,
+    height: 48,
   },
   modalInput: {
     flex: 1,
-    fontFamily: 'Montserrat_500Medium',
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 14,
+    color: Colors.text,
+    height: '100%',
+    paddingVertical: 0,
+  },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E4E7EC',
+    paddingHorizontal: 14,
+    height: 48,
+  },
+  dropdownTriggerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  dropdownTriggerText: {
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 13.5,
+    color: Colors.text,
+  },
+  dropdownMenu: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E4E7EC',
+    marginTop: 4,
+    overflow: 'hidden',
+    ...Shadow.sm,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F4F7',
+  },
+  dropdownItemSelected: {
+    backgroundColor: '#FFF7ED',
+  },
+  dropdownItemText: {
+    fontFamily: 'Outfit_400Regular',
     fontSize: 13,
     color: Colors.text,
-    paddingVertical: 10,
   },
-  modalInputSingle: {
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 12,
-  },
-  roleChipsScroll: {
-    marginBottom: Spacing.md,
-  },
-  roleChipsRow: {
-    flexDirection: 'row',
-    gap: 6,
-    paddingVertical: 4,
-  },
-  roleChip: {
-    backgroundColor: Colors.background,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: BorderRadius.sm,
-  },
-  roleChipSelected: {
-    backgroundColor: Colors.primary + '20',
-    borderColor: Colors.primary,
-  },
-  roleChipText: {
-    fontFamily: 'Montserrat_500Medium',
-    fontSize: 11,
-    color: Colors.textSecondary,
-  },
-  roleChipTextSelected: {
-    fontFamily: 'Montserrat_700Bold',
+  dropdownItemTextSelected: {
+    fontFamily: 'Outfit_600SemiBold',
     color: Colors.primary,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.lg,
-  },
-  toggleBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: BorderRadius.sm,
-  },
-  toggleBtnActive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderWidth: 1,
-    borderColor: Colors.success,
-  },
-  toggleBtnInactive: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderWidth: 1,
-    borderColor: Colors.error,
-  },
-  toggleBtnText: {
-    fontFamily: 'Montserrat_600SemiBold',
-    fontSize: 12,
-    color: Colors.text,
   },
   modalSubmitBtn: {
     backgroundColor: Colors.primary,
     borderRadius: BorderRadius.md,
-    paddingVertical: 12,
+    paddingVertical: 13,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: Spacing.xs,
+    ...Shadow.xs,
   },
   modalSubmitBtnText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 13,
-    color: '#ffffff',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
-  // Modal Confirmación Corporativo
   confirmOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(5, 10, 20, 0.85)',
+    backgroundColor: 'rgba(16, 24, 40, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.lg,
@@ -1025,40 +1526,36 @@ const styles = StyleSheet.create({
   confirmCard: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: '#132238',
-    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.card,
+    borderRadius: BorderRadius['2xl'],
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: Colors.border,
     padding: Spacing.xl,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 20,
+    ...Shadow.lg,
   },
   confirmIconBadge: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    backgroundColor: Colors.errorLight,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.35)',
+    borderColor: Colors.errorBorder,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.md,
   },
   confirmTitle: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 18,
-    color: '#ffffff',
+    color: Colors.text,
     textAlign: 'center',
     marginBottom: Spacing.xs,
   },
   confirmMessage: {
-    fontFamily: 'Montserrat_500Medium',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 13,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 19,
     marginBottom: Spacing.xl,
@@ -1076,22 +1573,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   confirmBtnCancel: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: Colors.background,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: Colors.border,
   },
   confirmBtnCancelText: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 13,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
   },
   confirmBtnAction: {
     backgroundColor: Colors.error,
-    elevation: 3,
   },
   confirmBtnActionText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 13,
-    color: '#ffffff',
+    color: '#FFFFFF',
   },
 });

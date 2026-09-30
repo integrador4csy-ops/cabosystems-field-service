@@ -60,14 +60,14 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   title: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 22,
     color: Colors.text,
     marginBottom: Spacing.sm,
     textAlign: 'center',
   },
   subtitle: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 13.5,
     color: Colors.textSecondary,
     textAlign: 'center',
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
   },
   continueText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 14,
     color: '#FFFFFF',
     letterSpacing: 0.4,

@@ -2,9 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal, ScrollView, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import { BlurView } from 'expo-blur';
 import { MapPin, X, ChevronDown, Check } from 'lucide-react-native';
-import { Colors, BorderRadius } from '@/constants/Theme';
+import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { useProjects } from '@/lib/projects';
 import type { Project } from '@/types/database';
 
@@ -14,18 +13,14 @@ interface HeaderProps {
   onSelectProject?: (project: Project) => void;
 }
 
-const LOGO_URL = 'https://csy.mx/wp-content/uploads/2024/03/Logo-CSY-Cabo-Systems-White-Hz.svg';
+const LOGO_DARK = require('@/assets/images/Logo-CaboSystems-Field-Service-Dark.png');
 
-const ORANGE = Colors.primary;
-const DARK_BG = 'rgba(0, 0, 0, 0.65)';
-const DARK_BORDER = 'rgba(255, 255, 255, 0.08)';
-
-export const HEADER_BASE_HEIGHT = 68;
+export const HEADER_BASE_HEIGHT = 72;
 
 export function useHeaderHeight() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const baseHeight = width >= 768 ? 70 : 64;
+  const baseHeight = width >= 768 ? 78 : 72;
   return insets.top + baseHeight;
 }
 
@@ -40,7 +35,6 @@ export function HeaderCaboSystems({
   const onSelectProject = propOnSelectProject ?? context.setSelectedProject;
 
   const [visible, setVisible] = useState(false);
-  const [isSelectorHovered, setIsSelectorHovered] = useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
 
@@ -59,43 +53,51 @@ export function HeaderCaboSystems({
 
   return (
     <View style={styles.headerWrapper}>
-      <BlurView tint="dark" intensity={70} style={StyleSheet.absoluteFill} />
-      <View style={styles.overlayBackground} />
-
       <SafeAreaView edges={['top']} style={styles.safeArea}>
         <View style={[styles.container, isTablet && styles.containerTablet]}>
-          <View style={styles.logoGroup}>
+          {/* Logo Minimalista CSY en Modo Claro */}
+          <View style={styles.logoContainer}>
             <Image
-              source={{ uri: LOGO_URL }}
+              source={LOGO_DARK}
               style={[styles.logo, isTablet && styles.logoTablet]}
               contentFit="contain"
+              contentPosition="left center"
               priority="high"
             />
-            <Text style={[styles.logoSubtext, isTablet && styles.logoSubtextTablet]}>Field Service</Text>
           </View>
 
+          {/* Selector de Villa Minimalista */}
           {projects.length > 0 && (
             <Pressable
               style={({ pressed }) => [
                 styles.selector,
                 isTablet && styles.selectorTablet,
-                isSelectorHovered && styles.selectorHovered,
-                pressed && { opacity: 0.75, transform: [{ scale: 0.98 }] },
+                selected && styles.selectorActive,
+                pressed && (selected ? styles.selectorActivePressed : styles.selectorPressed),
               ]}
-              onHoverIn={() => setIsSelectorHovered(true)}
-              onHoverOut={() => setIsSelectorHovered(false)}
+              hitSlop={8}
               onPress={() => setVisible(true)}
             >
-              <MapPin color={ORANGE} size={isTablet ? 16 : 16} strokeWidth={2.5} />
-              <Text style={[styles.selectorText, isTablet && styles.selectorTextTablet]} numberOfLines={1}>
+              <View style={[styles.selectorPinBox, selected && styles.selectorPinBoxActive]}>
+                <MapPin color={selected ? '#FFFFFF' : Colors.primary} size={14} strokeWidth={2.5} />
+              </View>
+              <Text
+                style={[
+                  styles.selectorText,
+                  isTablet && styles.selectorTextTablet,
+                  selected && styles.selectorTextActive,
+                ]}
+                numberOfLines={1}
+              >
                 {displayCode}
               </Text>
-              <ChevronDown color="#FFFFFF" size={isTablet ? 14 : 14} strokeWidth={2.5} />
+              <ChevronDown color={selected ? '#FFFFFF' : Colors.textSecondary} size={14} strokeWidth={2.2} />
             </Pressable>
           )}
         </View>
       </SafeAreaView>
 
+      {/* Modal TailAdmin Minimalista */}
       <Modal
         visible={visible}
         transparent
@@ -105,13 +107,20 @@ export function HeaderCaboSystems({
         <Pressable style={styles.modalBackdrop} onPress={() => setVisible(false)}>
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Seleccionar villa</Text>
-              <Pressable onPress={() => setVisible(false)} style={styles.modalClose}>
-                <X color="#343e48" size={20} />
+              <View>
+                <Text style={styles.modalTitle}>Ubicación Activa</Text>
+                <Text style={styles.modalSubtitle}>Selecciona el desarrollo o villa a operar</Text>
+              </View>
+              <Pressable
+                onPress={() => setVisible(false)}
+                style={({ pressed }) => [styles.modalClose, pressed && { opacity: 0.7 }]}
+                hitSlop={10}
+              >
+                <X color={Colors.textSecondary} size={18} />
               </Pressable>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
               {grouped.map(([desarrollo, units]) => (
                 <View key={desarrollo} style={styles.devSection}>
                   <Text style={styles.devName}>{desarrollo}</Text>
@@ -124,7 +133,7 @@ export function HeaderCaboSystems({
                         style={({ pressed }) => [
                           styles.unitRow,
                           isSelected && styles.unitRowSelected,
-                          pressed && { opacity: 0.85 },
+                          pressed && { opacity: 0.8 },
                         ]}
                         onPress={() => {
                           onSelectProject?.(unit);
@@ -134,7 +143,7 @@ export function HeaderCaboSystems({
                         <Text style={[styles.unitCode, isSelected && styles.unitCodeSelected]}>
                           {unitName}
                         </Text>
-                        {isSelected && <Check color={ORANGE} size={16} strokeWidth={2.5} />}
+                        {isSelected && <Check color="#FFFFFF" size={16} strokeWidth={2.8} />}
                       </Pressable>
                     );
                   })}
@@ -155,130 +164,161 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 50,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: DARK_BORDER,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  overlayBackground: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: DARK_BG,
+    borderBottomColor: Colors.border,
+    ...Shadow.xs,
   },
   safeArea: {
-    backgroundColor: 'transparent',
+    backgroundColor: '#FFFFFF',
   },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    height: 64,
-    minHeight: 64,
+    paddingLeft: 10,
+    paddingRight: Spacing.md,
+    height: 72,
+    minHeight: 72,
   },
   containerTablet: {
-    paddingHorizontal: 24,
-    height: 70,
-    minHeight: 70,
+    paddingLeft: Spacing.md,
+    paddingRight: Spacing.xl,
+    height: 78,
+    minHeight: 78,
   },
-  logoGroup: {
-    alignItems: 'center',
+  logoContainer: {
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    transform: [{ translateY: -3 }],
   },
   logo: {
-    width: 140,
-    height: 30,
+    width: 220,
+    height: 54,
   },
   logoTablet: {
-    width: 140,
-    height: 32,
-  },
-  logoSubtext: {
-    fontFamily: 'Outfit_400Regular',
-    fontSize: 9,
-    color: '#FFFFFF',
-    letterSpacing: 3,
-    marginTop: 2,
-  },
-  logoSubtextTablet: {
-    fontSize: 9,
-    letterSpacing: 3,
+    width: 250,
+    height: 60,
   },
   selector: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 6,
+    gap: 7,
+    paddingVertical: 7,
     paddingHorizontal: 12,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderRadius: BorderRadius.full,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E4E7EC',
+    ...Shadow.xs,
   },
   selectorTablet: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    gap: 8,
   },
-  selectorHovered: {
-    backgroundColor: 'rgba(247, 140, 38, 0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(247, 140, 38, 0.4)',
-    transform: [{ scale: 1.02 }],
+  selectorPressed: {
+    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.borderBrand,
+    opacity: 0.9,
   },
-  selectorText: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 13,
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
+  selectorActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+    ...Shadow.xs,
   },
-  selectorTextTablet: {
-    fontSize: 13,
+  selectorActivePressed: {
+    backgroundColor: Colors.primaryDark,
+    borderColor: Colors.primaryDark,
+    opacity: 0.9,
   },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  selectorPinBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: Colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  selectorPinBoxActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+  },
+  selectorText: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 13.5,
+    color: Colors.text,
+    letterSpacing: 0.2,
+    maxWidth: 140,
+  },
+  selectorTextActive: {
+    color: '#FFFFFF',
+  },
+  selectorTextTablet: {
+    fontSize: 14,
+    maxWidth: 220,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(16, 24, 40, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
+  },
   modalContent: {
-    width: '80%',
-    maxHeight: '60%',
-    backgroundColor: '#111111',
-    borderRadius: 16,
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '75%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius['2xl'],
     borderWidth: 1,
-    borderColor: DARK_BORDER,
+    borderColor: Colors.border,
     overflow: 'hidden',
+    ...Shadow.lg,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 12,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: DARK_BORDER,
+    borderBottomColor: Colors.borderLight,
   },
   modalTitle: {
-    fontFamily: 'Outfit_600SemiBold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 16,
-    color: '#FFFFFF',
+    color: Colors.text,
+  },
+  modalSubtitle: {
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
   modalClose: {
-    padding: 4,
+    width: 32,
+    height: 32,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalList: {
+    paddingVertical: Spacing.xs,
   },
   devSection: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 4,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.xs,
   },
   devName: {
-    fontFamily: 'Outfit_500Medium',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.4)',
-    letterSpacing: 2,
+    color: Colors.textSecondary,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
-    marginBottom: 8,
+    marginBottom: Spacing.xs,
   },
   unitRow: {
     flexDirection: 'row',
@@ -286,21 +326,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 14,
-    marginBottom: 4,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    marginBottom: 6,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
   },
   unitRowSelected: {
-    backgroundColor: 'rgba(247, 140, 38, 0.15)',
-    borderWidth: 1,
-    borderColor: ORANGE,
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
   unitCode: {
     fontFamily: 'Outfit_600SemiBold',
     fontSize: 14,
-    color: '#FFFFFF',
+    color: Colors.text,
   },
   unitCodeSelected: {
-    color: ORANGE,
+    color: '#FFFFFF',
+    fontFamily: 'Outfit_700Bold',
   },
 });

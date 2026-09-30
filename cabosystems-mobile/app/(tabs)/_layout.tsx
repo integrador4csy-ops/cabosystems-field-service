@@ -15,21 +15,24 @@ import { useAuth } from '@/lib/auth';
 import { useProjects } from '@/lib/projects';
 import { getLatestFieldRecord } from '@/lib/api';
 
-const FAB_SIZE = 48;
+const FAB_SIZE = 52;
 
 function TabBarIcon({
   Icon,
   color,
   focused,
 }: {
-  Icon: React.ComponentType<{ size: number; color: string }>;
+  Icon: React.ComponentType<{ size: number; color: string; strokeWidth?: number }>;
   color: any;
   focused: boolean;
 }) {
   return (
-    <View style={styles.iconContainer}>
-      <Icon size={20} color={color} />
-      {focused && <View style={styles.activeDot} />}
+    <View style={[styles.iconPill, focused && styles.iconPillActive]}>
+      <Icon
+        size={21}
+        color={focused ? Colors.primary : Colors.textSecondary}
+        strokeWidth={focused ? 2.4 : 1.9}
+      />
     </View>
   );
 }
@@ -75,7 +78,7 @@ function FloatingActionButton(props: any) {
             router.push(`/checkin/${targetId}?type=${checkType}` as any);
           }}
         >
-          <Camera size={22} color={Colors.textWhite} />
+          <Camera size={23} color={Colors.textWhite} strokeWidth={2.4} />
           {isCheckedIn && <View style={styles.fabActiveBadge} />}
         </Pressable>
       </View>
@@ -99,15 +102,15 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.textMuted,
+        tabBarInactiveTintColor: Colors.textSecondary,
         tabBarStyle: {
-          backgroundColor: Glass.bgSolid,
-          borderTopColor: Glass.border,
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#E4E7EC',
           borderTopWidth: 1,
-          height: 60 + bottomInset,
+          height: 66 + bottomInset,
           paddingTop: 8,
           paddingBottom: bottomInset,
-          paddingHorizontal: 20,
+          paddingHorizontal: 8,
           overflow: 'visible',
           ...Shadow.md,
         },
@@ -116,9 +119,9 @@ export default function TabLayout() {
         },
         tabBarLabelStyle: {
           fontFamily: 'Outfit_600SemiBold',
-          fontSize: 10,
-          marginTop: 2,
-          letterSpacing: 0.2,
+          fontSize: 11,
+          marginTop: 3,
+          letterSpacing: 0.15,
         },
         headerShown: false,
       }}>
@@ -142,19 +145,14 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="fab"
-        options={{
-          title: '',
-          tabBarButton: (props) => <FloatingActionButton {...props} />,
-        }}
-      />
-      <Tabs.Screen
-        name="chat"
-        options={{
-          title: 'Chat',
-          tabBarIcon: ({ color, focused }) => (
-            <TabBarIcon Icon={MessageSquare} color={color} focused={focused} />
-          ),
-        }}
+        options={
+          isAdmin
+            ? { href: null }
+            : {
+                title: '',
+                tabBarButton: (props) => <FloatingActionButton {...props} />,
+              }
+        }
       />
       <Tabs.Screen
         name="users"
@@ -164,6 +162,15 @@ export default function TabLayout() {
             <TabBarIcon Icon={Users} color={color} focused={focused} />
           ),
           href: isAdmin ? undefined : null,
+        }}
+      />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: 'Chat',
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon Icon={MessageSquare} color={color} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -180,17 +187,15 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  iconContainer: {
+  iconPill: {
+    width: 48,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 26,
   },
-  activeDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: Colors.primary,
-    marginTop: 2,
+  iconPillActive: {
+    backgroundColor: Colors.primaryLight,
   },
   fabWrapper: {
     flex: 1,
@@ -200,7 +205,7 @@ const styles = StyleSheet.create({
     overflow: 'visible',
   },
   fabAlignBox: {
-    height: 26,
+    height: 30,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'visible',

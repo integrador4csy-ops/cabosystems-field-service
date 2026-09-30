@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { captureImageSafe, pickImageSafe } from '@/lib/mediaPicker';
 import {
@@ -30,7 +29,7 @@ import {
   Smile,
   X,
 } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius } from '@/constants/Theme';
+import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import {
@@ -397,17 +396,15 @@ export default function ChatRoomScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header Glass CSY */}
+      {/* Header Minimalista en Modo Claro */}
       <View style={[styles.headerWrapper, { paddingTop: insets.top }]}>
-        <BlurView tint="dark" intensity={70} style={StyleSheet.absoluteFill} />
-        <View style={styles.headerOverlay} />
         <View style={styles.headerContent}>
           <Pressable
             onPress={() => router.back()}
             style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.7 }]}
             hitSlop={10}
           >
-            <ArrowLeft size={22} color={Colors.textWhite} />
+            <ArrowLeft size={20} color={Colors.text} />
           </Pressable>
 
           <Pressable
@@ -603,14 +600,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.backgroundAlt,
   },
   headerWrapper: {
-    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderBottomColor: Colors.border,
     zIndex: 10,
-  },
-  headerOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    ...Shadow.xs,
   },
   headerContent: {
     height: 60,
@@ -642,14 +636,14 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: BorderRadius.full,
-    backgroundColor: 'rgba(247, 140, 38, 0.2)',
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+    borderWidth: 1,
+    borderColor: Colors.borderBrand,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerAvatarLetter: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 16,
     color: Colors.primary,
   },
@@ -657,14 +651,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 15,
-    color: Colors.textWhite,
+    color: Colors.text,
   },
   headerSubtitle: {
-    fontFamily: 'Montserrat_400Regular',
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.70)',
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 11.5,
+    color: Colors.textSecondary,
     marginTop: 1,
   },
   messagesList: {
@@ -698,10 +692,10 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   bubbleOther: {
-    backgroundColor: Colors.card,
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.12)',
+    borderColor: '#E4E7EC',
     shadowColor: Colors.text,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
@@ -715,17 +709,17 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   senderName: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 12,
     color: Colors.primary,
   },
   senderRoleTag: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 9,
     color: Colors.textMuted,
   },
   msgText: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 14,
     lineHeight: 20,
   },
@@ -736,8 +730,8 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   msgTime: {
-    fontFamily: 'Montserrat_400Regular',
-    fontSize: 9,
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 9.5,
     alignSelf: 'flex-end',
     marginTop: 4,
   },
@@ -765,12 +759,12 @@ const styles = StyleSheet.create({
   videoPlaceholder: {
     width: 220,
     height: 140,
-    backgroundColor: 'rgba(52, 62, 72, 0.08)',
+    backgroundColor: '#F2F4F7',
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.12)',
+    borderColor: '#E4E7EC',
   },
   videoPlayBtn: {
     width: 48,
@@ -793,7 +787,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   videoBadgeText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 9,
     color: '#ffffff',
   },
@@ -802,7 +796,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   senderLabel: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 11,
     color: Colors.primary,
     marginBottom: 2,
@@ -812,7 +806,7 @@ const styles = StyleSheet.create({
     height: 120,
   },
   stickerTime: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 9,
     color: Colors.textMuted,
     textAlign: 'right',
@@ -827,12 +821,12 @@ const styles = StyleSheet.create({
   reactionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(52, 62, 72, 0.06)',
+    backgroundColor: '#F2F4F7',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.10)',
+    borderColor: '#E4E7EC',
   },
   reactionItemMe: {
     backgroundColor: 'rgba(0, 0, 0, 0.15)',
@@ -842,7 +836,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   reactionCount: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 10,
     color: Colors.text,
     marginLeft: 3,
@@ -855,23 +849,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: 'rgba(247, 140, 38, 0.10)',
+    backgroundColor: '#FFF7ED',
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderTopWidth: 1,
-    borderColor: 'rgba(247, 140, 38, 0.25)',
+    borderColor: '#FED7AA',
   },
   restrictedText: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 11,
     color: Colors.primary,
   },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.10)',
+    borderColor: '#E4E7EC',
     paddingHorizontal: 8,
     paddingTop: 8,
     gap: 6,
@@ -884,29 +878,29 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    backgroundColor: Colors.backgroundAlt,
+    backgroundColor: '#F9FAFB',
     borderRadius: BorderRadius.md,
     paddingHorizontal: 12,
     paddingVertical: 8,
     maxHeight: 90,
     color: Colors.text,
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 14,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.12)',
+    borderColor: '#E4E7EC',
   },
   textInputDisabled: {
     flex: 1,
-    backgroundColor: Colors.backgroundAlt,
+    backgroundColor: '#F9FAFB',
     borderRadius: BorderRadius.md,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.08)',
+    borderColor: '#E4E7EC',
     justifyContent: 'center',
   },
   textInputDisabledLabel: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 12,
     color: Colors.textMuted,
     fontStyle: 'italic',
@@ -926,25 +920,25 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   loadingText: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 13,
     color: Colors.textSecondary,
   },
   reactionBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(16, 24, 40, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   reactionBar: {
     flexDirection: 'row',
-    backgroundColor: Colors.card,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 30,
     gap: 14,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.12)',
+    borderColor: '#E4E7EC',
     shadowColor: Colors.text,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,

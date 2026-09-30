@@ -115,7 +115,7 @@ export default function AppUpdateModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: 'rgba(16, 24, 40, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.md,
@@ -127,6 +127,8 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 380,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E4E7EC',
     ...Shadow.lg,
   },
   iconContainer: {

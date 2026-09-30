@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,26 +10,61 @@ import {
   useWindowDimensions,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { AlertCircle, Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
+import { AlertCircle, Mail, Lock, Eye, EyeOff, Fingerprint, ScanFace } from 'lucide-react-native';
 import CaboLogo from '@/components/CaboLogo';
-import { Colors, Spacing, BorderRadius } from '@/constants/Theme';
+import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { useAuth, formatAuthError } from '@/lib/auth';
+import {
+  getBiometricStatus,
+  getBiometricCredentials,
+  setBiometricCredentials,
+  authenticateWithBiometrics,
+  performBiometricLogin,
+  BiometricStatus,
+} from '@/lib/biometrics';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+  const [promptLoading, setPromptLoading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [biometricStatus, setBiometricStatus] = useState<BiometricStatus | null>(null);
+  const [hasSavedBiometrics, setHasSavedBiometrics] = useState(false);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [savedEmail, setSavedEmail] = useState('');
+  const [tempCredentials, setTempCredentials] = useState<{ email: string; password: string } | null>(null);
 
   const { signInWithEmail, authError, clearAuthError } = useAuth();
   const router = useRouter();
   const { width, height } = useWindowDimensions();
   const isCompact = height < 700 || width < 360;
   const logoWidth = Math.min(width * 0.55, 220);
+
+  // Inicializar verificación de hardware biométrico y credenciales guardadas
+  useEffect(() => {
+    async function initBiometrics() {
+      const status = await getBiometricStatus();
+      setBiometricStatus(status);
+
+      if (status.available && status.enrolled) {
+        const saved = await getBiometricCredentials();
+        if (saved && saved.email && (saved.password || saved.refreshToken)) {
+          setHasSavedBiometrics(true);
+          setSavedEmail(saved.email);
+          if (!email) {
+            setEmail(saved.email);
+          }
+        }
+      }
+    }
+    initBiometrics();
+  }, []);
 
   const handleLogin = async () => {
     setLocalError(null);
@@ -42,12 +77,60 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      const { error } = await signInWithEmail(email, password);
+      const { error } = await signInWithEmail(email.trim(), password);
       if (error) {
         setLocalError(formatAuthError(error));
+      } else {
+        // Guardar credenciales de forma segura para permitir acceso biométrico
+        if (biometricStatus?.available && biometricStatus?.enrolled) {
+          await setBiometricCredentials(email.trim(), password, true);
+          setHasSavedBiometrics(true);
+        }
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConfirmRegisterBiometrics = async () => {
+    if (!tempCredentials) {
+      setShowRegisterModal(false);
+      return;
+    }
+
+    setPromptLoading(true);
+    try {
+      const authResult = await authenticateWithBiometrics(
+        `Registrar ${biometricStatus?.label || 'biometría'} en CaboSystems`
+      );
+
+      if (authResult.success) {
+        await setBiometricCredentials(tempCredentials.email, tempCredentials.password, true);
+        setHasSavedBiometrics(true);
+        setSavedEmail(tempCredentials.email);
+      }
+    } finally {
+      setPromptLoading(false);
+      setShowRegisterModal(false);
+    }
+  };
+
+  const handleDeclineRegisterBiometrics = () => {
+    setShowRegisterModal(false);
+  };
+
+  const handleBiometricLogin = async () => {
+    setLocalError(null);
+    clearAuthError();
+
+    setBiometricLoading(true);
+    try {
+      const result = await performBiometricLogin(signInWithEmail);
+      if (!result.success && result.error) {
+        setLocalError(result.error);
+      }
+    } finally {
+      setBiometricLoading(false);
     }
   };
 
@@ -178,6 +261,32 @@ export default function LoginScreen() {
             )}
           </Pressable>
 
+          {/* Botón Circular de Ícono Biométrico (Huella o Face ID) abajo de Login */}
+          {hasSavedBiometrics && (
+            <View style={styles.biometricIconWrapper}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.biometricCircleBtn,
+                  pressed && { opacity: 0.75, transform: [{ scale: 0.94 }] },
+                  (loading || biometricLoading) && { opacity: 0.5 },
+                ]}
+                onPress={handleBiometricLogin}
+                disabled={loading || biometricLoading}
+                hitSlop={8}
+                accessibilityLabel={`Ingresar con ${biometricStatus?.label || 'Huella'}`}
+                accessibilityRole="button"
+              >
+                {biometricLoading ? (
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                ) : biometricStatus?.biometryType === 'facial' ? (
+                  <ScanFace size={28} color={Colors.primary} strokeWidth={2.2} />
+                ) : (
+                  <Fingerprint size={28} color={Colors.primary} strokeWidth={2.2} />
+                )}
+              </Pressable>
+            </View>
+          )}
+
           {/* Enlace para Invitación / Registro */}
           <View style={styles.inviteNoticeContainer}>
             <Text style={styles.inviteNoticeText}>
@@ -189,6 +298,63 @@ export default function LoginScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Modal para Registrar Biometría tras Login Exitoso */}
+      <Modal
+        visible={showRegisterModal}
+        transparent
+        animationType="fade"
+        onRequestClose={handleDeclineRegisterBiometrics}
+        statusBarTranslucent
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, Shadow.lg]}>
+            <View style={styles.modalIconCircle}>
+              {biometricStatus?.biometryType === 'facial' ? (
+                <ScanFace size={28} color="#FFFFFF" strokeWidth={2.3} />
+              ) : (
+                <Fingerprint size={28} color="#FFFFFF" strokeWidth={2.3} />
+              )}
+            </View>
+
+            <Text style={styles.modalTitle}>
+              ¿Activar {biometricStatus?.label || 'Huella Dactilar'}?
+            </Text>
+            <Text style={styles.modalMessage}>
+              Registra tu {biometricStatus?.label?.toLowerCase() || 'huella'} para acceder rápidamente a CaboSystems Field Service en tus próximas sesiones sin escribir tu contraseña.
+            </Text>
+
+            <View style={styles.modalActionsRow}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.modalDeclineBtn,
+                  pressed && { opacity: 0.8 },
+                ]}
+                onPress={handleDeclineRegisterBiometrics}
+                disabled={promptLoading}
+              >
+                <Text style={styles.modalDeclineBtnText}>Ahora no</Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.modalAcceptBtn,
+                  pressed && { opacity: 0.9 },
+                  promptLoading && { opacity: 0.6 },
+                ]}
+                onPress={handleConfirmRegisterBiometrics}
+                disabled={promptLoading}
+              >
+                {promptLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalAcceptBtnText}>Activar</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -202,28 +368,32 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.xl,
+    paddingTop: Spacing.xxl + 16,
+    paddingBottom: Spacing.xl,
     maxWidth: 480,
     width: '100%',
     alignSelf: 'center',
   },
   contentCompact: {
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.lg,
+    paddingTop: Spacing.xl + 12,
+    paddingBottom: Spacing.lg,
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: Spacing.xxl,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xl,
   },
   logoContainerCompact: {
-    marginBottom: Spacing.xl,
+    marginTop: 0,
+    marginBottom: Spacing.lg,
   },
   logoSubtext: {
     fontFamily: 'Outfit_700Bold',
-    fontSize: 12,
+    fontSize: 11.5,
     color: Colors.primary,
-    letterSpacing: 4,
-    marginTop: Spacing.md,
+    letterSpacing: 2,
+    marginTop: 4,
   },
   formContainer: {
     marginBottom: Spacing.xl,
@@ -342,6 +512,26 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     letterSpacing: 0.5,
   },
+  biometricIconWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.lg,
+  },
+  biometricCircleBtn: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1.5,
+    borderColor: '#FED7AA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
   inviteNoticeContainer: {
     marginTop: Spacing.xl,
     flexDirection: 'row',
@@ -359,5 +549,95 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.primary,
     textDecorationLine: 'underline',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(16, 24, 40, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius['2xl'],
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingVertical: 26,
+    paddingHorizontal: 22,
+    alignItems: 'center',
+  },
+  modalIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.primary,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  modalTitle: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 18,
+    color: Colors.text,
+    textAlign: 'center',
+    marginBottom: 8,
+    letterSpacing: 0.2,
+  },
+  modalMessage: {
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 22,
+  },
+  modalActionsRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    width: '100%',
+  },
+  modalDeclineBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalDeclineBtnText: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 12.5,
+    color: Colors.textSecondary,
+    letterSpacing: 0.3,
+  },
+  modalAcceptBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  modalAcceptBtnText: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 12.5,
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
 });

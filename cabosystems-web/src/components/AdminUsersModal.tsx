@@ -35,7 +35,7 @@ const ROLES_LIST = [
   { id: 'supervisor_instalacion', label: 'Supervisor Instalación' },
   { id: 'instalador', label: 'Técnico Instalador' },
   { id: 'aux_instalacion', label: 'Auxiliar Instalación' },
-  { id: 'integrador', label: 'Especialista Integrador' },
+  { id: 'integrador', label: 'Integrador' },
   { id: 'aux_integracion', label: 'Auxiliar Integración' },
   { id: 'infraestructura', label: 'Infraestructura' },
   { id: 'aux_infraestructura', label: 'Auxiliar Infraestructura' },
@@ -446,7 +446,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
       isOpen: true,
       title: '¿Revocar Invitación y Anular Enlace?',
       message: `¿Deseas cancelar la invitación pendiente para ${invite.email}? El enlace enviado quedará invalidado de inmediato y ya no podrá ser utilizado para registrarse.`,
-      confirmLabel: 'Sí, Revocar y Anular Enlace',
+      confirmLabel: 'Sí',
       confirmVariant: 'danger',
       onConfirm: async () => {
         try {

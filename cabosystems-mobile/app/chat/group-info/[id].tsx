@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { pickImageSafe } from '@/lib/mediaPicker';
 import {
@@ -30,7 +29,7 @@ import {
   Edit2,
   X,
 } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius } from '@/constants/Theme';
+import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { useAuth } from '@/lib/auth';
 import {
   getChatGroupDetails,
@@ -249,17 +248,15 @@ export default function GroupInfoScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header Glass CSY */}
+      {/* Header Minimalist Light Mode */}
       <View style={[styles.headerWrapper, { paddingTop: insets.top }]}>
-        <BlurView tint="dark" intensity={70} style={StyleSheet.absoluteFill} />
-        <View style={styles.headerOverlay} />
         <View style={styles.headerContent}>
           <Pressable
             onPress={() => router.back()}
             style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
             hitSlop={10}
           >
-            <ArrowLeft size={22} color={Colors.textWhite} />
+            <ArrowLeft size={22} color={Colors.text} />
           </Pressable>
 
           <Text style={styles.headerTitle}>INFO DEL GRUPO</Text>
@@ -556,17 +553,14 @@ export default function GroupInfoScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.backgroundAlt,
+    backgroundColor: '#F9FAFB',
   },
   headerWrapper: {
-    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: '#E4E7EC',
     zIndex: 10,
-  },
-  headerOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    ...Shadow.xs,
   },
   headerContent: {
     height: 56,
@@ -582,10 +576,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 13,
-    color: Colors.textWhite,
-    letterSpacing: 1.5,
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 14,
+    color: Colors.text,
+    letterSpacing: 0.8,
   },
   scroll: {
     flex: 1,
@@ -596,17 +590,13 @@ const styles = StyleSheet.create({
   },
   heroCard: {
     alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.10)',
+    borderColor: '#E4E7EC',
     marginBottom: Spacing.md,
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
+    ...Shadow.xs,
   },
   avatarBox: {
     width: 90,
@@ -625,12 +615,12 @@ const styles = StyleSheet.create({
   heroAvatarPlaceholder: {
     width: '100%',
     height: '100%',
-    backgroundColor: 'rgba(247, 140, 38, 0.12)',
+    backgroundColor: '#FFF7ED',
     justifyContent: 'center',
     alignItems: 'center',
   },
   heroAvatarLetter: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 32,
     color: Colors.primary,
   },
@@ -653,12 +643,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   groupName: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 18,
     color: Colors.text,
   },
   groupDesc: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 13,
     color: Colors.textSecondary,
     textAlign: 'center',
@@ -670,26 +660,26 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   nameInput: {
-    backgroundColor: Colors.backgroundAlt,
-    borderRadius: BorderRadius.sm,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
     color: Colors.text,
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 14,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.12)',
+    borderColor: '#E4E7EC',
   },
   descInput: {
-    backgroundColor: Colors.backgroundAlt,
-    borderRadius: BorderRadius.sm,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
     color: Colors.text,
-    fontFamily: 'Montserrat_400Regular',
-    fontSize: 12,
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 12.5,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.12)',
+    borderColor: '#E4E7EC',
   },
   editButtonsRow: {
     flexDirection: 'row',
@@ -702,7 +692,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   cancelBtnText: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_500Medium',
     fontSize: 12,
     color: Colors.textMuted,
   },
@@ -710,25 +700,21 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     paddingHorizontal: 16,
     paddingVertical: 6,
-    borderRadius: BorderRadius.sm,
+    borderRadius: 8,
   },
   saveBtnText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 12,
     color: '#ffffff',
   },
   settingCard: {
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.10)',
+    borderColor: '#E4E7EC',
     marginBottom: Spacing.md,
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
+    ...Shadow.xs,
   },
   settingHeader: {
     flexDirection: 'row',
@@ -737,10 +723,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   settingCardTitle: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 11,
     color: Colors.primary,
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   switchRow: {
     flexDirection: 'row',
@@ -757,29 +743,25 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   switchTitle: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 13,
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 13.5,
     color: Colors.text,
   },
   switchSubtitle: {
-    fontFamily: 'Montserrat_400Regular',
-    fontSize: 11,
-    color: Colors.textMuted,
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 11.5,
+    color: Colors.textSecondary,
     marginTop: 3,
-    lineHeight: 15,
+    lineHeight: 16,
   },
   membersSection: {
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.10)',
+    borderColor: '#E4E7EC',
     marginBottom: Spacing.lg,
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
+    ...Shadow.xs,
   },
   membersHeader: {
     flexDirection: 'row',
@@ -793,10 +775,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   membersTitle: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 12,
     color: Colors.primary,
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   addMemberBtn: {
     flexDirection: 'row',
@@ -805,10 +787,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: BorderRadius.sm,
+    borderRadius: 8,
   },
   addMemberText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 11,
     color: '#ffffff',
   },
@@ -825,12 +807,12 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: BorderRadius.full,
-    backgroundColor: 'rgba(52, 62, 72, 0.08)',
+    backgroundColor: '#F2F4F7',
     justifyContent: 'center',
     alignItems: 'center',
   },
   memberAvatarLetter: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 14,
     color: Colors.text,
   },
@@ -843,35 +825,37 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   memberName: {
-    fontFamily: 'Montserrat_600SemiBold',
-    fontSize: 13,
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 13.5,
     color: Colors.text,
   },
   youBadge: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 9,
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 9.5,
     color: Colors.primary,
-    backgroundColor: 'rgba(247, 140, 38, 0.12)',
+    backgroundColor: '#FFF7ED',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#FED7AA',
   },
   memberRole: {
-    fontFamily: 'Montserrat_400Regular',
-    fontSize: 10,
-    color: Colors.textMuted,
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 10.5,
+    color: Colors.textSecondary,
     marginTop: 2,
   },
   adminBadge: {
-    backgroundColor: 'rgba(247, 140, 38, 0.12)',
+    backgroundColor: '#FFF7ED',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 4,
+    borderRadius: 6,
     borderWidth: 1,
-    borderColor: 'rgba(247, 140, 38, 0.3)',
+    borderColor: '#FED7AA',
   },
   adminBadgeText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 10,
     color: Colors.primary,
   },
@@ -886,16 +870,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: 'rgba(52, 62, 72, 0.06)',
+    backgroundColor: '#FEF2F2',
     paddingVertical: 14,
-    borderRadius: BorderRadius.md,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.18)',
+    borderColor: '#FECDCA',
   },
   deleteGroupText: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 13,
-    color: Colors.text,
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 13.5,
+    color: '#B42318',
   },
   centerLoading: {
     flex: 1,
@@ -904,29 +888,25 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   loadingText: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 12,
     color: Colors.textSecondary,
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(16, 24, 40, 0.45)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: Colors.card,
-    borderTopLeftRadius: BorderRadius.xl,
-    borderTopRightRadius: BorderRadius.xl,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     padding: Spacing.md,
     maxHeight: '75%',
     minHeight: 400,
     borderTopWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.10)',
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 5,
+    borderColor: '#E4E7EC',
+    ...Shadow.lg,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -935,26 +915,26 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   modalTitle: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 16,
     color: Colors.text,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.backgroundAlt,
-    borderRadius: BorderRadius.md,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
     paddingHorizontal: 12,
     gap: 8,
     marginBottom: Spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.12)',
+    borderColor: '#E4E7EC',
   },
   searchInput: {
     flex: 1,
     height: 40,
     color: Colors.text,
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 13,
   },
   modalList: {
@@ -966,17 +946,17 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 10,
     paddingHorizontal: 8,
-    borderRadius: BorderRadius.sm,
+    borderRadius: 10,
   },
   modalItemSelected: {
-    backgroundColor: 'rgba(247, 140, 38, 0.08)',
+    backgroundColor: '#FFF7ED',
   },
   checkbox: {
     width: 20,
     height: 20,
     borderRadius: 5,
     borderWidth: 1.5,
-    borderColor: 'rgba(52, 62, 72, 0.3)',
+    borderColor: '#D0D5DD',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -987,13 +967,13 @@ const styles = StyleSheet.create({
   confirmAddBtn: {
     backgroundColor: Colors.primary,
     paddingVertical: 12,
-    borderRadius: BorderRadius.md,
+    borderRadius: 10,
     alignItems: 'center',
     marginTop: 12,
   },
   confirmAddText: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 13,
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 13.5,
     color: '#ffffff',
   },
 });

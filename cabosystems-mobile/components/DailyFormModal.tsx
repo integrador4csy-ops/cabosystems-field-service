@@ -9,7 +9,6 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
 import * as WebBrowser from 'expo-web-browser';
 import {
   X,
@@ -18,7 +17,8 @@ import {
   ShieldCheck,
   ClipboardList,
 } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius } from '@/constants/Theme';
+import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
+import { Button, Badge } from '@/components/ui';
 import { isNativeWebViewAvailable } from '@/lib/dailyForm';
 import DailyFormConfirmModal from '@/components/DailyFormConfirmModal';
 
@@ -118,7 +118,7 @@ export default function DailyFormModal({
   const handleOpenExternal = async () => {
     try {
       await WebBrowser.openBrowserAsync(url, {
-        toolbarColor: '#161c22',
+        toolbarColor: '#1A202C',
         controlsColor: Colors.primary,
         presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
       });
@@ -150,11 +150,8 @@ export default function DailyFormModal({
       onRequestClose={onClose}
     >
       <View style={[styles.container, { paddingTop: Platform.OS === 'android' ? insets.top : 0 }]}>
-        {/* Encabezado Oficial CaboSystems (Dark Glassmorphism) */}
+        {/* Encabezado Minimalista en Modo Claro */}
         <View style={styles.headerWrapper}>
-          <BlurView tint="dark" intensity={75} style={StyleSheet.absoluteFill} />
-          <View style={styles.headerOverlay} />
-
           <View style={styles.headerContent}>
             <View style={styles.headerLeft}>
               <View style={styles.badge}>
@@ -173,7 +170,7 @@ export default function DailyFormModal({
                   onPress={() => webViewRef.current?.reload?.()}
                   hitSlop={8}
                 >
-                  <RotateCw size={17} color="#FFFFFF" strokeWidth={2.2} />
+                  <RotateCw size={16} color={Colors.textSecondary} strokeWidth={2.2} />
                 </Pressable>
               )}
 
@@ -182,7 +179,7 @@ export default function DailyFormModal({
                 onPress={onClose}
                 hitSlop={8}
               >
-                <X size={19} color="#FFFFFF" strokeWidth={2.5} />
+                <X size={18} color={Colors.textSecondary} strokeWidth={2.5} />
               </Pressable>
             </View>
           </View>
@@ -204,10 +201,14 @@ export default function DailyFormModal({
                   <Text style={styles.errorText}>
                     No se pudo cargar el formulario embebido.
                   </Text>
-                  <Pressable style={styles.fallbackBtn} onPress={handleOpenExternal}>
-                    <ExternalLink size={16} color="#FFFFFF" />
-                    <Text style={styles.fallbackBtnText}>Abrir en Navegador Seguro</Text>
-                  </Pressable>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    startIcon={<ExternalLink size={16} color="#FFFFFF" />}
+                    onPress={handleOpenExternal}
+                  >
+                    Abrir en Navegador Seguro
+                  </Button>
                 </View>
               )}
               startInLoadingState
@@ -222,26 +223,30 @@ export default function DailyFormModal({
             <View style={styles.fallbackScreen}>
               <View style={styles.fallbackCard}>
                 <View style={styles.fallbackIconCircle}>
-                  <ClipboardList size={34} color={Colors.primary} strokeWidth={2.2} />
+                  <ClipboardList size={32} color={Colors.primary} strokeWidth={2.2} />
                 </View>
+                <Badge color="primary" variant="light" size="sm" style={{ marginBottom: 10 }}>
+                  TURNO DE HOY
+                </Badge>
                 <Text style={styles.fallbackTitle}>Formulario Diario de Operación</Text>
                 <Text style={styles.fallbackDescription}>
                   Abre el formulario oficial de Google en tu navegador seguro para registrar tus actividades del turno de hoy.
                 </Text>
 
-                <Pressable
-                  style={({ pressed }) => [styles.openBrowserBtn, pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] }]}
+                <Button
+                  variant="primary"
+                  size="lg"
+                  startIcon={<ExternalLink size={17} color="#FFFFFF" strokeWidth={2.2} />}
                   onPress={handleOpenExternal}
                 >
-                  <ExternalLink size={17} color="#FFFFFF" strokeWidth={2.2} />
-                  <Text style={styles.openBrowserBtnText}>ABRIR FORMULARIO</Text>
-                </Pressable>
+                  ABRIR FORMULARIO
+                </Button>
               </View>
             </View>
           )}
         </View>
 
-        {/* Modal de Confirmación Estilo CaboSystems (usado al volver del navegador externo en fallback) */}
+        {/* Modal de Confirmación Estilo TailAdmin */}
         <DailyFormConfirmModal
           visible={confirmModalVisible}
           type="confirm"
@@ -253,7 +258,7 @@ export default function DailyFormModal({
           onCancel={() => setConfirmModalVisible(false)}
         />
 
-        {/* Modal de Éxito Estilo CaboSystems al presionar "Enviar" en Google */}
+        {/* Modal de Éxito Estilo TailAdmin */}
         <DailyFormConfirmModal
           visible={successModalVisible}
           type="success"
@@ -270,18 +275,15 @@ export default function DailyFormModal({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0c1117',
+    backgroundColor: '#FFFFFF',
   },
   headerWrapper: {
-    height: 64,
-    overflow: 'hidden',
+    height: 60,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    borderBottomColor: Colors.border,
     justifyContent: 'center',
-  },
-  headerOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    ...Shadow.xs,
   },
   headerContent: {
     flexDirection: 'row',
@@ -300,16 +302,16 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   badgeText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 10,
     color: Colors.primary,
     letterSpacing: 0.8,
   },
   title: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 16,
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
+    color: Colors.text,
+    letterSpacing: -0.2,
   },
   headerActions: {
     flexDirection: 'row',
@@ -317,22 +319,22 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    width: 34,
+    height: 34,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.background,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: Colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
   closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    width: 34,
+    height: 34,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.background,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: Colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -352,7 +354,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    fontFamily: 'Montserrat_500Medium',
+    fontFamily: 'Outfit_500Medium',
     fontSize: 13,
     color: Colors.textSecondary,
   },
@@ -365,95 +367,56 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   errorText: {
-    fontFamily: 'Montserrat_500Medium',
+    fontFamily: 'Outfit_500Medium',
     fontSize: 14,
     color: Colors.textSecondary,
     textAlign: 'center',
   },
-  fallbackBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: Colors.primary,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: BorderRadius.md,
-  },
-  fallbackBtnText: {
-    fontFamily: 'Montserrat_600SemiBold',
-    fontSize: 14,
-    color: '#FFFFFF',
-  },
   fallbackScreen: {
     flex: 1,
-    backgroundColor: '#0c1117',
+    backgroundColor: Colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
   },
   fallbackCard: {
     width: '100%',
-    maxWidth: 340,
-    backgroundColor: '#161c22',
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: '#343e48',
+    maxWidth: 360,
+    backgroundColor: Colors.card,
+    borderRadius: BorderRadius['2xl'],
+    borderWidth: 1,
+    borderColor: Colors.border,
     paddingVertical: 32,
-    paddingHorizontal: 22,
+    paddingHorizontal: 24,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.45,
-    shadowRadius: 20,
-    elevation: 12,
+    ...Shadow.lg,
   },
   fallbackIconCircle: {
     width: 64,
     height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(247, 140, 38, 0.15)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(247, 140, 38, 0.4)',
+    borderRadius: BorderRadius.xl,
+    backgroundColor: Colors.primaryLight,
+    borderWidth: 1,
+    borderColor: Colors.borderBrand,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   fallbackTitle: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 17,
-    color: '#FFFFFF',
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 18,
+    color: Colors.text,
     textAlign: 'center',
     marginBottom: 8,
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
   fallbackDescription: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 13,
-    color: '#94a3b8',
+    color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 24,
     paddingHorizontal: Spacing.xs,
-  },
-  openBrowserBtn: {
-    width: '100%',
-    height: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  openBrowserBtnText: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 12,
-    color: '#FFFFFF',
-    letterSpacing: 1,
   },
 });

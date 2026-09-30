@@ -12,39 +12,34 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { HeaderCaboSystems, useHeaderHeight } from '@/components/HeaderCaboSystems';
-import { Colors, Spacing, BorderRadius } from '@/constants/Theme';
+import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
+import { Badge } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useProjects } from '@/lib/projects';
-import { supabase } from '@/lib/supabase';
 import { getMyTasks, type TaskWithProject } from '@/lib/api';
-import type { Project } from '@/types/database';
 
 const STATUS_META: Record<
   string,
   {
     color: string;
     label: string;
-    bgAlpha: string;
-    icon: React.ComponentType<{ size: number; color: string }>;
+    badgeColor: 'warning' | 'gray' | 'success';
   }
 > = {
   pendiente: {
-    color: Colors.pending,
-    label: 'Pendiente',
-    bgAlpha: 'rgba(52, 62, 72, 0.1)',
-    icon: Clock,
+    color: Colors.textSecondary,
+    label: 'Por Hacer',
+    badgeColor: 'gray',
   },
   en_proceso: {
-    color: Colors.inProgress,
+    color: Colors.primary,
     label: 'En Proceso',
-    bgAlpha: 'rgba(247, 140, 38, 0.12)',
-    icon: Play,
+    badgeColor: 'warning',
   },
   completada: {
-    color: Colors.completed,
+    color: Colors.success,
     label: 'Completada',
-    bgAlpha: 'rgba(0, 0, 0, 0.08)',
-    icon: CheckCircle2,
+    badgeColor: 'success',
   },
 };
 
@@ -55,7 +50,6 @@ const ScheduleTaskCard = React.memo(function ScheduleTaskCard({
   item: TaskWithProject;
   onPress: () => void;
 }) {
-  const [isHovered, setIsHovered] = useState(false);
   const meta = STATUS_META[item.estatus] ?? STATUS_META.pendiente;
   const woCode = `WO-${item.id.slice(0, 6).toUpperCase()}`;
 
@@ -63,57 +57,38 @@ const ScheduleTaskCard = React.memo(function ScheduleTaskCard({
     <Pressable
       style={({ pressed }) => [
         styles.taskCard,
-        isHovered && styles.taskCardHovered,
         pressed && styles.taskCardPressed,
       ]}
-      onHoverIn={() => setIsHovered(true)}
-      onHoverOut={() => setIsHovered(false)}
       onPress={onPress}
     >
-      <View
-        style={[
-          styles.taskCardAccentLine,
-          { backgroundColor: isHovered ? Colors.primary : meta.color },
-        ]}
-      />
+      <View style={styles.taskCardHeader}>
+        <Text style={styles.woCodeText}>{woCode}</Text>
+        <Badge color={meta.badgeColor} variant="light" size="sm">
+          {meta.label}
+        </Badge>
+      </View>
 
-      <View style={styles.taskCardInner}>
-        <View style={styles.taskCardHeader}>
-          <View style={styles.headerLeftGroup}>
-            <Text style={styles.woCodeText}>{woCode}</Text>
-            <View style={[styles.statusBadge, { backgroundColor: meta.bgAlpha }]}>
-              <View style={[styles.statusDot, { backgroundColor: meta.color }]} />
-              <Text style={[styles.statusText, { color: meta.color }]}>{meta.label}</Text>
-            </View>
-          </View>
+      <Text style={styles.taskTitle} numberOfLines={2}>
+        {item.titulo}
+      </Text>
 
-          <View style={[styles.chevronBox, isHovered && styles.chevronBoxHovered]}>
-            <ChevronRight
-              size={18}
-              color={isHovered ? Colors.primary : Colors.textSecondary}
-            />
-          </View>
-        </View>
-
-        <Text style={styles.taskTitle} numberOfLines={2}>
-          {item.titulo}
+      {!!item.descripcion && (
+        <Text style={styles.taskDescription} numberOfLines={2}>
+          {item.descripcion}
         </Text>
+      )}
 
-        {item.proyectos && (
+      {item.proyectos && (
+        <View style={styles.taskFooter}>
           <View style={styles.locationChip}>
-            <MapPin size={13} color={Colors.primary} />
+            <MapPin size={12} color={Colors.primary} />
             <Text style={styles.locationText} numberOfLines={1}>
               {item.proyectos.villa || item.proyectos.unidad} · {item.proyectos.desarrollo}
             </Text>
           </View>
-        )}
-
-        {!!item.descripcion && (
-          <Text style={styles.taskDescription} numberOfLines={2}>
-            {item.descripcion}
-          </Text>
-        )}
-      </View>
+          <ChevronRight size={15} color={Colors.textDisabled} />
+        </View>
+      )}
     </Pressable>
   );
 });
@@ -186,13 +161,12 @@ export default function ScheduleScreen() {
   const listHeader = (
     <View style={styles.scheduleHeader}>
       <View style={styles.headerLeft}>
-        <Calendar size={16} color={Colors.primary} />
-        <Text style={styles.sectionTitle}>AGENDA OPERATIVA</Text>
+        <Calendar size={15} color={Colors.primary} />
+        <Text style={styles.sectionTitle}>AGENDA DE CAMPO</Text>
       </View>
-      <View style={styles.countBadge}>
-        <Text style={styles.countValue}>{pendientes.length}</Text>
-        <Text style={styles.countLabel}>PENDIENTES</Text>
-      </View>
+      <Badge color="warning" variant="light" size="sm">
+        {`${pendientes.length} pendientes`}
+      </Badge>
     </View>
   );
 
@@ -207,22 +181,22 @@ export default function ScheduleScreen() {
     return (
       <View style={styles.emptyContainer}>
         <View style={styles.emptyIconBox}>
-          <Calendar size={36} color={Colors.textSecondary} />
+          <Calendar size={32} color={Colors.textSecondary} />
         </View>
         <Text style={styles.emptyTitle}>
-          {error ? 'No se pudieron cargar los datos' : 'Sin pendientes en la agenda'}
+          {error ? 'No se pudieron cargar los datos' : 'Sin tareas pendientes'}
         </Text>
         <Text style={styles.emptySubtitle}>
           {error
-            ? 'Revisa tu conexión e intenta de nuevo.'
-            : 'Las tareas asignadas para ejecución hoy aparecerán organizadas aquí.'}
+            ? 'Revisa tu conexión de red e intenta de nuevo.'
+            : 'Las órdenes pendientes de ejecución para hoy se organizarán aquí.'}
         </Text>
         <Pressable
           style={({ pressed }) => [styles.retryButton, pressed && { opacity: 0.8 }]}
           onPress={() => load()}
         >
-          <RefreshCw size={15} color={Colors.textWhite} />
-          <Text style={styles.retryText}>Reintentar carga</Text>
+          <RefreshCw size={14} color={Colors.textWhite} />
+          <Text style={styles.retryText}>Reintentar</Text>
         </Pressable>
       </View>
     );
@@ -270,9 +244,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: Spacing.md,
-    paddingBottom: Spacing.sm,
+    paddingBottom: Spacing.xs,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(52, 62, 72, 0.08)',
+    borderBottomColor: Colors.borderLight,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -280,157 +254,89 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   sectionTitle: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 12,
-    color: Colors.textSecondary,
-    letterSpacing: 1,
-  },
-  countBadge: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-    backgroundColor: Colors.background,
-    borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.15)',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 3,
-    borderRadius: BorderRadius.md,
-  },
-  countValue: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 15,
-    color: Colors.primary,
-  },
-  countLabel: {
-    fontFamily: 'Montserrat_600SemiBold',
-    fontSize: 10,
     color: Colors.textSecondary,
     letterSpacing: 0.8,
   },
   taskCard: {
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.card,
+    borderRadius: BorderRadius.lg,
     marginBottom: Spacing.sm,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.12)',
-    flexDirection: 'row',
-    overflow: 'hidden',
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  taskCardHovered: {
-    borderColor: Colors.primary,
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    borderColor: Colors.border,
+    padding: Spacing.md,
+    gap: Spacing.xs,
+    ...Shadow.xs,
   },
   taskCardPressed: {
     opacity: 0.9,
-    backgroundColor: 'rgba(52, 62, 72, 0.02)',
-  },
-  taskCardAccentLine: {
-    width: 4,
-  },
-  taskCardInner: {
-    flex: 1,
-    padding: Spacing.md,
-    gap: Spacing.xs,
+    backgroundColor: '#FAFBFD',
   },
   taskCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
-  },
-  headerLeftGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
+    marginBottom: 2,
   },
   woCodeText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 11,
-    color: Colors.textSecondary,
-    letterSpacing: 0.8,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
-    gap: 5,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusText: {
-    fontFamily: 'Montserrat_600SemiBold',
-    fontSize: 11,
-    letterSpacing: 0.3,
-  },
-  chevronBox: {
-    width: 28,
-    height: 28,
-    borderRadius: BorderRadius.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(52, 62, 72, 0.04)',
-  },
-  chevronBoxHovered: {
-    backgroundColor: 'rgba(247, 140, 38, 0.12)',
+    color: Colors.textMuted,
+    letterSpacing: 0.5,
   },
   taskTitle: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 15,
     color: Colors.text,
-    lineHeight: 20,
-    marginBottom: 2,
+    lineHeight: 21,
+  },
+  taskDescription: {
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
+  taskFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Spacing.xs,
+    paddingTop: Spacing.xs,
   },
   locationChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    flex: 1,
   },
   locationText: {
-    fontFamily: 'Montserrat_500Medium',
-    fontSize: 12,
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 11.5,
     color: Colors.textSecondary,
-  },
-  taskDescription: {
-    fontFamily: 'Montserrat_400Regular',
-    fontSize: 13,
-    color: Colors.textMuted,
-    lineHeight: 18,
-    marginTop: 2,
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: Spacing.xxl * 1.5,
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
   emptyIconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: BorderRadius.full,
-    backgroundColor: 'rgba(52, 62, 72, 0.06)',
+    width: 56,
+    height: 56,
+    borderRadius: BorderRadius.xl,
+    backgroundColor: Colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.xs,
   },
   emptyTitle: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 16,
     color: Colors.text,
   },
   emptySubtitle: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 13,
     color: Colors.textSecondary,
     textAlign: 'center',
@@ -446,14 +352,9 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     marginTop: Spacing.md,
     gap: Spacing.xs,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 3,
   },
   retryText: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 13,
     color: Colors.textWhite,
   },

@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
 import {
   ArrowLeft,
   Play,
@@ -25,7 +24,8 @@ import {
   Square,
   Clock,
 } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius } from '@/constants/Theme';
+import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
+import { Badge, Card, Button } from '@/components/ui';
 import { getTaskById, updateTaskStatus, toggleSubtarea, type TaskDetail } from '@/lib/api';
 import type { Subtarea } from '@/types/database';
 
@@ -34,26 +34,26 @@ const STATUS_META: Record<
   {
     color: string;
     label: string;
-    bgAlpha: string;
+    badgeColor: 'gray' | 'primary' | 'success';
     icon: React.ComponentType<{ size: number; color: string }>;
   }
 > = {
   pendiente: {
     color: Colors.pending,
     label: 'Pendiente',
-    bgAlpha: 'rgba(52, 62, 72, 0.1)',
+    badgeColor: 'gray',
     icon: Clock,
   },
   en_proceso: {
     color: Colors.inProgress,
     label: 'En Proceso',
-    bgAlpha: 'rgba(247, 140, 38, 0.12)',
+    badgeColor: 'primary',
     icon: Play,
   },
   completada: {
     color: Colors.completed,
     label: 'Completada',
-    bgAlpha: 'rgba(0, 0, 0, 0.08)',
+    badgeColor: 'success',
     icon: CheckCircle2,
   },
 };
@@ -92,7 +92,6 @@ export default function TaskDetailScreen() {
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [isStatusBtnHovered, setIsStatusBtnHovered] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -166,20 +165,20 @@ export default function TaskDetailScreen() {
   const development = task.proyectos?.desarrollo ?? '—';
   const villa = task.proyectos?.villa ?? task.proyectos?.unidad ?? '—';
   const woCode = `WO-${task.id.slice(0, 6).toUpperCase()}`;
+  const completedSubsCount = task.subtareas.filter((s) => s.completada).length;
+  const totalSubsCount = task.subtareas.length;
 
   return (
     <View style={styles.container}>
-      {/* Header Glass CSY */}
+      {/* Header Minimalista en Modo Claro */}
       <View style={[styles.headerWrapper, { paddingTop: insets.top }]}>
-        <BlurView tint="dark" intensity={70} style={StyleSheet.absoluteFill} />
-        <View style={styles.headerOverlay} />
         <View style={styles.headerContent}>
           <Pressable
             onPress={() => router.back()}
             style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.7 }]}
             hitSlop={10}
           >
-            <ArrowLeft size={22} color={Colors.textWhite} />
+            <ArrowLeft size={18} color={Colors.text} />
           </Pressable>
 
           <View style={styles.headerInfo}>
@@ -189,10 +188,9 @@ export default function TaskDetailScreen() {
             </Text>
           </View>
 
-          <View style={[styles.statusBadge, { backgroundColor: meta.bgAlpha }]}>
-            <View style={[styles.statusDot, { backgroundColor: meta.color }]} />
-            <Text style={[styles.statusText, { color: meta.color }]}>{meta.label}</Text>
-          </View>
+          <Badge color={meta.badgeColor} variant="light" size="sm">
+            {meta.label}
+          </Badge>
         </View>
       </View>
 
@@ -201,7 +199,7 @@ export default function TaskDetailScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Ubicación / Villa Tag */}
+        {/* Ubicación / Villa Bar */}
         <View style={styles.locationBar}>
           <View style={styles.locationIconBox}>
             <MapPin size={16} color={Colors.primary} />
@@ -211,120 +209,134 @@ export default function TaskDetailScreen() {
           </Text>
         </View>
 
-        {/* Sección de Título Principal */}
+        {/* Tarjeta de Título Principal */}
         <View style={styles.titleCard}>
           <Text style={styles.category}>{development.toUpperCase()}</Text>
           <Text style={styles.title}>{task.titulo}</Text>
         </View>
 
-        {/* Grilla de Telemetría Técnica */}
+        {/* Grilla de Telemetría Técnica (Estilo TailAdmin) */}
         <View style={styles.infoGrid}>
           <View style={styles.infoItem}>
             <View style={styles.infoLabelRow}>
-              <MapPin size={12} color={Colors.textSecondary} />
+              <MapPin size={13} color={Colors.textSecondary} />
               <Text style={styles.infoLabel}>VILLA</Text>
             </View>
-            <Text style={styles.infoValue}>{villa}</Text>
+            <Text style={styles.infoValue} numberOfLines={1}>
+              {villa}
+            </Text>
           </View>
 
           <View style={styles.infoItem}>
             <View style={styles.infoLabelRow}>
-              <User size={12} color={Colors.textSecondary} />
+              <User size={13} color={Colors.textSecondary} />
               <Text style={styles.infoLabel}>ASIGNADO A</Text>
             </View>
-            <Text style={styles.infoValue}>{task.profiles?.nombre ?? '—'}</Text>
+            <Text style={styles.infoValue} numberOfLines={1}>
+              {task.profiles?.nombre ?? '—'}
+            </Text>
           </View>
 
           <View style={styles.infoItem}>
             <View style={styles.infoLabelRow}>
-              <Calendar size={12} color={Colors.textSecondary} />
+              <Calendar size={13} color={Colors.textSecondary} />
               <Text style={styles.infoLabel}>FECHA</Text>
             </View>
-            <Text style={styles.infoValue}>{formatDate(task.created_at)}</Text>
+            <Text style={styles.infoValue} numberOfLines={1}>
+              {formatDate(task.created_at)}
+            </Text>
           </View>
 
           <View style={styles.infoItem}>
             <View style={styles.infoLabelRow}>
-              <Clock size={12} color={Colors.textSecondary} />
+              <Clock size={13} color={Colors.textSecondary} />
               <Text style={styles.infoLabel}>ESTADO</Text>
             </View>
-            <Text style={[styles.infoValue, { color: meta.color }]}>{meta.label}</Text>
+            <Text style={[styles.infoValue, { color: meta.color }]} numberOfLines={1}>
+              {meta.label}
+            </Text>
           </View>
         </View>
 
-        {/* Sección de Descripción */}
-        <View style={styles.scopeSection}>
-          <View style={styles.scopeHeader}>
-            <FileText size={16} color={Colors.primary} />
-            <Text style={styles.scopeTitle}>DETALLE Y ESPECIFICACIONES</Text>
+        {/* Tarjeta: Detalle y Especificaciones */}
+        <Card elevated={false} style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionIconBox}>
+              <FileText size={16} color={Colors.primary} />
+            </View>
+            <Text style={styles.sectionTitle}>DETALLE Y ESPECIFICACIONES</Text>
           </View>
           <Text style={styles.scopeText}>
             {task.descripcion || 'Sin especificaciones adicionales registradas.'}
           </Text>
-        </View>
+        </Card>
 
-        {/* Sección de Subtareas con interactividad */}
-        {task.subtareas.length > 0 && (
-          <View style={styles.scopeSection}>
-            <View style={styles.scopeHeader}>
-              <ListChecks size={16} color={Colors.primary} />
-              <Text style={styles.scopeTitle}>
-                CHECKLIST DE ACTIVIDADES ({task.subtareas.filter((s) => s.completada).length}/
-                {task.subtareas.length})
-              </Text>
-            </View>
-            {task.subtareas.map((sub) => (
-              <Pressable
-                key={sub.id}
-                style={({ pressed }) => [
-                  styles.subtareaRow,
-                  sub.completada && styles.subtareaRowCompleted,
-                  pressed && { opacity: 0.75 },
-                ]}
-                onPress={() => handleToggleSubtarea(sub)}
+        {/* Tarjeta: Checklist de Actividades */}
+        {totalSubsCount > 0 && (
+          <Card elevated={false} style={styles.sectionCard}>
+            <View style={styles.checklistHeader}>
+              <View style={styles.sectionHeaderNoMargin}>
+                <View style={styles.sectionIconBox}>
+                  <ListChecks size={16} color={Colors.primary} />
+                </View>
+                <Text style={styles.sectionTitle}>CHECKLIST DE ACTIVIDADES</Text>
+              </View>
+              <Badge
+                color={completedSubsCount === totalSubsCount ? 'success' : 'primary'}
+                variant="light"
+                size="sm"
               >
-                {sub.completada ? (
-                  <CheckSquare size={18} color={Colors.completed} />
-                ) : (
-                  <Square size={18} color={Colors.textSecondary} />
-                )}
-                <Text
-                  style={[
-                    styles.subtareaText,
-                    sub.completada && styles.subtareaTextCompleted,
+                {`${completedSubsCount}/${totalSubsCount}`}
+              </Badge>
+            </View>
+
+            <View style={styles.checklistContainer}>
+              {task.subtareas.map((sub) => (
+                <Pressable
+                  key={sub.id}
+                  style={({ pressed }) => [
+                    styles.subtareaRow,
+                    sub.completada && styles.subtareaRowCompleted,
+                    pressed && { opacity: 0.75 },
                   ]}
+                  onPress={() => handleToggleSubtarea(sub)}
                 >
-                  {sub.titulo}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+                  {sub.completada ? (
+                    <CheckSquare size={18} color={Colors.success} />
+                  ) : (
+                    <Square size={18} color={Colors.textSecondary} />
+                  )}
+                  <Text
+                    style={[
+                      styles.subtareaText,
+                      sub.completada && styles.subtareaTextCompleted,
+                    ]}
+                  >
+                    {sub.titulo}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </Card>
         )}
       </ScrollView>
 
-      {/* Footer de Acciones */}
+      {/* Footer de Acciones Ergonómico TailAdmin */}
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.statusButton,
-            isStatusBtnHovered && styles.statusButtonHovered,
-            pressed && { opacity: 0.85 },
-            saving && { opacity: 0.6 },
-          ]}
-          onHoverIn={() => setIsStatusBtnHovered(true)}
-          onHoverOut={() => setIsStatusBtnHovered(false)}
+        <Button
+          variant={task.estatus === 'completada' ? 'outline' : 'primary'}
+          size="lg"
+          loading={saving}
+          startIcon={
+            <NextIcon
+              size={18}
+              color={task.estatus === 'completada' ? Colors.text : '#FFFFFF'}
+            />
+          }
           onPress={handleStatusChange}
-          disabled={saving}
         >
-          {saving ? (
-            <ActivityIndicator size="small" color={Colors.textWhite} />
-          ) : (
-            <>
-              <NextIcon size={16} color={Colors.textWhite} />
-              <Text style={styles.statusButtonText}>{next.label}</Text>
-            </>
-          )}
-        </Pressable>
+          {next.label}
+        </Button>
       </View>
     </View>
   );
@@ -343,18 +355,15 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   emptyText: {
-    fontFamily: 'Montserrat_500Medium',
+    fontFamily: 'Outfit_500Medium',
     fontSize: 15,
     color: Colors.textSecondary,
   },
   headerWrapper: {
-    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  headerOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    borderBottomColor: Colors.border,
+    ...Shadow.xs,
   },
   headerContent: {
     flexDirection: 'row',
@@ -365,10 +374,12 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    width: 34,
+    height: 34,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -376,33 +387,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   taskId: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 10,
     color: Colors.primary,
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   headerTitle: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 15,
-    color: Colors.textWhite,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-    borderRadius: BorderRadius.sm,
-    gap: 4,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusText: {
-    fontFamily: 'Montserrat_600SemiBold',
-    fontSize: 11,
-    letterSpacing: 0.3,
+    color: Colors.text,
   },
   content: {
     flex: 1,
@@ -419,44 +412,46 @@ const styles = StyleSheet.create({
   locationBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.card,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     gap: Spacing.sm,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.12)',
+    borderColor: Colors.border,
+    ...Shadow.xs,
   },
   locationIconBox: {
-    width: 28,
-    height: 28,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: 'rgba(247, 140, 38, 0.12)',
+    width: 32,
+    height: 32,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   address: {
     flex: 1,
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 13,
     color: Colors.text,
   },
   titleCard: {
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.card,
     padding: Spacing.md,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.12)',
+    borderColor: Colors.border,
     gap: 4,
+    ...Shadow.xs,
   },
   category: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 11,
     color: Colors.primary,
     letterSpacing: 1,
   },
   title: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 20,
     color: Colors.text,
     lineHeight: 26,
@@ -469,72 +464,105 @@ const styles = StyleSheet.create({
   infoItem: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.card,
     padding: Spacing.md,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.12)',
-    gap: 2,
+    borderColor: Colors.border,
+    gap: 4,
+    ...Shadow.xs,
   },
   infoLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   infoLabel: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 10,
     color: Colors.textSecondary,
     letterSpacing: 0.8,
   },
   infoValue: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 13,
     color: Colors.text,
     marginTop: 2,
   },
-  scopeSection: {
-    backgroundColor: Colors.background,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
+  sectionCard: {
+    backgroundColor: Colors.card,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.12)',
+    borderColor: Colors.border,
+    padding: Spacing.md,
     gap: Spacing.sm,
+    ...Shadow.xs,
   },
-  scopeHeader: {
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
     paddingBottom: Spacing.xs,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(52, 62, 72, 0.08)',
+    borderBottomColor: Colors.border,
   },
-  scopeTitle: {
-    fontFamily: 'Montserrat_700Bold',
+  sectionHeaderNoMargin: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    flex: 1,
+  },
+  sectionIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checklistHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: Spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    gap: Spacing.sm,
+  },
+  sectionTitle: {
+    fontFamily: 'Outfit_700Bold',
     fontSize: 11,
     color: Colors.textSecondary,
     letterSpacing: 1,
   },
   scopeText: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 13,
     color: Colors.text,
     lineHeight: 20,
+    paddingTop: Spacing.xs,
+  },
+  checklistContainer: {
+    gap: Spacing.xs,
+    paddingTop: Spacing.xs,
   },
   subtareaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    paddingVertical: Spacing.sm,
+    paddingVertical: 10,
     paddingHorizontal: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: 'rgba(52, 62, 72, 0.03)',
+    borderRadius: BorderRadius.md,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#F2F4F7',
   },
   subtareaRowCompleted: {
-    backgroundColor: 'transparent',
+    backgroundColor: '#FCFCFD',
+    borderColor: '#EAECF0',
   },
   subtareaText: {
-    fontFamily: 'Montserrat_500Medium',
+    fontFamily: 'Outfit_500Medium',
     fontSize: 13,
     color: Colors.text,
     flex: 1,
@@ -546,36 +574,12 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.sm,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.card,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(52, 62, 72, 0.12)',
-    gap: Spacing.xs,
+    borderTopColor: Colors.border,
     maxWidth: 960,
     width: '100%',
     alignSelf: 'center',
-  },
-  statusButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.md,
-    gap: Spacing.sm,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  statusButtonHovered: {
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    transform: [{ scale: 1.01 }],
-  },
-  statusButtonText: {
-    fontFamily: 'Montserrat_600SemiBold',
-    fontSize: 14,
-    color: Colors.textWhite,
+    ...Shadow.sm,
   },
 });

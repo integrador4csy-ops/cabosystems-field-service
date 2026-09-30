@@ -15,7 +15,6 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import { BlurView } from 'expo-blur';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import {
   X,
@@ -37,7 +36,7 @@ import {
   Layers,
   AlertCircle,
 } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius } from '@/constants/Theme';
+import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { useAuth } from '@/lib/auth';
 import { useProjects } from '@/lib/projects';
 import {
@@ -696,17 +695,15 @@ export default function CheckinScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header Glass CSY */}
+      {/* Header Minimalista en Modo Claro */}
       <View style={[styles.headerWrapper, { paddingTop: insets.top }]}>
-        <BlurView tint="dark" intensity={70} style={StyleSheet.absoluteFill} />
-        <View style={styles.headerOverlay} />
         <View style={styles.headerContent}>
           <Pressable
             onPress={() => router.back()}
             style={({ pressed }) => [styles.headerButton, pressed && { opacity: 0.7 }]}
             hitSlop={10}
           >
-            <X size={22} color={Colors.textWhite} />
+            <X size={18} color={Colors.text} />
           </Pressable>
 
           <Text style={styles.headerTitle}>{screenTitle}</Text>
@@ -718,9 +715,9 @@ export default function CheckinScreen() {
             disabled={!!photoUri}
           >
             {flash === 'on' ? (
-              <Zap size={22} color={Colors.primary} />
+              <Zap size={18} color={Colors.primary} />
             ) : (
-              <ZapOff size={22} color={photoUri ? Colors.textMuted : Colors.textWhite} />
+              <ZapOff size={18} color={photoUri ? Colors.textDisabled : Colors.textSecondary} />
             )}
           </Pressable>
         </View>
@@ -939,7 +936,7 @@ export default function CheckinScreen() {
                           <View style={styles.taskItemRow}>
                             <Building
                               size={15}
-                              color={isSelected ? Colors.primary : Colors.textSecondary}
+                              color={isSelected ? '#FFFFFF' : Colors.textSecondary}
                             />
                             <Text
                               style={[styles.taskItemTitle, isSelected && styles.taskItemTitleSelected]}
@@ -947,7 +944,14 @@ export default function CheckinScreen() {
                               {unit.villa || unit.unidad}
                             </Text>
                           </View>
-                          <Text style={styles.taskItemSubtitle}>{desarrollo}</Text>
+                          <Text
+                            style={[
+                              styles.taskItemSubtitle,
+                              isSelected && styles.taskItemSubtitleSelected,
+                            ]}
+                          >
+                            {desarrollo}
+                          </Text>
                         </View>
                         {isSelected && (
                           <View style={styles.taskItemCheck}>
@@ -989,11 +993,11 @@ export default function CheckinScreen() {
               ]}
             >
               {feedbackModal.type === 'success' ? (
-                <Check size={32} color={Colors.primary} strokeWidth={2.8} />
+                <Check size={32} color={Colors.success} strokeWidth={2.8} />
               ) : (
                 <AlertCircle
                   size={32}
-                  color={feedbackModal.type === 'error' ? '#ef4444' : Colors.primary}
+                  color={feedbackModal.type === 'error' ? Colors.error : Colors.warning}
                   strokeWidth={2.5}
                 />
               )}
@@ -1024,13 +1028,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   headerWrapper: {
-    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  headerOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    borderBottomColor: Colors.border,
+    ...Shadow.xs,
   },
   headerContent: {
     flexDirection: 'row',
@@ -1040,16 +1041,18 @@ const styles = StyleSheet.create({
     height: 56,
   },
   headerTitle: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 15,
-    color: Colors.textWhite,
-    letterSpacing: 1,
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 16,
+    color: Colors.text,
+    letterSpacing: -0.2,
   },
   headerButton: {
-    width: 38,
-    height: 38,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    width: 34,
+    height: 34,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1066,7 +1069,7 @@ const styles = StyleSheet.create({
     minHeight: 320,
     backgroundColor: '#000000',
     margin: Spacing.md,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.xl,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(52, 62, 72, 0.3)',
@@ -1129,7 +1132,7 @@ const styles = StyleSheet.create({
     width: 60,
   },
   controlText: {
-    fontFamily: 'Montserrat_500Medium',
+    fontFamily: 'Outfit_500Medium',
     fontSize: 10,
     color: Colors.textWhite,
     letterSpacing: 1,
@@ -1168,7 +1171,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   previewBadgeText: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 11,
     color: Colors.textWhite,
     letterSpacing: 0.5,
@@ -1194,7 +1197,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   retakeText: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 12,
     color: Colors.textWhite,
     letterSpacing: 0.5,
@@ -1208,13 +1211,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   permissionTitle: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 16,
     color: Colors.textWhite,
     textAlign: 'center',
   },
   permissionSubtitle: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 12,
     color: Colors.textMuted,
     textAlign: 'center',
@@ -1228,7 +1231,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
   },
   permissionButtonText: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 13,
     color: Colors.textWhite,
   },
@@ -1239,14 +1242,14 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   fallbackCaptureTitle: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 15,
     color: Colors.textWhite,
     textAlign: 'center',
     marginTop: Spacing.xs,
   },
   fallbackCaptureSubtitle: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 12,
     color: Colors.textMuted,
     textAlign: 'center',
@@ -1264,7 +1267,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
   },
   webButtonText: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 12,
     color: Colors.textWhite,
   },
@@ -1289,7 +1292,7 @@ const styles = StyleSheet.create({
     maxWidth: '48%',
   },
   presetText: {
-    fontFamily: 'Montserrat_500Medium',
+    fontFamily: 'Outfit_500Medium',
     fontSize: 11,
     color: Colors.textWhite,
   },
@@ -1306,7 +1309,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
   },
   sampleButtonText: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 11,
     color: Colors.primary,
   },
@@ -1317,31 +1320,32 @@ const styles = StyleSheet.create({
   gpsCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.border,
     padding: Spacing.md,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     gap: Spacing.sm,
+    ...Shadow.xs,
   },
   gpsIconBox: {
     width: 38,
     height: 38,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: 'rgba(52, 62, 72, 0.08)',
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   gpsIconBoxSuccess: {
-    backgroundColor: `${Colors.primary}18`,
+    backgroundColor: Colors.successLight,
     borderWidth: 1,
-    borderColor: `${Colors.primary}35`,
+    borderColor: Colors.successBorder,
   },
   gpsDetails: {
     flex: 1,
   },
   gpsHeaderLabel: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 10,
     color: Colors.textSecondary,
     letterSpacing: 0.5,
@@ -1352,18 +1356,18 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   gpsSuccessText: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 13,
     color: Colors.text,
   },
   gpsLoadingText: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 12,
     color: Colors.textSecondary,
     marginTop: 2,
   },
   gpsErrorText: {
-    fontFamily: 'Montserrat_500Medium',
+    fontFamily: 'Outfit_500Medium',
     fontSize: 12,
     color: Colors.primary,
     marginTop: 2,
@@ -1374,22 +1378,22 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(52, 62, 72, 0.08)',
+    backgroundColor: Colors.backgroundDark,
   },
   notesSection: {
     gap: Spacing.xs,
   },
   notesLabel: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 11,
     color: Colors.textSecondary,
     letterSpacing: 0.5,
   },
   notesInput: {
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.card,
+    borderRadius: BorderRadius.lg,
     padding: Spacing.md,
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 13,
     color: Colors.text,
     minHeight: 80,
@@ -1400,42 +1404,40 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.md,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.card,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     maxWidth: 960,
     width: '100%',
     alignSelf: 'center',
+    ...Shadow.sm,
   },
   submitButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     paddingVertical: Spacing.md,
     gap: Spacing.sm,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 3,
+    ...Shadow.xs,
   },
   submitDisabled: {
     opacity: 0.4,
   },
   submitButtonText: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 15,
     color: Colors.textWhite,
   },
   taskCard: {
     backgroundColor: Colors.card,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.border,
     marginBottom: Spacing.sm,
+    ...Shadow.xs,
   },
   taskCardHeader: {
     flexDirection: 'row',
@@ -1445,8 +1447,8 @@ const styles = StyleSheet.create({
   taskCardIconBox: {
     width: 36,
     height: 36,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: `${Colors.primary}18`,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1454,19 +1456,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   taskCardHeaderLabel: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 10,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
     letterSpacing: 0.8,
   },
   taskCardTitle: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 14,
     color: Colors.text,
     marginTop: 2,
   },
   taskCardSub: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 12,
     color: Colors.textSecondary,
     marginTop: 1,
@@ -1478,12 +1480,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   taskCardLoadingText: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 12,
     color: Colors.textMuted,
   },
   taskCardEmptyText: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 12,
     color: Colors.textMuted,
     marginTop: 2,
@@ -1494,46 +1496,47 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingVertical: 6,
     paddingHorizontal: 10,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: `${Colors.primary}15`,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.primaryLight,
     borderWidth: 1,
-    borderColor: `${Colors.primary}35`,
+    borderColor: Colors.borderBrand,
   },
   taskChangeBtnText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 11,
-    color: Colors.primary,
+    color: Colors.primaryDark,
   },
   taskWarningBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
     padding: Spacing.md,
-    backgroundColor: `${Colors.primary}12`,
-    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.warningLight,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: `${Colors.primary}30`,
+    borderColor: Colors.warningBorder,
     marginBottom: Spacing.sm,
   },
   taskWarningText: {
     flex: 1,
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 12,
-    color: Colors.text,
+    color: Colors.warningText,
     lineHeight: 16,
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(16, 24, 40, 0.45)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
     backgroundColor: Colors.card,
-    borderTopLeftRadius: BorderRadius.lg,
-    borderTopRightRadius: BorderRadius.lg,
+    borderTopLeftRadius: BorderRadius['2xl'],
+    borderTopRightRadius: BorderRadius['2xl'],
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.sm,
     maxHeight: '75%',
+    ...Shadow.lg,
   },
   modalHeader: {
     alignItems: 'center',
@@ -1547,13 +1550,13 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   modalTitle: {
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 13,
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 14,
     color: Colors.text,
-    letterSpacing: 0.8,
+    letterSpacing: 0.5,
   },
   modalSubtitle: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 12,
     color: Colors.textSecondary,
     marginTop: 2,
@@ -1566,7 +1569,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   devName: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 11,
     color: Colors.textSecondary,
     letterSpacing: 1,
@@ -1577,7 +1580,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: Spacing.md,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -1590,69 +1593,69 @@ const styles = StyleSheet.create({
   },
   taskItemCardSelected: {
     borderColor: Colors.primary,
-    backgroundColor: `${Colors.primary}10`,
+    backgroundColor: Colors.primary,
   },
   taskItemInfo: {
     flex: 1,
   },
   taskItemTitle: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 13,
     color: Colors.text,
   },
   taskItemTitleSelected: {
-    color: Colors.primary,
+    color: '#FFFFFF',
+    fontFamily: 'Outfit_700Bold',
   },
   taskItemSubtitle: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 12,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  taskItemSubtitleSelected: {
+    color: 'rgba(255, 255, 255, 0.85)',
   },
   taskItemCheck: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: Colors.primary,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalCloseBtn: {
     paddingVertical: Spacing.md,
     alignItems: 'center',
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.border,
     marginTop: Spacing.xs,
   },
   modalCloseBtnText: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 13,
     color: Colors.textSecondary,
   },
   feedbackBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(16, 24, 40, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
   },
   feedbackCard: {
     width: '100%',
-    maxWidth: 340,
-    backgroundColor: '#161c22',
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: '#343e48',
+    maxWidth: 360,
+    backgroundColor: Colors.card,
+    borderRadius: BorderRadius['2xl'],
+    borderWidth: 1,
+    borderColor: Colors.border,
     paddingVertical: 28,
     paddingHorizontal: 22,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.45,
-    shadowRadius: 20,
-    elevation: 12,
+    ...Shadow.lg,
   },
   feedbackIconCircle: {
     width: 68,
@@ -1663,32 +1666,32 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   feedbackIconSuccess: {
-    backgroundColor: 'rgba(247, 140, 38, 0.15)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(247, 140, 38, 0.4)',
+    backgroundColor: Colors.successLight,
+    borderWidth: 1,
+    borderColor: Colors.successBorder,
   },
   feedbackIconWarning: {
-    backgroundColor: 'rgba(247, 140, 38, 0.15)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(247, 140, 38, 0.4)',
+    backgroundColor: Colors.warningLight,
+    borderWidth: 1,
+    borderColor: Colors.warningBorder,
   },
   feedbackIconError: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(239, 68, 68, 0.4)',
+    backgroundColor: Colors.errorLight,
+    borderWidth: 1,
+    borderColor: Colors.errorBorder,
   },
   feedbackTitle: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 18,
-    color: Colors.textWhite,
+    color: Colors.text,
     textAlign: 'center',
     marginBottom: 8,
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
   feedbackMessage: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 14,
-    color: '#94a3b8',
+    color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 21,
     marginBottom: 24,
@@ -1697,20 +1700,16 @@ const styles = StyleSheet.create({
   feedbackButton: {
     width: '100%',
     backgroundColor: Colors.primary,
-    borderRadius: 14,
+    borderRadius: BorderRadius.lg,
     height: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 4,
+    ...Shadow.xs,
   },
   feedbackButtonText: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 13,
-    color: Colors.textWhite,
+    color: '#FFFFFF',
     letterSpacing: 1.2,
   },
 });

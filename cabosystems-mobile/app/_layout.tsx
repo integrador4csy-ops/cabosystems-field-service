@@ -132,12 +132,15 @@ function RootLayoutNav() {
 
   return (
     <>
-      <Stack>
+      <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="pending" options={{ headerShown: false }} />
         <Stack.Screen name="task/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="checkin/[id]" options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="chat/new-group" options={{ headerShown: false }} />
+        <Stack.Screen name="chat/group-info/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />
       </Stack>
       <BackgroundLocationModal

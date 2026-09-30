@@ -12,7 +12,7 @@ import {
 import { Image } from 'expo-image';
 import { pickDocumentSafe } from '@/lib/mediaPicker';
 import { X, Sparkles, FolderDown } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius } from '@/constants/Theme';
+import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { getMyStickers, uploadSticker } from '@/lib/chatApi';
 import type { ChatSticker } from '@/types/database';
 
@@ -147,25 +147,21 @@ export default function StickerPickerModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(16, 24, 40, 0.45)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: Colors.card,
-    borderTopLeftRadius: BorderRadius.xl,
-    borderTopRightRadius: BorderRadius.xl,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.xl + 20,
     maxHeight: '65%',
     minHeight: 380,
     borderTopWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.10)',
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 5,
+    borderColor: '#E4E7EC',
+    ...Shadow.lg,
   },
   header: {
     flexDirection: 'row',
@@ -179,7 +175,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 16,
     color: Colors.text,
   },
@@ -197,7 +193,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   importBtnText: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 13,
     color: '#ffffff',
   },
@@ -210,12 +206,12 @@ const styles = StyleSheet.create({
   stickerCell: {
     width: '22%',
     aspectRatio: 1,
-    backgroundColor: Colors.backgroundAlt,
+    backgroundColor: '#F9FAFB',
     borderRadius: BorderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(52, 62, 72, 0.10)',
+    borderColor: '#E4E7EC',
   },
   stickerImg: {
     width: '80%',
@@ -228,7 +224,7 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   loadingText: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 13,
     color: Colors.textMuted,
     marginTop: 10,
@@ -241,13 +237,13 @@ const styles = StyleSheet.create({
     paddingVertical: 30,
   },
   emptyTitle: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 15,
     color: Colors.text,
     marginTop: 12,
   },
   emptySubtitle: {
-    fontFamily: 'Montserrat_400Regular',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 12,
     color: Colors.textMuted,
     textAlign: 'center',
