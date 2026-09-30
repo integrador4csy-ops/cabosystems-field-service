@@ -13,10 +13,12 @@ import {
   Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Image } from 'expo-image';
 import { AlertCircle, Mail, Lock, Eye, EyeOff, Fingerprint, ScanFace } from 'lucide-react-native';
-import CaboLogo from '@/components/CaboLogo';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { useAuth, formatAuthError } from '@/lib/auth';
+
+const LOGO_DARK = require('@/assets/images/Logo-CaboSystems-Field-Service-Dark.png');
 import {
   getBiometricStatus,
   getBiometricCredentials,
@@ -147,8 +149,12 @@ export default function LoginScreen() {
         bounces={false}
       >
         <View style={[styles.logoContainer, isCompact && styles.logoContainerCompact]}>
-          <CaboLogo width={logoWidth} textColor={Colors.text} />
-          <Text style={styles.logoSubtext}>FIELD SERVICES</Text>
+          <Image
+            source={LOGO_DARK}
+            style={{ width: logoWidth, height: logoWidth * (54 / 220) }}
+            contentFit="contain"
+            priority="high"
+          />
         </View>
 
         <View style={styles.formContainer}>
