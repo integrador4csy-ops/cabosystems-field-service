@@ -41,12 +41,6 @@ jobs:
           cache: npm
           cache-dependency-path: cabosystems-mobile/package-lock.json
 
-      - name: 🚀 Configurar EAS CLI
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
       - name: 📥 Instalar dependencias
         working-directory: ./cabosystems-mobile
         run: npm ci
