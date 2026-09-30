@@ -33,7 +33,6 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: gradle
 
       - name: 📦 Configurar Node.js 20
         uses: actions/setup-node@v4
