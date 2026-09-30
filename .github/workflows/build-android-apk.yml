@@ -33,9 +33,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-
-      - name: 📱 Configurar Android SDK
-        uses: android-actions/setup-android@v3
+          cache: gradle
 
       - name: 📦 Configurar Node.js 20
         uses: actions/setup-node@v4
@@ -67,7 +65,9 @@ jobs:
 
       - name: 🔨 Compilar APK con Gradle
         working-directory: ./cabosystems-mobile/android
-        run: ./gradlew assembleRelease --no-daemon
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --no-daemon
 
       - name: 📦 Renombrar APK generado
         run: |
