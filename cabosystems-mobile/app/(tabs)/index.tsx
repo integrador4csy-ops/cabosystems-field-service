@@ -200,14 +200,18 @@ export default function DashboardScreen() {
     [profile?.id, refreshProjects]
   );
 
+  const loadRef = useRef(load);
+  loadRef.current = load;
+
   useEffect(() => {
     load();
   }, [load]);
 
   useEffect(() => {
     if (!profile?.id) return;
+    const channelName = `tareas-dashboard-${profile.id}-${Date.now()}`;
     const channel = supabase
-      .channel('tareas-dashboard')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -217,7 +221,7 @@ export default function DashboardScreen() {
           filter: `asignado_a=eq.${profile.id}`,
         },
         () => {
-          load();
+          loadRef.current();
         }
       )
       .subscribe();
@@ -225,7 +229,7 @@ export default function DashboardScreen() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [profile?.id, load]);
+  }, [profile?.id]);
 
   const filteredTasks = useMemo(
     () => (selectedProjectId ? tasks.filter((t) => t.proyecto_id === selectedProjectId) : tasks),
