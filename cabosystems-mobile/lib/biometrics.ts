@@ -85,6 +85,34 @@ export async function isBiometricAuthEnabled(): Promise<boolean> {
 }
 
 /**
+ * Activa o desactiva la bandera biométrica sin borrar las credenciales seguras.
+ */
+export async function setBiometricEnabled(enabled: boolean): Promise<void> {
+  try {
+    if (Platform.OS === 'web') return;
+    if (enabled) {
+      await SecureStore.setItemAsync(BIOMETRICS_ENABLED_KEY, 'true');
+    } else {
+      await SecureStore.setItemAsync(BIOMETRICS_ENABLED_KEY, 'false');
+    }
+  } catch (error) {
+    console.warn('Error setting biometric enabled state:', error);
+  }
+}
+
+/**
+ * Obtiene la contraseña almacenada previamente en el Keystore/Keychain de forma segura.
+ */
+export async function getStoredPassword(): Promise<string | null> {
+  try {
+    if (Platform.OS === 'web') return null;
+    return await SecureStore.getItemAsync(BIOMETRICS_PASS_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Guarda o elimina las credenciales o tokens seguros para el inicio de sesión biométrico.
  */
 export async function setBiometricCredentials(
@@ -98,7 +126,7 @@ export async function setBiometricCredentials(
 
     if (enabled && email) {
       await SecureStore.setItemAsync(BIOMETRICS_ENABLED_KEY, 'true');
-      await SecureStore.setItemAsync(BIOMETRICS_EMAIL_KEY, email);
+      await SecureStore.setItemAsync(BIOMETRICS_EMAIL_KEY, email.trim().toLowerCase());
 
       if (password) {
         await SecureStore.setItemAsync(BIOMETRICS_PASS_KEY, password);
@@ -120,11 +148,13 @@ export async function setBiometricCredentials(
 /**
  * Obtiene las credenciales o tokens seguros almacenados para el inicio de sesión.
  */
-export async function getBiometricCredentials(): Promise<StoredBiometricCredentials | null> {
+export async function getBiometricCredentials(requireEnabled = true): Promise<StoredBiometricCredentials | null> {
   try {
     if (Platform.OS === 'web') return null;
-    const isEnabled = await isBiometricAuthEnabled();
-    if (!isEnabled) return null;
+    if (requireEnabled) {
+      const isEnabled = await isBiometricAuthEnabled();
+      if (!isEnabled) return null;
+    }
 
     const email = await SecureStore.getItemAsync(BIOMETRICS_EMAIL_KEY);
     const password = await SecureStore.getItemAsync(BIOMETRICS_PASS_KEY);

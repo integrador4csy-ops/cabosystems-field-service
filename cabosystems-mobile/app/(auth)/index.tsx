@@ -85,7 +85,7 @@ export default function LoginScreen() {
       } else {
         // Guardar credenciales de forma segura para permitir acceso biométrico
         if (biometricStatus?.available && biometricStatus?.enrolled) {
-          await setBiometricCredentials(email.trim(), password, true);
+          await setBiometricCredentials(email.trim(), password.trim(), true);
           setHasSavedBiometrics(true);
         }
       }

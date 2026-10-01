@@ -49,6 +49,8 @@ import {
   getBiometricCredentials,
   setBiometricCredentials,
   authenticateWithBiometrics,
+  getStoredPassword,
+  setBiometricEnabled,
 } from '@/lib/biometrics';
 
 const LOGO_DARK = require('@/assets/images/Logo-CaboSystems-Field-Service-Dark.png');
@@ -193,48 +195,60 @@ export default function ProfileScreen() {
         return;
       }
 
-      // Verificar si ya tenemos la contraseña almacenada de forma segura
-      const creds = await getBiometricCredentials();
-      if (creds?.password) {
+      const cleanEmail = user.email.trim().toLowerCase();
+
+      // 1. Verificar si ya tenemos la contraseña guardada en Keystore/Keychain
+      const storedPass = await getStoredPassword();
+      if (storedPass) {
+        // Contraseña ya disponible: Solicitar únicamente la huella/FaceID
         const auth = await authenticateWithBiometrics(`Confirma tu ${biometricLabel} para activar`);
         if (auth.success) {
-          await setBiometricCredentials(user.email, creds.password, true);
+          await setBiometricCredentials(cleanEmail, storedPass, true);
           setBiometricsEnabled(true);
           Alert.alert('Acceso Biométrico', `${biometricLabel} activada correctamente para inicio de sesión rápido.`);
         } else {
           setBiometricsEnabled(false);
         }
       } else {
-        // Solicitar contraseña una sola vez para guardarla cifrada en el dispositivo
+        // Solo si nunca se ha registrado una contraseña en este dispositivo, solicitarla
         setBioConfirmPassword('');
         setBioError(null);
         setBioPasswordModalVisible(true);
       }
     } else {
       setBiometricsEnabled(false);
-      await setBiometricCredentials(null, null, false);
-      Alert.alert('Acceso Biométrico', 'Se ha desactivado el acceso biométrico en este dispositivo.');
+      await setBiometricEnabled(false);
+      Alert.alert('Acceso Biométrico', 'Se ha desactivado el acceso biométrico.');
     }
   };
 
   const handleConfirmBioWithPassword = async () => {
-    if (!bioConfirmPassword.trim()) {
+    const cleanPassword = bioConfirmPassword.trim();
+    if (!cleanPassword) {
       setBioError('Ingresa tu contraseña actual.');
       return;
     }
     if (!user?.email) return;
+    const cleanEmail = user.email.trim().toLowerCase();
 
     setBioLoading(true);
     setBioError(null);
     try {
-      // 1. Validar que la contraseña sea correcta
+      // 1. Validar que la contraseña sea correcta contra Supabase
       const { error } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: bioConfirmPassword,
+        email: cleanEmail,
+        password: cleanPassword,
       });
 
       if (error) {
-        setBioError('La contraseña ingresada es incorrecta.');
+        console.warn('Supabase signInWithPassword verification error:', error);
+        if (error.message.toLowerCase().includes('invalid login credentials')) {
+          setBioError('La contraseña ingresada no coincide con tu cuenta corporativa.');
+        } else if (error.message.toLowerCase().includes('rate')) {
+          setBioError('Demasiados intentos. Espera unos momentos antes de reintentar.');
+        } else {
+          setBioError(error.message || 'Error al validar credenciales.');
+        }
         setBioLoading(false);
         return;
       }
@@ -242,7 +256,7 @@ export default function ProfileScreen() {
       // 2. Solicitar confirmación del sensor biométrico
       const auth = await authenticateWithBiometrics(`Confirma tu ${biometricLabel} para vincularla`);
       if (auth.success) {
-        await setBiometricCredentials(user.email, bioConfirmPassword, true);
+        await setBiometricCredentials(cleanEmail, cleanPassword, true);
         setBiometricsEnabled(true);
         setBioPasswordModalVisible(false);
         setBioConfirmPassword('');
