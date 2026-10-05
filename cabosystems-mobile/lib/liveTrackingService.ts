@@ -273,22 +273,20 @@ export async function startLiveTracking(userId: string): Promise<boolean> {
       return false;
     }
 
-    // 2. Verificar y solicitar permiso en segundo plano ("Permitir todo el tiempo")
+    // 2. Verificar permiso en segundo plano ("Permitir todo el tiempo")
     let hasBgPermission = false;
     if (Platform.OS !== 'web') {
       try {
-        const bgStatus = await Location.getBackgroundPermissionsAsync();
+        const bgStatus = await Location.getBackgroundPermissionsAsync().catch(() => ({ status: 'denied' }));
         if (bgStatus.status === 'granted') {
           hasBgPermission = true;
         } else {
-          const reqBg = await Location.requestBackgroundPermissionsAsync().catch(() => ({ status: 'denied' }));
-          if (reqBg.status === 'granted') {
-            hasBgPermission = true;
-          } else {
-            const canShow = await shouldShowBackgroundLocationPrompt();
-            if (canShow) {
-              triggerBackgroundLocationPrompt();
-            }
+          // No solicitar background permission de forma intempestiva en el arranque
+          // para no congelar el ciclo de vida de la app ni expulsar al usuario.
+          // En su lugar, mostrar el modal educativo de CaboSystems si aplica cooldown.
+          const canShow = await shouldShowBackgroundLocationPrompt();
+          if (canShow) {
+            triggerBackgroundLocationPrompt();
           }
         }
       } catch (err) {
@@ -310,8 +308,10 @@ export async function startLiveTracking(userId: string): Promise<boolean> {
     await startActivityRecognition();
     globalKalmanFilter.reset();
 
-    // 3. INICIAR SERVICIO NATIVO EN SEGUNDO PLANO INMEDIATAMENTE
-    // Se ejecuta aquí para garantizar que se invoque mientras la app está en primer plano y Android no bloquee el Foreground Service
+    // 3. INICIAR REGISTRO NATIVO EN SEGUNDO PLANO DE FORMA ESTABLE
+    // Se ejecuta de manera segura sin `foregroundService` para eliminar los cierres nativos
+    // fatales de Android 14 (ForegroundServiceStartNotAllowedException). FusedLocationProviderClient
+    // de Google Play Services se encarga de entregar las ubicaciones a TaskManager de fondo.
     if (Platform.OS === 'android' && hasBgPermission) {
       try {
         const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK).catch(() => false);
@@ -327,14 +327,8 @@ export async function startLiveTracking(userId: string): Promise<boolean> {
           deferredUpdatesInterval: 0,
           deferredUpdatesDistance: 0,
           pausesUpdatesAutomatically: false,
-          foregroundService: {
-            notificationTitle: 'CaboSystems • Radar en Vivo',
-            notificationBody: 'Monitoreo de asistencia y geolocalización activo',
-            notificationColor: '#f78c26',
-            killServiceOnDestroy: false,
-          },
         });
-        console.log('[CABO_BG] startLocationUpdatesAsync iniciado con éxito');
+        console.log('[CABO_BG] Background location updates iniciado con éxito');
       } catch (bgErr) {
         console.warn('No se pudo iniciar background location updates (se continuará en primer plano):', bgErr);
       }

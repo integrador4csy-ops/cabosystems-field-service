@@ -7,13 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Tag de versión (ej. v1.1.0)'
+        description: 'Tag de versión (ej. v1.1.3)'
         required: false
-        default: 'v1.1.0'
+        default: 'v1.1.3'
       release_title:
         description: 'Título del Release (Opcional)'
         required: false
-        default: 'CaboSystems Mobile v1.1.0'
+        default: 'CaboSystems Mobile v1.1.3'
       create_release:
         description: '¿Publicar como GitHub Release? (true / false)'
         required: true
