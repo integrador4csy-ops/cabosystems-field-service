@@ -21,7 +21,17 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.cabosystems.fieldservice",
-      "versionCode": 2,
+      "versionCode": 3,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "POST_NOTIFICATIONS",
+        "ACTIVITY_RECOGNITION",
+        "CAMERA"
+      ],
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -48,7 +58,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "CaboSystems necesita acceso continuo a la ubicación para coordinar la flota en tiempo real.",
           "isAndroidBackgroundLocationEnabled": true,
-          "isAndroidForegroundServiceEnabled": true
+          "isAndroidForegroundServiceEnabled": true,
+          "androidForegroundServiceIcon": "./assets/images/notification-icon.png"
         }
       ]
     ],

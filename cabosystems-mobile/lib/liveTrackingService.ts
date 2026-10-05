@@ -322,12 +322,11 @@ export async function startLiveTracking(userId: string): Promise<boolean> {
         }
         await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
           accuracy: Location.Accuracy.High,
-          timeInterval: 2500, // 2.5 segundos: cadencia continua ultra-rápida (1s menos)
-          distanceInterval: 0, // 0 metros para emitir siempre, incluso quieto en una mesa
-          deferredUpdatesInterval: 0, // 0 para enviar cada tick inmediatamente sin esperar
-          deferredUpdatesDistance: 0, // 0 para no requerir desplazamiento físico
+          timeInterval: 2500, // 2.5 segundos: cadencia continua ultra-rápida
+          distanceInterval: 0, // 0 metros para emitir siempre
+          deferredUpdatesInterval: 0,
+          deferredUpdatesDistance: 0,
           pausesUpdatesAutomatically: false,
-          showsBackgroundLocationIndicator: true,
           foregroundService: {
             notificationTitle: 'CaboSystems • Radar en Vivo',
             notificationBody: 'Monitoreo de asistencia y geolocalización activo',
@@ -335,9 +334,9 @@ export async function startLiveTracking(userId: string): Promise<boolean> {
             killServiceOnDestroy: false,
           },
         });
-        console.log('[CABO_BG] startLocationUpdatesAsync iniciado a 2500ms');
+        console.log('[CABO_BG] startLocationUpdatesAsync iniciado con éxito');
       } catch (bgErr) {
-        console.warn('No se pudo iniciar background location updates:', bgErr);
+        console.warn('No se pudo iniciar background location updates (se continuará en primer plano):', bgErr);
       }
     }
 
@@ -500,18 +499,24 @@ export async function stopLiveTracking() {
 }
 
 // Reactivar de forma transparente si la app regresa al primer plano sin spamear diálogos
+let appStateDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 if (Platform.OS !== 'web') {
   AppState.addEventListener('change', async (nextState) => {
     if (nextState === 'active' && currentTrackingUserId) {
-      try {
-        const bgStatus = await Location.getBackgroundPermissionsAsync().catch(() => ({ status: 'denied' }));
-        if (bgStatus.status === 'granted') {
-          const isRunning = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).catch(() => false);
-          if (!isRunning) {
-            startLiveTracking(currentTrackingUserId);
+      if (appStateDebounceTimer) clearTimeout(appStateDebounceTimer);
+      // Retardo de 1s para permitir que la Activity esté completamente estabilizada en primer plano
+      // y evitar la excepción ForegroundServiceStartNotAllowedException de Android 14
+      appStateDebounceTimer = setTimeout(async () => {
+        try {
+          const bgStatus = await Location.getBackgroundPermissionsAsync().catch(() => ({ status: 'denied' }));
+          if (bgStatus.status === 'granted') {
+            const isRunning = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).catch(() => false);
+            if (!isRunning && currentTrackingUserId) {
+              startLiveTracking(currentTrackingUserId);
+            }
           }
-        }
-      } catch {}
+        } catch {}
+      }, 1000);
     }
   });
 }
