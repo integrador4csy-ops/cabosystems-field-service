@@ -4,8 +4,12 @@ interface SidebarContextType {
   isExpanded: boolean;
   isHovered: boolean;
   activeItem: string;
+  unreadChatCount: number;
+  targetGroupId: string | null;
   setIsHovered: (hovered: boolean) => void;
   setActiveItem: (item: string) => void;
+  setUnreadChatCount: React.Dispatch<React.SetStateAction<number>>;
+  setTargetGroupId: (id: string | null) => void;
 }
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
@@ -23,6 +27,8 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isExpanded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [activeItem, setActiveItem] = useState<string>('radar');
+  const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
+  const [targetGroupId, setTargetGroupId] = useState<string | null>(null);
 
   return (
     <SidebarContext.Provider
@@ -30,8 +36,12 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({ child
         isExpanded,
         isHovered,
         activeItem,
+        unreadChatCount,
+        targetGroupId,
         setIsHovered,
         setActiveItem,
+        setUnreadChatCount,
+        setTargetGroupId,
       }}
     >
       {children}

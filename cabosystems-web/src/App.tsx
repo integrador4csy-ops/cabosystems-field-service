@@ -15,9 +15,27 @@ import { AppSidebar } from './components/layout/AppSidebar';
 import { AppHeader } from './components/layout/AppHeader';
 import { ChatView } from './components/chat/ChatView';
 import { AuthSplitScreen } from './components/auth/AuthSplitScreen';
+import {
+  playNotificationSound,
+  requestDesktopNotificationPermission,
+  showDesktopNotification,
+  updateTabTitle,
+  resetTabTitle,
+} from './lib/desktopNotifications';
+import {
+  ChatNotificationToastContainer,
+  type ChatToastItem,
+} from './components/chat/ChatNotificationToast';
 
 function DashboardContent() {
-  const { activeItem } = useSidebar();
+  const {
+    activeItem,
+    setActiveItem,
+    setUnreadChatCount,
+    setTargetGroupId,
+  } = useSidebar();
+  const { user } = useAdminAuth();
+  const [chatToasts, setChatToasts] = useState<ChatToastItem[]>([]);
   const [workers, setWorkers] = useState<LiveWorker[]>([]);
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,6 +44,110 @@ function DashboardContent() {
   const [isInvitationsModalOpen, setIsInvitationsModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [focusTrigger, setFocusTrigger] = useState(0);
+
+  // Solicitar permisos de notificación de escritorio en el navegador
+  useEffect(() => {
+    requestDesktopNotificationPermission();
+  }, []);
+
+  // Al entrar a la vista de chat, limpiar los contadores y toasts
+  useEffect(() => {
+    if (activeItem === 'chat') {
+      setUnreadChatCount(0);
+      setChatToasts([]);
+      resetTabTitle();
+    }
+  }, [activeItem, setUnreadChatCount]);
+
+  // Escuchar mensajes entrantes en tiempo real para notificaciones in-app y de escritorio
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('global_desktop_chat_notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_mensajes',
+        },
+        async (payload) => {
+          const newMsg = payload.new as any;
+          if (!newMsg) return;
+
+          // Si el mensaje es del propio usuario conectado, ignorar
+          if (newMsg.remitente_id === user.id) return;
+
+          try {
+            // Obtener nombre del grupo y del remitente
+            const [grpRes, senderRes] = await Promise.all([
+              supabase.from('chat_grupos').select('nombre').eq('id', newMsg.grupo_id).single(),
+              supabase.from('profiles').select('nombre').eq('id', newMsg.remitente_id).single(),
+            ]);
+
+            const groupName = grpRes.data?.nombre || 'Chat';
+            const senderName = senderRes.data?.nombre || 'Colaborador';
+
+            let preview = newMsg.contenido || 'Nuevo mensaje';
+            if (newMsg.tipo === 'imagen') preview = '📷 Foto';
+            if (newMsg.tipo === 'video') preview = '🎥 Video';
+            if (newMsg.tipo === 'sticker') preview = '🎨 Sticker';
+
+            const isUserActivelyInChat = activeItem === 'chat' && !document.hidden;
+
+            // Si el usuario NO está en la vista de chat O si la pestaña del navegador está en segundo plano / minimizada:
+            if (!isUserActivelyInChat) {
+              // 1. Sonido suave sintetizado
+              playNotificationSound();
+
+              // 2. Incrementar badge numérico en sidebar y título de pestaña
+              setUnreadChatCount((prev) => {
+                const next = prev + 1;
+                updateTabTitle(next);
+                return next;
+              });
+
+              // 3. Notificación nativa del sistema operativo (Windows / Mac)
+              showDesktopNotification(`💬 ${groupName}`, `${senderName}: ${preview}`, () => {
+                setTargetGroupId(newMsg.grupo_id);
+                setActiveItem('chat');
+                setUnreadChatCount(0);
+                resetTabTitle();
+              });
+
+              // 4. Banner flotante in-app (si la ventana del navegador está visible)
+              if (!document.hidden) {
+                const toastId = `${newMsg.id}-${Date.now()}`;
+                setChatToasts((prev) => [
+                  ...prev.slice(-2),
+                  {
+                    id: toastId,
+                    groupId: newMsg.grupo_id,
+                    groupName,
+                    senderName,
+                    preview,
+                    createdAt: new Date(),
+                  },
+                ]);
+
+                // Auto-cerrar el toast a los 6 segundos
+                setTimeout(() => {
+                  setChatToasts((prev) => prev.filter((t) => t.id !== toastId));
+                }, 6000);
+              }
+            }
+          } catch (e) {
+            console.warn('Error procesando alerta de chat:', e);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, activeItem, setActiveItem, setTargetGroupId, setUnreadChatCount]);
 
   // 1. Fetch fleet data
   const fetchFleet = async (showRefreshIndicator = false) => {
@@ -247,6 +369,19 @@ function DashboardContent() {
       {/* 5. Admin Authentication & Profile Modals */}
       <AdminLoginModal />
       <AdminEditProfileModal />
+
+      {/* 6. Floating In-App Chat Notifications */}
+      <ChatNotificationToastContainer
+        toasts={chatToasts}
+        onDismiss={(id) => setChatToasts((prev) => prev.filter((t) => t.id !== id))}
+        onOpenChat={(groupId) => {
+          setTargetGroupId(groupId);
+          setActiveItem('chat');
+          setUnreadChatCount(0);
+          setChatToasts([]);
+          resetTabTitle();
+        }}
+      />
     </div>
   );
 }

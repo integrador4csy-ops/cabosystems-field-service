@@ -33,6 +33,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     setIsHovered,
     activeItem,
     setActiveItem,
+    unreadChatCount,
+    setUnreadChatCount,
   } = useSidebar();
 
   const {
@@ -108,10 +110,26 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     {
       id: 'chat',
       name: 'Chat de Equipo',
-      icon: <ChatIcon size={20} className="shrink-0" />,
-      badge: 'En Vivo',
-      badgeColor: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-bold',
-      action: () => setActiveItem('chat'),
+      icon: (
+        <span className="relative inline-flex items-center justify-center">
+          <ChatIcon size={20} className="shrink-0" />
+          {!isWide && unreadChatCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border border-white"></span>
+            </span>
+          )}
+        </span>
+      ),
+      badge: unreadChatCount > 0 ? `${unreadChatCount} nuevo${unreadChatCount > 1 ? 's' : ''}` : 'En Vivo',
+      badgeColor:
+        unreadChatCount > 0
+          ? 'bg-red-500 text-white font-bold animate-pulse shadow-2xs'
+          : 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-bold',
+      action: () => {
+        setUnreadChatCount(0);
+        setActiveItem('chat');
+      },
     },
   ];
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAdminAuth } from '../../context/AdminAuthContext';
+import { useSidebar } from '../../context/SidebarContext';
 import { getMyChatGroups } from '../../lib/chatApi';
 import type { ChatGroup } from '../../types/chat';
 import { GroupList } from './GroupList';
@@ -11,6 +12,7 @@ import { MessageSquare, Plus } from 'lucide-react';
 
 export const ChatView: React.FC = () => {
   const { user, adminProfile } = useAdminAuth();
+  const { targetGroupId, setTargetGroupId } = useSidebar();
   const currentUserId = user?.id || '';
   const isGlobalAdmin =
     adminProfile?.rol === 'admin' ||
@@ -41,6 +43,16 @@ export const ChatView: React.FC = () => {
       setLoading(false);
     }
   }, [currentUserId]);
+
+  // Si se hizo clic en una notificación para un grupo específico, seleccionarlo
+  useEffect(() => {
+    if (targetGroupId && groups.length > 0) {
+      if (groups.some((g) => g.id === targetGroupId)) {
+        setSelectedGroupId(targetGroupId);
+        setTargetGroupId(null);
+      }
+    }
+  }, [targetGroupId, groups, setTargetGroupId]);
 
   useEffect(() => {
     if (currentUserId) {
