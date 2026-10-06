@@ -364,6 +364,24 @@ export async function sendChatMessage(params: {
     .single();
 
   if (error) throw error;
+
+  // Disparar notificación push a los dispositivos móviles del grupo
+  supabase.functions
+    .invoke('chat-push-notifications', {
+      body: {
+        record: {
+          id: data.id,
+          grupo_id: params.grupo_id,
+          remitente_id: params.remitente_id,
+          tipo: params.tipo,
+          contenido: params.contenido || null,
+        },
+      },
+    })
+    .catch((err) => {
+      console.warn('Push notification dispatch error from web:', err);
+    });
+
   return data as ChatMessage;
 }
 

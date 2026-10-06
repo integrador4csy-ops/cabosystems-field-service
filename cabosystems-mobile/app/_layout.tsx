@@ -17,6 +17,7 @@ import { startLiveTracking, stopLiveTracking, subscribeToBackgroundLocationPromp
 import BackgroundLocationModal from '@/components/BackgroundLocationModal';
 import { useAppUpdateCheck } from '@/lib/appUpdateService';
 import AppUpdateModal from '@/components/AppUpdateModal';
+import { registerForPushNotificationsAsync, setupNotificationResponseListener } from '@/lib/notifications';
 
 export {
   ErrorBoundary,
@@ -52,6 +53,25 @@ function RootLayoutNav() {
       stopLiveTracking();
     }
   }, [session?.user?.id]);
+
+  // Registrar Expo Push Token y sincronizarlo con Supabase
+  useEffect(() => {
+    if (session?.user?.id) {
+      registerForPushNotificationsAsync(session.user.id);
+    }
+  }, [session?.user?.id]);
+
+  // Escuchar cuando el usuario toca una notificación push (app en segundo plano / pantalla bloqueada)
+  useEffect(() => {
+    const unsubscribe = setupNotificationResponseListener((path) => {
+      try {
+        router.push(path as any);
+      } catch (e) {
+        console.warn('Error navegando desde notificación push:', e);
+      }
+    });
+    return () => unsubscribe();
+  }, [router]);
 
   // Interceptar enlaces de invitación y enrutar directamente a Registro o Recuperación
   useEffect(() => {

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "464982248915",
+    "project_id": "cabo-system-field-app",
+    "storage_bucket": "cabo-system-field-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:464982248915:android:851be7c23632fed33b7326",
+        "android_client_info": {
+          "package_name": "com.cabosystems.fieldservice"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDp_GTKqV3et38ggwB3uiFCj51za4RA94U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
