@@ -26,11 +26,11 @@ export const ChatNotificationToastContainer: React.FC<ChatNotificationToastProps
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-99999 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none select-none">
+    <div className="fixed top-5 left-4 md:left-[88px] z-99999 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none select-none">
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className="pointer-events-auto flex items-start gap-3.5 p-3.5 bg-white/95 backdrop-blur-md rounded-2xl border border-orange-200/90 shadow-xl shadow-orange-950/10 transition-all duration-300 animate-in slide-in-from-bottom-5 fade-in hover:shadow-2xl"
+          className="pointer-events-auto flex items-start gap-3.5 p-3.5 bg-white/95 backdrop-blur-md rounded-2xl border border-orange-200/90 shadow-xl shadow-orange-950/10 transition-all duration-300 animate-in slide-in-from-top-4 fade-in hover:shadow-2xl"
         >
           {/* Icon Badge */}
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-[#f78c26] border border-orange-200/80 shadow-2xs mt-0.5">
