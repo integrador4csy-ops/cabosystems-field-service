@@ -22,7 +22,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.cabosystems.fieldservice",
-      "versionCode": 6,
+      "versionCode": 7,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -56,7 +56,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/adaptive-icon.png",
+          "icon": "./assets/images/notification-icon.png",
           "color": "#f78c26"
         }
       ],
