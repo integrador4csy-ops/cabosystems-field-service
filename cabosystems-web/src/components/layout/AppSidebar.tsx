@@ -14,7 +14,9 @@ import {
   User,
   LogOut,
   LogIn,
+  Globe,
 } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface AppSidebarProps {
   onOpenCollaboratorsModal: () => void;
@@ -45,6 +47,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     logout,
   } = useAdminAuth();
 
+  const { language, setLanguage, t } = useLanguage();
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -73,15 +77,15 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   const navItems: NavItem[] = [
     {
       id: 'radar',
-      name: 'Radar Satelital',
+      name: t('sidebar.radar'),
       icon: <GridIcon size={20} className="shrink-0" />,
       action: () => setActiveItem('radar'),
     },
     {
       id: 'colaboradores',
-      name: 'Colaboradores',
+      name: t('sidebar.collaborators'),
       icon: <GroupIcon size={20} className="shrink-0" />,
-      badge: 'Equipo',
+      badge: t('sidebar.collaboratorsBadge'),
       badgeColor: 'bg-slate-100 text-slate-600',
       action: () => {
         onOpenCollaboratorsModal();
@@ -89,9 +93,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     },
     {
       id: 'invitaciones',
-      name: 'Invitaciones',
+      name: t('sidebar.invitations'),
       icon: <Clock size={19} className="shrink-0" />,
-      badge: 'Activas',
+      badge: t('sidebar.invitationsBadge'),
       badgeColor: 'bg-slate-100 text-slate-600',
       action: () => {
         onOpenInvitationsModal();
@@ -99,9 +103,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     },
     {
       id: 'invitar',
-      name: 'Invitar Colaborador',
+      name: t('sidebar.invite'),
       icon: <UserPlus size={19} className="shrink-0" />,
-      badge: '+ Nuevo',
+      badge: t('sidebar.inviteBadge'),
       badgeColor: 'bg-orange-50 text-orange-700 border border-orange-200/80',
       action: () => {
         onOpenInviteModal();
@@ -109,19 +113,23 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     },
     {
       id: 'chat',
-      name: 'Chat de Equipo',
+      name: t('sidebar.chat'),
       icon: (
         <span className="relative inline-flex items-center justify-center">
           <ChatIcon size={20} className="shrink-0" />
           {!isWide && unreadChatCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border border-white"></span>
+            <span className="absolute -top-2 -right-2.5 z-10 flex items-center justify-center">
+              <span className="flex h-4 min-w-[17px] px-1 items-center justify-center rounded-full bg-red-500 text-[9.5px] font-black leading-none text-white shadow-xs ring-2 ring-white animate-in zoom-in-75 duration-150">
+                {unreadChatCount > 99 ? '99+' : unreadChatCount}
+              </span>
             </span>
           )}
         </span>
       ),
-      badge: unreadChatCount > 0 ? `${unreadChatCount} nuevo${unreadChatCount > 1 ? 's' : ''}` : 'En Vivo',
+      badge:
+        unreadChatCount > 0
+          ? `${unreadChatCount} ${unreadChatCount > 1 ? t('sidebar.newMessages') : t('sidebar.newMessage')}`
+          : t('sidebar.chatLive'),
       badgeColor:
         unreadChatCount > 0
           ? 'bg-red-500 text-white font-bold animate-pulse shadow-2xs'
@@ -136,8 +144,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   const adminName = adminProfile?.nombre || 'Admin CaboSystems';
   const adminRoleLabel =
     adminProfile?.rol === 'admin'
-      ? 'Super Administrador'
-      : (adminProfile?.rol?.replace(/_/g, ' ') || 'Super Administrador');
+      ? t('sidebar.superAdmin')
+      : (adminProfile?.rol?.replace(/_/g, ' ') || t('sidebar.superAdmin'));
 
   const initials = adminName
     .split(' ')
@@ -185,7 +193,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         <div className="px-2.5 pt-3">
           {isWide && (
             <p className="px-2.5 pb-2 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-              Operaciones y Personal
+              {t('sidebar.operationsAndStaff')}
             </p>
           )}
 
@@ -208,7 +216,15 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-transparent',
                     isWide ? 'px-3 justify-between' : 'justify-center px-0'
                   )}
-                  title={isDisabled ? `${item.name} (Próximamente)` : (!isWide ? item.name : undefined)}
+                  title={
+                    isDisabled
+                      ? `${item.name} (Próximamente)`
+                      : !isWide
+                        ? item.id === 'chat' && unreadChatCount > 0
+                          ? `${item.name} (${unreadChatCount})`
+                          : item.name
+                        : undefined
+                  }
                 >
                   <div className="flex items-center gap-2.5 overflow-hidden">
                     <span
@@ -309,12 +325,12 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
               </button>
             )}
 
-            {/* Dropdown Menu - Exactly 2 Options: Editar Perfil & Cerrar Sesión */}
+            {/* Dropdown Menu - Editar Perfil, Idioma & Cerrar Sesión */}
             {isMenuOpen && (
               <div
                 className={cn(
                   'absolute z-50 bottom-[calc(100%+8px)] overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10 animate-in fade-in slide-in-from-bottom-2 duration-150',
-                  isWide ? 'left-3 right-3' : 'left-3 w-48'
+                  isWide ? 'left-3 right-3' : 'left-3 w-52'
                 )}
               >
                 <div className="flex flex-col gap-0.5">
@@ -327,7 +343,24 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                     className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#343e48] hover:bg-orange-50 hover:text-[#f78c26] transition-colors cursor-pointer"
                   >
                     <User size={15} className="text-slate-400 group-hover:text-[#f78c26]" />
-                    <span>Editar Perfil</span>
+                    <span>{t('sidebar.editProfile')}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLanguage(language === 'es' ? 'en' : 'es');
+                    }}
+                    className="flex items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#343e48] hover:bg-orange-50 hover:text-[#f78c26] transition-colors cursor-pointer"
+                    title={language === 'es' ? 'Cambiar a English' : 'Switch to Spanish'}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Globe size={15} className="text-slate-400 group-hover:text-[#f78c26]" />
+                      <span>{t('sidebar.language')}</span>
+                    </div>
+                    <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 border border-slate-200">
+                      {language === 'es' ? '🇲🇽 ES' : '🇺🇸 EN'}
+                    </span>
                   </button>
 
                   <div className="my-1 border-t border-slate-100" />
@@ -341,7 +374,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                     className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                   >
                     <LogOut size={15} className="text-rose-500" />
-                    <span>Cerrar Sesión</span>
+                    <span>{t('sidebar.logout')}</span>
                   </button>
                 </div>
               </div>
@@ -358,7 +391,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
             title="Iniciar Sesión de Administrador"
           >
             <LogIn size={16} />
-            {isWide && <span>Iniciar Sesión</span>}
+            {isWide && <span>{t('sidebar.login')}</span>}
           </button>
         )}
       </div>

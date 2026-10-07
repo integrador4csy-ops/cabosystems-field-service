@@ -36,9 +36,11 @@ import {
   X,
   Fingerprint,
   ScanFace,
+  Globe,
 } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, Shadow, Animation } from '@/constants/Theme';
 import { useAuth } from '@/lib/auth';
+import { useLanguage } from '@/lib/i18n';
 import { useHeaderHeight } from '@/components/HeaderCaboSystems';
 import { supabase } from '@/lib/supabase';
 import { pickImageSafe } from '@/lib/mediaPicker';
@@ -80,6 +82,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function ProfileScreen() {
   const { profile, user, session, signOut, refreshProfile } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -88,6 +91,7 @@ export default function ProfileScreen() {
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [supportModalVisible, setSupportModalVisible] = useState(false);
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -311,13 +315,13 @@ export default function ProfileScreen() {
     user?.user_metadata?.full_name ||
     user?.user_metadata?.name ||
     user?.email?.split('@')[0] ||
-    'Técnico CaboSystems';
+    t('profile.userFallback');
 
   const displayName = rawName.includes('@') ? rawName.split('@')[0] : rawName;
   const initials = getInitials(displayName);
   const email = user?.email || '';
   const roleKey = profile?.rol || 'tecnico';
-  const roleTitle = ROLE_LABELS[roleKey] || roleKey.toUpperCase();
+  const roleTitle = t(`role.${roleKey}`) || ROLE_LABELS[roleKey] || roleKey.toUpperCase();
 
   const handleConfirmLogout = async () => {
     setLogoutModalVisible(false);
@@ -342,7 +346,7 @@ export default function ProfileScreen() {
 
             <View style={[styles.profilePill, isTablet && styles.profilePillTablet]}>
               <User color="#FFFFFF" size={14} strokeWidth={2.5} />
-              <Text style={styles.profilePillText}>Mi Perfil</Text>
+              <Text style={styles.profilePillText}>{t('profile.title')}</Text>
             </View>
           </View>
         </SafeAreaView>
@@ -418,7 +422,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Sección: OPERACIÓN EN CAMPO */}
-        <Text style={styles.sectionHeading}>OPERACIÓN EN CAMPO</Text>
+        <Text style={styles.sectionHeading}>{t('profile.fieldOperations')}</Text>
         <View style={styles.menuGroup}>
           <Pressable
             style={({ pressed }) => [
@@ -431,8 +435,8 @@ export default function ProfileScreen() {
               <ClipboardList size={18} color="#FFFFFF" strokeWidth={2.2} />
             </View>
             <View style={styles.menuTexts}>
-              <Text style={styles.menuTitle}>Mis Órdenes de Servicio</Text>
-              <Text style={styles.menuSubtitle}>Consultar tareas asignadas en villa</Text>
+              <Text style={styles.menuTitle}>{t('profile.myWorkOrders')}</Text>
+              <Text style={styles.menuSubtitle}>{t('profile.myWorkOrdersSub')}</Text>
             </View>
             <ChevronRight size={17} color={Colors.textDisabled} />
           </Pressable>
@@ -452,8 +456,8 @@ export default function ProfileScreen() {
                   <MapPin size={18} color="#FFFFFF" strokeWidth={2.2} />
                 </View>
                 <View style={styles.menuTexts}>
-                  <Text style={styles.menuTitle}>Registrar Check-In / Check-Out</Text>
-                  <Text style={styles.menuSubtitle}>Captura fotográfica y coordenadas GPS</Text>
+                  <Text style={styles.menuTitle}>{t('profile.checkinCheckout')}</Text>
+                  <Text style={styles.menuSubtitle}>{t('profile.checkinCheckoutSub')}</Text>
                 </View>
                 <ChevronRight size={17} color={Colors.textDisabled} />
               </Pressable>
@@ -461,8 +465,34 @@ export default function ProfileScreen() {
           )}
         </View>
 
+        {/* Sección: AJUSTES DE LA APLICACIÓN */}
+        <Text style={styles.sectionHeading}>{t('profile.appSettings')}</Text>
+        <View style={styles.menuGroup}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.menuItem,
+              pressed && { opacity: 0.75, transform: [{ scale: Animation.pressScale }] },
+            ]}
+            onPress={() => setLanguageModalVisible(true)}
+          >
+            <View style={styles.menuIconCircle}>
+              <Globe size={18} color="#FFFFFF" strokeWidth={2.2} />
+            </View>
+            <View style={styles.menuTexts}>
+              <Text style={styles.menuTitle}>{t('profile.language')}</Text>
+              <Text style={styles.menuSubtitle}>{t('profile.languageSub')}</Text>
+            </View>
+            <View style={styles.languagePillBadge}>
+              <Text style={styles.languagePillText}>
+                {language === 'es' ? '🇲🇽 Español' : '🇺🇸 English'}
+              </Text>
+            </View>
+            <ChevronRight size={17} color={Colors.textDisabled} />
+          </Pressable>
+        </View>
+
         {/* Sección: SOPORTE Y SEGURIDAD */}
-        <Text style={styles.sectionHeading}>SOPORTE Y SEGURIDAD</Text>
+        <Text style={styles.sectionHeading}>{t('profile.supportSecurity')}</Text>
         <View style={styles.menuGroup}>
           {/* Opción de Acceso Biométrico */}
           {biometricAvailable && (
@@ -474,7 +504,7 @@ export default function ProfileScreen() {
                 <View style={styles.menuTexts}>
                   <Text style={styles.menuTitle}>{biometricLabel}</Text>
                   <Text style={styles.menuSubtitle}>
-                    {biometricsEnabled ? 'Habilitada para acceso rápido' : 'Desactivada'}
+                    {biometricsEnabled ? t('profile.biometricEnabled') : t('profile.biometricDisabled')}
                   </Text>
                 </View>
                 <Switch
@@ -504,8 +534,8 @@ export default function ProfileScreen() {
               <KeyRound size={18} color="#FFFFFF" strokeWidth={2.2} />
             </View>
             <View style={styles.menuTexts}>
-              <Text style={styles.menuTitle}>Cambiar Contraseña</Text>
-              <Text style={styles.menuSubtitle}>Actualizar credenciales de acceso</Text>
+              <Text style={styles.menuTitle}>{t('profile.changePassword')}</Text>
+              <Text style={styles.menuSubtitle}>{t('profile.changePasswordSub')}</Text>
             </View>
             <ChevronRight size={17} color={Colors.textDisabled} />
           </Pressable>
@@ -523,8 +553,8 @@ export default function ProfileScreen() {
               <HelpCircle size={18} color="#FFFFFF" strokeWidth={2.2} />
             </View>
             <View style={styles.menuTexts}>
-              <Text style={styles.menuTitle}>Soporte Operativo CSY</Text>
-              <Text style={styles.menuSubtitle}>Ayuda técnica y reportes en campo</Text>
+              <Text style={styles.menuTitle}>{t('profile.support')}</Text>
+              <Text style={styles.menuSubtitle}>{t('profile.supportSub')}</Text>
             </View>
             <ChevronRight size={17} color={Colors.textDisabled} />
           </Pressable>
@@ -543,8 +573,8 @@ export default function ProfileScreen() {
               <LogOut size={18} color="#FFFFFF" strokeWidth={2.2} />
             </View>
             <View style={styles.menuTexts}>
-              <Text style={styles.logoutText}>Cerrar Sesión</Text>
-              <Text style={styles.menuSubtitle}>Salir de tu cuenta en este dispositivo</Text>
+              <Text style={styles.logoutText}>{t('profile.logout')}</Text>
+              <Text style={styles.menuSubtitle}>{t('profile.logoutSub')}</Text>
             </View>
             <ChevronRight size={17} color={Colors.textDisabled} />
           </Pressable>
@@ -553,8 +583,8 @@ export default function ProfileScreen() {
         {/* Footer Minimalista de Marca */}
         <View style={styles.brandFooter}>
           <Text style={styles.brandFooterTitle}>CABOSYSTEMS FIELD SERVICE</Text>
-          <Text style={styles.brandFooterCopy}>Tecnología e Integración Residencial • Los Cabos, B.C.S.</Text>
-          <Text style={styles.brandFooterVersion}>Versión 1.1.0 (Native)</Text>
+          <Text style={styles.brandFooterCopy}>{t('profile.footerTagline')}</Text>
+          <Text style={styles.brandFooterVersion}>{t('profile.version')}</Text>
         </View>
       </ScrollView>
 
@@ -570,9 +600,9 @@ export default function ProfileScreen() {
             <View style={styles.modalIconCircle}>
               <LogOut size={28} color="#FFFFFF" strokeWidth={2.5} />
             </View>
-            <Text style={styles.modalTitle}>¿Cerrar Sesión?</Text>
+            <Text style={styles.modalTitle}>{t('profile.logoutModalTitle')}</Text>
             <Text style={styles.modalMessage}>
-              Al salir, se suspenderá la sincronización de campo hasta que vuelvas a iniciar sesión con tu cuenta.
+              {t('profile.logoutModalMsg')}
             </Text>
 
             <View style={styles.modalButtonRow}>
@@ -583,7 +613,7 @@ export default function ProfileScreen() {
                 ]}
                 onPress={() => setLogoutModalVisible(false)}
               >
-                <Text style={styles.modalCancelBtnText}>CANCELAR</Text>
+                <Text style={styles.modalCancelBtnText}>{t('profile.cancel')}</Text>
               </Pressable>
 
               <Pressable
@@ -593,9 +623,114 @@ export default function ProfileScreen() {
                 ]}
                 onPress={handleConfirmLogout}
               >
-                <Text style={styles.modalConfirmBtnText}>SALIR</Text>
+                <Text style={styles.modalConfirmBtnText}>{t('profile.logoutConfirm')}</Text>
               </Pressable>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Selector de Idioma (Español / Inglés) */}
+      <Modal
+        visible={languageModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.languageModalCard}>
+            <View style={styles.passwordModalHeader}>
+              <View style={styles.passwordHeaderLeft}>
+                <View style={styles.keyIconCircle}>
+                  <Globe size={20} color="#FFFFFF" strokeWidth={2.4} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalFormTitle}>{t('profile.selectLanguageTitle')}</Text>
+                  <Text style={styles.modalSubtitle} numberOfLines={2}>
+                    {t('profile.selectLanguageSub')}
+                  </Text>
+                </View>
+              </View>
+              <Pressable
+                onPress={() => setLanguageModalVisible(false)}
+                hitSlop={8}
+                style={styles.modalCloseBtn}
+              >
+                <X size={20} color={Colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            <View style={styles.languageOptionsList}>
+              {/* Opción Español */}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.languageOptionItem,
+                  language === 'es' && styles.languageOptionActive,
+                  pressed && { opacity: 0.85 },
+                ]}
+                onPress={async () => {
+                  await setLanguage('es');
+                  setLanguageModalVisible(false);
+                }}
+              >
+                <View style={styles.languageOptionLeft}>
+                  <Text style={styles.languageFlag}>🇲🇽</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.languageOptionTitle, language === 'es' && styles.languageOptionTitleActive]}>
+                      Español
+                    </Text>
+                    <Text style={styles.languageOptionDesc}>
+                      {t('profile.langEsDesc')}
+                    </Text>
+                  </View>
+                </View>
+                {language === 'es' && (
+                  <View style={styles.languageCheckCircle}>
+                    <Check size={14} color="#FFFFFF" strokeWidth={3} />
+                  </View>
+                )}
+              </Pressable>
+
+              {/* Opción Inglés */}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.languageOptionItem,
+                  language === 'en' && styles.languageOptionActive,
+                  pressed && { opacity: 0.85 },
+                ]}
+                onPress={async () => {
+                  await setLanguage('en');
+                  setLanguageModalVisible(false);
+                }}
+              >
+                <View style={styles.languageOptionLeft}>
+                  <Text style={styles.languageFlag}>🇺🇸</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.languageOptionTitle, language === 'en' && styles.languageOptionTitleActive]}>
+                      English
+                    </Text>
+                    <Text style={styles.languageOptionDesc}>
+                      {t('profile.langEnDesc')}
+                    </Text>
+                  </View>
+                </View>
+                {language === 'en' && (
+                  <View style={styles.languageCheckCircle}>
+                    <Check size={14} color="#FFFFFF" strokeWidth={3} />
+                  </View>
+                )}
+              </Pressable>
+            </View>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.modalCancelFullBtn,
+                pressed && { opacity: 0.8 },
+              ]}
+              onPress={() => setLanguageModalVisible(false)}
+            >
+              <Text style={styles.modalCancelBtnText}>{t('profile.close')}</Text>
+            </Pressable>
           </View>
         </View>
       </Modal>
@@ -1305,5 +1440,88 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.sm,
     marginTop: Spacing.xs,
+  },
+  languagePillBadge: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginRight: 4,
+  },
+  languagePillText: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 12,
+    color: Colors.text,
+  },
+  languageModalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: Colors.card,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.lg,
+    ...Shadow.lg,
+  },
+  languageOptionsList: {
+    gap: Spacing.sm,
+    marginVertical: Spacing.md,
+  },
+  languageOptionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: '#FAFAFA',
+  },
+  languageOptionActive: {
+    borderColor: Colors.primary,
+    backgroundColor: '#FFF8F2',
+  },
+  languageOptionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  languageFlag: {
+    fontSize: 26,
+  },
+  languageOptionTitle: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 14,
+    color: Colors.text,
+  },
+  languageOptionTitleActive: {
+    color: Colors.primary,
+  },
+  languageOptionDesc: {
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  languageCheckCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelFullBtn: {
+    width: '100%',
+    height: 44,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

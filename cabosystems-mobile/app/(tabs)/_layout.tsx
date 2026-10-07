@@ -14,6 +14,7 @@ import { Colors, BorderRadius, Glass, Shadow, Animation } from '@/constants/Them
 import { useAuth } from '@/lib/auth';
 import { useProjects } from '@/lib/projects';
 import { getLatestFieldRecord } from '@/lib/api';
+import { useTranslation } from '@/lib/i18n';
 
 const FAB_SIZE = 52;
 
@@ -90,6 +91,7 @@ function FloatingActionButton(props: any) {
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
+  const { t } = useTranslation();
   const isAdmin =
     profile?.rol === 'admin' ||
     profile?.rol === 'supervisor_instalacion' ||
@@ -128,7 +130,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tareas',
+          title: t('nav.tasks'),
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon Icon={ClipboardList} color={color} focused={focused} />
           ),
@@ -137,7 +139,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="schedule"
         options={{
-          title: 'Agenda',
+          title: t('nav.schedule'),
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon Icon={Calendar} color={color} focused={focused} />
           ),
@@ -157,7 +159,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="users"
         options={{
-          title: 'Equipo',
+          title: t('nav.team'),
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon Icon={Users} color={color} focused={focused} />
           ),
@@ -167,7 +169,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="chat"
         options={{
-          title: 'Chat',
+          title: t('nav.chat'),
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon Icon={MessageSquare} color={color} focused={focused} />
           ),
@@ -176,7 +178,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Perfil',
+          title: t('nav.profile'),
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon Icon={User} color={color} focused={focused} />
           ),

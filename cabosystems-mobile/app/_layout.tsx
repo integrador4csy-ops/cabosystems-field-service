@@ -13,6 +13,7 @@ import React, { useState, useEffect } from 'react';
 import { Linking } from 'react-native';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { ProjectsProvider } from '@/lib/projects';
+import { LanguageProvider } from '@/lib/i18n';
 import { startLiveTracking, stopLiveTracking, subscribeToBackgroundLocationPrompt } from '@/lib/liveTrackingService';
 import BackgroundLocationModal from '@/components/BackgroundLocationModal';
 import { useAppUpdateCheck } from '@/lib/appUpdateService';
@@ -206,10 +207,12 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <ProjectsProvider>
-        <RootLayoutNav />
-      </ProjectsProvider>
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <ProjectsProvider>
+          <RootLayoutNav />
+        </ProjectsProvider>
+      </AuthProvider>
+    </LanguageProvider>
   );
 }

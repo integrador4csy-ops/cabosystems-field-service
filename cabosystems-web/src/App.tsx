@@ -11,6 +11,7 @@ import { AdminLoginModal } from './components/modals/AdminLoginModal';
 import { AdminEditProfileModal } from './components/modals/AdminEditProfileModal';
 import { SidebarProvider, useSidebar } from './context/SidebarContext';
 import { AdminAuthProvider, useAdminAuth } from './context/AdminAuthContext';
+import { LanguageProvider } from './context/LanguageContext';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { AppHeader } from './components/layout/AppHeader';
 import { ChatView } from './components/chat/ChatView';
@@ -53,11 +54,48 @@ function DashboardContent() {
   // Al entrar a la vista de chat, limpiar los contadores y toasts
   useEffect(() => {
     if (activeItem === 'chat') {
+      try {
+        localStorage.setItem('csy_last_chat_view_time', new Date().toISOString());
+      } catch {
+        // ignore
+      }
       setUnreadChatCount(0);
       setChatToasts([]);
       resetTabTitle();
     }
   }, [activeItem, setUnreadChatCount]);
+
+  // Verificar mensajes no leídos iniciales al cargar la aplicación (ej. en el mapa satelital)
+  useEffect(() => {
+    if (!user?.id || activeItem === 'chat') return;
+
+    let isMounted = true;
+    async function checkInitialUnread() {
+      try {
+        const lastViewTime = localStorage.getItem('csy_last_chat_view_time');
+        // Si no hay tiempo guardado, verificar la última hora
+        const sinceTime = lastViewTime || new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+        const { count, error } = await supabase
+          .from('chat_mensajes')
+          .select('*', { count: 'exact', head: true })
+          .gt('created_at', sinceTime)
+          .neq('remitente_id', user!.id);
+
+        if (!error && count && count > 0 && isMounted) {
+          setUnreadChatCount(count);
+          updateTabTitle(count);
+        }
+      } catch (err) {
+        console.warn('Error al verificar mensajes no leídos iniciales:', err);
+      }
+    }
+
+    checkInitialUnread();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, activeItem, setUnreadChatCount]);
 
   // Escuchar mensajes entrantes en tiempo real para notificaciones in-app y de escritorio
   useEffect(() => {
@@ -417,9 +455,11 @@ function AppContent() {
 
 export function App() {
   return (
-    <AdminAuthProvider>
-      <AppContent />
-    </AdminAuthProvider>
+    <LanguageProvider>
+      <AdminAuthProvider>
+        <AppContent />
+      </AdminAuthProvider>
+    </LanguageProvider>
   );
 }
 

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAdminAuth } from '../../context/AdminAuthContext';
-import { User, X, Check, UploadCloud, Trash2, AlertCircle, Camera } from 'lucide-react';
+import { useLanguage, type SupportedLanguage } from '../../context/LanguageContext';
+import { cn } from '../../utils';
+import { User, X, Check, UploadCloud, Trash2, AlertCircle, Camera, Globe } from 'lucide-react';
 import '../AdminUsersModal.css';
 
 export const AdminEditProfileModal: React.FC = () => {
@@ -11,8 +13,11 @@ export const AdminEditProfileModal: React.FC = () => {
     updateAdminProfile,
   } = useAdminAuth();
 
+  const { language, setLanguage, t } = useLanguage();
+
   const [nombre, setNombre] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [selectedLang, setSelectedLang] = useState<SupportedLanguage>(language);
   const [saving, setSaving] = useState(false);
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -22,19 +27,20 @@ export const AdminEditProfileModal: React.FC = () => {
     if (adminProfile) {
       setNombre(adminProfile.nombre || '');
       setAvatarUrl(adminProfile.avatar_url || null);
+      setSelectedLang(language);
     }
-  }, [adminProfile, isEditProfileModalOpen]);
+  }, [adminProfile, isEditProfileModalOpen, language]);
 
   if (!isEditProfileModalOpen) return null;
 
   const handleProcessFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
-      setBanner({ type: 'error', text: 'Por favor selecciona un archivo de imagen válido (PNG, JPG, WEBP).' });
+      setBanner({ type: 'error', text: t('modal.invalidImage') });
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setBanner({ type: 'error', text: 'La imagen es demasiado grande. Tamaño máximo: 5 MB.' });
+      setBanner({ type: 'error', text: t('modal.imageTooLarge') });
       return;
     }
 
@@ -78,12 +84,17 @@ export const AdminEditProfileModal: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombre.trim()) {
-      setBanner({ type: 'error', text: 'El nombre no puede estar vacío.' });
+      setBanner({ type: 'error', text: t('modal.emptyName') });
       return;
     }
 
     setSaving(true);
     setBanner(null);
+
+    // Guardar preferencia de idioma inmediatamente si cambió
+    if (selectedLang !== language) {
+      setLanguage(selectedLang);
+    }
 
     const result = await updateAdminProfile({
       nombre: nombre.trim(),
@@ -93,13 +104,13 @@ export const AdminEditProfileModal: React.FC = () => {
     setSaving(false);
 
     if (result.success) {
-      setBanner({ type: 'success', text: 'Perfil de administrador actualizado con éxito.' });
+      setBanner({ type: 'success', text: t('modal.saveSuccess') });
       setTimeout(() => {
         setIsEditProfileModalOpen(false);
         setBanner(null);
       }, 1000);
     } else {
-      setBanner({ type: 'error', text: result.error || 'Error al guardar cambios.' });
+      setBanner({ type: 'error', text: result.error || t('modal.saveError') });
     }
   };
 
@@ -115,17 +126,17 @@ export const AdminEditProfileModal: React.FC = () => {
             <div>
               <h2 className="admin-modal-title flex items-center gap-2">
                 <User size={19} className="text-[#f78c26]" />
-                Editar Perfil de Administrador
+                {t('modal.profileTitle')}
               </h2>
               <p className="admin-modal-subtitle">
-                Personaliza tu nombre y foto visible en la plataforma
+                {t('modal.profileSubtitle')}
               </p>
             </div>
           </div>
           <button
             className="admin-modal-close"
             onClick={() => setIsEditProfileModalOpen(false)}
-            title="Cerrar ventana"
+            title={t('modal.cancel')}
           >
             <X size={18} />
           </button>
@@ -156,7 +167,7 @@ export const AdminEditProfileModal: React.FC = () => {
             {/* Drag and drop / Device upload box */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-[#343e48]">
-                Foto de Perfil
+                {t('modal.profilePhoto')}
               </label>
 
               {avatarUrl ? (
@@ -176,7 +187,7 @@ export const AdminEditProfileModal: React.FC = () => {
                       className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-[#343e48] hover:border-orange-300 hover:text-[#f78c26] shadow-2xs transition-colors cursor-pointer"
                     >
                       <Camera size={13} />
-                      <span>Cambiar Foto</span>
+                      <span>{t('modal.changePhoto')}</span>
                     </button>
                     <button
                       type="button"
@@ -184,7 +195,7 @@ export const AdminEditProfileModal: React.FC = () => {
                       className="flex items-center gap-1.5 rounded-xl border border-rose-100 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                     >
                       <Trash2 size={13} />
-                      <span>Eliminar Foto</span>
+                      <span>{t('modal.deletePhoto')}</span>
                     </button>
                   </div>
                 </div>
@@ -205,10 +216,10 @@ export const AdminEditProfileModal: React.FC = () => {
                     <UploadCloud size={22} />
                   </div>
                   <p className="text-xs font-bold text-[#343e48]">
-                    Haz clic para subir o arrastra tu foto aquí
+                    {t('modal.uploadDropzone')}
                   </p>
                   <p className="mt-0.5 text-[11px] text-slate-400">
-                    PNG, JPG o WEBP desde tu dispositivo (máx. 5MB)
+                    {t('modal.uploadHint')}
                   </p>
                 </div>
               )}
@@ -216,14 +227,62 @@ export const AdminEditProfileModal: React.FC = () => {
 
             {/* Name Field */}
             <div className="form-field">
-              <label>Nombre del Administrador</label>
+              <label>{t('modal.adminName')}</label>
               <input
                 type="text"
-                placeholder="Ej. Carlos Fregoso"
+                placeholder={t('modal.adminNamePlaceholder')}
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 required
               />
+            </div>
+
+            {/* Language Preference Field */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-[#343e48] flex items-center gap-1.5">
+                <Globe size={14} className="text-[#f78c26]" />
+                <span>{t('modal.languagePref')}</span>
+              </label>
+              <p className="text-[11px] text-slate-400">
+                {t('modal.languagePrefDesc')}
+              </p>
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedLang('es')}
+                  className={cn(
+                    'flex items-center gap-2.5 rounded-xl border p-2.5 text-left text-xs font-semibold transition-all cursor-pointer',
+                    selectedLang === 'es'
+                      ? 'border-[#f78c26] bg-orange-50 text-[#f78c26] shadow-2xs font-bold'
+                      : 'border-slate-200 bg-slate-50/60 text-slate-600 hover:border-slate-300'
+                  )}
+                >
+                  <span className="text-lg">🇲🇽</span>
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <span className="font-bold truncate">Español</span>
+                    <span className="text-[10px] text-slate-400 font-normal">Latinoamérica</span>
+                  </div>
+                  {selectedLang === 'es' && <Check size={14} className="shrink-0 text-[#f78c26]" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedLang('en')}
+                  className={cn(
+                    'flex items-center gap-2.5 rounded-xl border p-2.5 text-left text-xs font-semibold transition-all cursor-pointer',
+                    selectedLang === 'en'
+                      ? 'border-[#f78c26] bg-orange-50 text-[#f78c26] shadow-2xs font-bold'
+                      : 'border-slate-200 bg-slate-50/60 text-slate-600 hover:border-slate-300'
+                  )}
+                >
+                  <span className="text-lg">🇺🇸</span>
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <span className="font-bold truncate">English</span>
+                    <span className="text-[10px] text-slate-400 font-normal">United States</span>
+                  </div>
+                  {selectedLang === 'en' && <Check size={14} className="shrink-0 text-[#f78c26]" />}
+                </button>
+              </div>
             </div>
 
             {/* Submit Button */}
@@ -233,7 +292,7 @@ export const AdminEditProfileModal: React.FC = () => {
                 onClick={() => setIsEditProfileModalOpen(false)}
                 className="flex h-11 flex-1 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-600 transition-colors cursor-pointer"
               >
-                Cancelar
+                {t('modal.cancel')}
               </button>
               <button
                 type="submit"
@@ -243,12 +302,12 @@ export const AdminEditProfileModal: React.FC = () => {
                 {saving ? (
                   <span className="flex items-center gap-2">
                     <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                    Guardando...
+                    {t('modal.saving')}
                   </span>
                 ) : (
                   <>
                     <Check size={16} />
-                    <span>Guardar Cambios</span>
+                    <span>{t('modal.save')}</span>
                   </>
                 )}
               </button>

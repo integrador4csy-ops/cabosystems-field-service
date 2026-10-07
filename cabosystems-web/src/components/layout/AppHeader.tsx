@@ -4,6 +4,7 @@ import {
   CloseIcon,
 } from '../../icons';
 import { Car, MapPin } from 'lucide-react';
+import { useTranslation } from '../../context/LanguageContext';
 
 interface AppHeaderProps {
   searchQuery: string;
@@ -20,6 +21,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   movingCount,
   offlineCount,
 }) => {
+  const { t } = useTranslation();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Keyboard shortcut: Cmd+K / Ctrl+K still focuses input
@@ -39,7 +41,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       {/* Left: City of the company */}
       <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
         <MapPin size={14} className="text-[#f78c26] shrink-0" />
-        <span className="hidden sm:inline">Los Cabos, B.C.S.</span>
+        <span className="hidden sm:inline">{t('header.location')}</span>
       </div>
 
       {/* Center: Search Bar in the Exact Middle (No ⌘K icon) */}
@@ -51,7 +53,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Buscar técnico por nombre o correo..."
+            placeholder={t('header.searchPlaceholder')}
             className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-9.5 pr-9 text-xs font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#f78c26] focus:ring-4 focus:ring-orange-500/10 focus:outline-none transition-all shadow-2xs"
           />
           {searchQuery && (
@@ -71,33 +73,33 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         {/* Online pill */}
         <div
           className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700"
-          title="Técnicos conectados con señal activa"
+          title={t('header.onlineTitle')}
         >
           <span className="h-2 w-2 rounded-full bg-emerald-500 beacon-pulse" />
           <span>{onlineCount}</span>
-          <span className="hidden sm:inline font-normal">en línea</span>
+          <span className="hidden sm:inline font-normal">{t('header.online')}</span>
         </div>
 
         {/* Moving pill */}
         {movingCount > 0 && (
           <div
             className="flex items-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700"
-            title="Técnicos en movimiento/ruta (>12 km/h)"
+            title={t('header.inRouteTitle')}
           >
             <Car size={13} className="text-[#f78c26]" />
             <span>{movingCount}</span>
-            <span className="hidden sm:inline font-normal">en ruta</span>
+            <span className="hidden sm:inline font-normal">{t('header.inRoute')}</span>
           </div>
         )}
 
         {/* Offline pill */}
         <div
           className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600"
-          title="Técnicos sin señal reciente (>15 min)"
+          title={t('header.offlineTitle')}
         >
           <span className="h-2 w-2 rounded-full bg-slate-400" />
           <span>{offlineCount}</span>
-          <span className="hidden sm:inline text-slate-500">offline</span>
+          <span className="hidden sm:inline text-slate-500">{t('header.offline')}</span>
         </div>
       </div>
     </header>
