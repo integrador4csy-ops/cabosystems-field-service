@@ -115,11 +115,11 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
       id: 'chat',
       name: t('sidebar.chat'),
       icon: (
-        <span className="relative inline-flex items-center justify-center">
+        <span className="relative inline-flex items-center justify-center overflow-visible">
           <ChatIcon size={20} className="shrink-0" />
           {!isWide && unreadChatCount > 0 && (
-            <span className="absolute -top-2 -right-2.5 z-10 flex items-center justify-center">
-              <span className="flex h-4 min-w-[17px] px-1 items-center justify-center rounded-full bg-red-500 text-[9.5px] font-black leading-none text-white shadow-xs ring-2 ring-white animate-in zoom-in-75 duration-150">
+            <span className="absolute -top-1.5 -right-2.5 z-30 flex items-center justify-center pointer-events-none">
+              <span className="flex h-4 min-w-[17px] px-1 items-center justify-center rounded-full bg-red-500 text-[9.5px] font-black leading-none text-white shadow-xs ring-2 ring-white">
                 {unreadChatCount > 99 ? '99+' : unreadChatCount}
               </span>
             </span>
@@ -226,14 +226,15 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                         : undefined
                   }
                 >
-                  <div className="flex items-center gap-2.5 overflow-hidden">
+                  <div className="flex items-center gap-2.5 min-w-0 overflow-visible">
                     <span
                       className={cn(
                         isDisabled
                           ? 'text-slate-400'
                           : isActive
                             ? 'text-[#f78c26]'
-                            : 'text-slate-400 group-hover:text-slate-600'
+                            : 'text-slate-400 group-hover:text-slate-600',
+                        'relative shrink-0 overflow-visible'
                       )}
                     >
                       {item.icon}
