@@ -15,6 +15,7 @@ import {
   LogOut,
   LogIn,
   Globe,
+  Building2,
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -80,6 +81,14 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
       name: t('sidebar.radar'),
       icon: <GridIcon size={20} className="shrink-0" />,
       action: () => setActiveItem('radar'),
+    },
+    {
+      id: 'proyectos',
+      name: t('sidebar.projects'),
+      icon: <Building2 size={20} className="shrink-0" />,
+      badge: t('sidebar.projectsBadge'),
+      badgeColor: 'bg-orange-50 text-[#f78c26] border border-orange-200/80 font-bold',
+      action: () => setActiveItem('proyectos'),
     },
     {
       id: 'colaboradores',

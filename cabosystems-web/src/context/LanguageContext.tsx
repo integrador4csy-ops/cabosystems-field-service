@@ -9,6 +9,8 @@ export const WEB_TRANSLATIONS = {
     // Sidebar
     'sidebar.operationsAndStaff': 'Operaciones y Personal',
     'sidebar.radar': 'Radar Satelital',
+    'sidebar.projects': 'Desarrollos y Villas',
+    'sidebar.projectsBadge': 'Obras',
     'sidebar.collaborators': 'Colaboradores',
     'sidebar.collaboratorsBadge': 'Equipo',
     'sidebar.invitations': 'Invitaciones',
@@ -69,6 +71,8 @@ export const WEB_TRANSLATIONS = {
     // Sidebar
     'sidebar.operationsAndStaff': 'Operations & Personnel',
     'sidebar.radar': 'Satellite Radar',
+    'sidebar.projects': 'Developments & Villas',
+    'sidebar.projectsBadge': 'Sites',
     'sidebar.collaborators': 'Collaborators',
     'sidebar.collaboratorsBadge': 'Team',
     'sidebar.invitations': 'Invitations',

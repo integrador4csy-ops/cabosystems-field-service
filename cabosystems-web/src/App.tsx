@@ -15,6 +15,7 @@ import { LanguageProvider } from './context/LanguageContext';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { AppHeader } from './components/layout/AppHeader';
 import { ChatView } from './components/chat/ChatView';
+import { ProjectsManagementView } from './components/projects/ProjectsManagementView';
 import { AuthSplitScreen } from './components/auth/AuthSplitScreen';
 import {
   playNotificationSound,
@@ -365,10 +366,14 @@ function DashboardContent() {
           offlineCount={offlineCount}
         />
 
-        {/* 3. Main View: GPS Radar Map or Team Group Chat */}
+        {/* 3. Main View: GPS Radar Map, Team Group Chat or Projects Management */}
         <main className="flex-1 min-h-0 p-3 lg:p-3.5 overflow-hidden relative flex flex-col">
           {activeItem === 'chat' ? (
             <ChatView />
+          ) : activeItem === 'proyectos' ? (
+            <div className="flex-1 h-full w-full rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden relative">
+              <ProjectsManagementView />
+            </div>
           ) : (
             <div className="flex-1 h-full w-full rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden relative">
               <LiveMap
