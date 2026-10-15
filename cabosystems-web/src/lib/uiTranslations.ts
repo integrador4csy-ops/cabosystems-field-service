@@ -1,6 +1,7 @@
 // Source text is the Spanish fallback. Only interface copy belongs here;
 // names, task content, addresses and chat messages are never translated.
 export const UI_TRANSLATIONS: Record<string, string> = {
+  'Proyectos': 'Projects',
   'Eliminando...': 'Deleting...',
   'Recientes': 'Recent',
   'Caras y emociones': 'Smileys and emotions',

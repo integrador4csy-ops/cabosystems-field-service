@@ -100,6 +100,12 @@ create policy globales_read on public.proyecto_accesos_globales for select to au
 create policy globales_admin on public.proyecto_accesos_globales for all to authenticated using((select private.project_admin())) with check((select private.project_admin()));
 
 -- Replace permissive legacy policies (policies combine with OR).
+alter table public.proyectos enable row level security;
+alter table public.tareas enable row level security;
+alter table public.subtareas enable row level security;
+alter table public.pendientes enable row level security;
+alter table public.registros_campo enable row level security;
+alter table public.profiles enable row level security;
 do $$ declare r record; begin
   for r in select tablename,policyname from pg_policies where schemaname='public' and tablename in ('proyectos','tareas','subtareas','pendientes','registros_campo') loop
     execute format('drop policy %I on public.%I',r.policyname,r.tablename);
@@ -170,6 +176,13 @@ begin
 end; $$;
 create trigger profiles_protect_authority before update or delete on public.profiles for each row execute function private.protect_profile_authority();
 revoke all on function private.protect_profile_authority() from public,anon,authenticated;
+-- Older ALL policies must not allow a supervisor to insert an administrator profile.
+do $$ declare r record; begin
+  for r in select policyname from pg_policies where schemaname='public' and tablename='profiles' and cmd in ('ALL','DELETE','INSERT') loop
+    execute format('drop policy %I on public.profiles',r.policyname);
+  end loop;
+end $$;
+create policy profiles_authority_admin on public.profiles for all to authenticated using((select private.project_admin())) with check((select private.project_admin()));
 do $$ declare r record; v_definition text; begin
   for r in select p.oid from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('admin_editar_colaborador','admin_reactivar_colaborador','admin_expulsar_colaborador') loop
     v_definition := pg_get_functiondef(r.oid);

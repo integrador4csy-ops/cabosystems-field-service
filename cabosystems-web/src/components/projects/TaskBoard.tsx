@@ -1,4 +1,5 @@
 import { useTranslation } from '../../context/LanguageContext';
+import { useAdminAuth } from '../../context/AdminAuthContext';
 import { useMemo, useRef, useState } from 'react';
 import { GripVertical, Loader2, Search } from 'lucide-react';
 import type { Tarea } from '../../types/projects';
@@ -24,6 +25,7 @@ interface TaskBoardProps {
 
 export function TaskBoard({ tasks, expandedTaskIds, onToggleExpand, onTaskUpdated, onEditTask, onMoveTask, showSearch = true, projectLabels }: TaskBoardProps) {
   const { t } = useTranslation();
+  const { user, isAdmin } = useAdminAuth();
   const [query, setQuery] = useState('');
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [overStatus, setOverStatus] = useState<Tarea['estatus'] | null>(null);
@@ -85,7 +87,7 @@ export function TaskBoard({ tasks, expandedTaskIds, onToggleExpand, onTaskUpdate
                 <div key={task.id} className={`task-board-item ${draggedId === task.id ? 'is-dragging' : ''}`}>
                   <div className="task-board-drag-row">
                     <span
-                      draggable={!saving}
+                      draggable={!saving && (isAdmin || task.asignado_a === user?.id)}
                       onDragStart={(event) => { setDraggedId(task.id); event.dataTransfer.setData('text/plain', task.id); event.dataTransfer.effectAllowed = 'move'; }}
                       onDragEnd={() => { setDraggedId(null); setOverStatus(null); }}
                       title={t("Arrastrar tarea a otro estado")}

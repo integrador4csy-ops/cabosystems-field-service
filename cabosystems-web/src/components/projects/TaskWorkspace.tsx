@@ -1,4 +1,5 @@
 import { AppSelect } from '../ui/AppSelect';
+import { useSidebar } from '../../context/SidebarContext';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Building2, Columns3, List, Loader2, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { useTranslation } from '../../context/LanguageContext';
@@ -38,6 +39,7 @@ interface TaskWorkspaceProps {
 
 export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, searchQuery, createVersion, onReload, onMoveTask, onDeleteProject }: TaskWorkspaceProps) {
   const { t } = useTranslation();
+  const { setActiveItem } = useSidebar();
   const [development, setDevelopment] = useState('all');
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filterId = useId();
@@ -102,7 +104,7 @@ export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, se
       <label>{t('Desarrollo')}<AppSelect aria-label={t('Desarrollo')} value={development} onChange={(event) => { setDevelopment(event.target.value); setProjectId('all'); }}><option value="all">{t('Todos los desarrollos')}</option>{developments.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect></label>
       <label>{t('Villa')}<AppSelect aria-label={t('Villa')} value={effectiveProject} onChange={(event) => setProjectId(event.target.value)}><option value="all">{t('Todas las villas')}</option>{availableProjects.map((project) => <option key={project.id} value={project.id}>{project.villa}</option>)}</AppSelect></label>
       <label>{t('Responsable')}<AppSelect aria-label={t('Responsable')} value={assignee} onChange={(event) => setAssignee(event.target.value)}><option value="all">{t('Todos los responsables')}</option><option value="unassigned">{t('Sin asignar')}</option>{staff.map((person) => <option key={person.id} value={person.id}>{person.nombre || person.full_name || person.email}</option>)}</AppSelect></label>
-    </div><div className="workspace-tools"><button type="button" className="workspace-button workspace-mobile-filter-toggle" aria-expanded={mobileFiltersOpen} aria-controls={filterId} onClick={() => setMobileFiltersOpen((previous) => !previous)}><SlidersHorizontal size={15} aria-hidden="true" />{t('Filtros')}{activeFilterCount > 0 && <span>{activeFilterCount}</span>}</button><button type="button" className="workspace-button" onClick={() => setCatalogOpen(true)}><Building2 size={15} aria-hidden="true" />{t('Villas')}</button><button type="button" className="workspace-icon" aria-label={t('Recargar datos')} disabled={loading || refreshing} onClick={() => void refresh()}><RefreshCw size={15} className={loading || refreshing ? 'animate-spin' : ''} /></button></div></div>
+    </div><div className="workspace-tools"><button type="button" className="workspace-button workspace-mobile-filter-toggle" aria-expanded={mobileFiltersOpen} aria-controls={filterId} onClick={() => setMobileFiltersOpen((previous) => !previous)}><SlidersHorizontal size={15} aria-hidden="true" />{t('Filtros')}{activeFilterCount > 0 && <span>{activeFilterCount}</span>}</button><button type="button" className="workspace-button" onClick={() => setActiveItem('directorio-proyectos')}><Building2 size={15} aria-hidden="true" />{t('Villas')}</button><button type="button" className="workspace-icon" aria-label={t('Recargar datos')} disabled={loading || refreshing} onClick={() => void refresh()}><RefreshCw size={15} className={loading || refreshing ? 'animate-spin' : ''} /></button></div></div>
     {(error || actionError) && <div role="alert" className="workspace-error">{t(error || actionError || '')}<button type="button" disabled={refreshing} onClick={() => void refresh()}>{t('Reintentar')}</button></div>}
     {mode === 'tasks' && <div className="workspace-toolbar"><div className="workspace-view-switch" role="group" aria-label={t('Vista de tareas')}><button type="button" aria-pressed={view === 'board'} onClick={() => changeView('board')}><Columns3 size={16} />{t('Tablero')}</button><button type="button" aria-pressed={view === 'list'} onClick={() => changeView('list')}><List size={16} />{t('Lista')}</button></div><span className="workspace-count">{visible.length} {t(visible.length === 1 ? 'tarea' : 'tareas')}</span></div>}
     {showStatusFilters && <div className="workspace-status-tabs" role="group" aria-label={t('Estado')}>

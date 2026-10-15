@@ -17,6 +17,7 @@ import {
   Globe,
   ListTodo,
   CalendarDays,
+  Building2,
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react';
@@ -74,6 +75,12 @@ export const AppSidebar: React.FC = () => {
   }
 
   const navItems: NavItem[] = [
+    {
+      id: 'directorio-proyectos',
+      name: t('Proyectos'),
+      icon: <Building2 size={20} className="shrink-0" />,
+      action: () => setActiveItem('directorio-proyectos'),
+    },
     {
       id: 'radar',
       name: t('sidebar.radar'),

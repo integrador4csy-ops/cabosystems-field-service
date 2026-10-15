@@ -3,6 +3,7 @@ import { SearchIcon, CloseIcon } from '../../icons';
 import { Car, Menu, MapPin, Plus } from 'lucide-react';
 import { useTranslation } from '../../context/LanguageContext';
 import { useSidebar } from '../../context/SidebarContext';
+import { useAdminAuth } from '../../context/AdminAuthContext';
 
 interface AppHeaderProps {
   searchQuery: string;
@@ -14,11 +15,12 @@ interface AppHeaderProps {
 
 export const AppHeader: React.FC<AppHeaderProps> = ({ searchQuery, onSearchChange, onlineCount, movingCount, offlineCount }) => {
   const { t } = useTranslation();
+  const { isAdmin } = useAdminAuth();
   const { activeItem, isMobileOpen, setIsMobileOpen, taskSearchQuery, setTaskSearchQuery, requestCreateTask } = useSidebar();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const isRadar = activeItem === 'radar';
   const isTasks = activeItem === 'proyectos' || activeItem === 'agenda';
-  const teamTitles: Record<string, string> = { colaboradores: t('sidebar.collaborators'), invitaciones: t('sidebar.invitations') };
+  const teamTitles: Record<string, string> = { colaboradores: t('sidebar.collaborators'), invitaciones: t('sidebar.invitations'), 'directorio-proyectos': t('Proyectos') };
   const title = teamTitles[activeItem] || (activeItem === 'chat' ? t('sidebar.chat') : activeItem === 'agenda' ? t('sidebar.agenda') : activeItem === 'proyectos' ? t('sidebar.projects') : t('sidebar.radar'));
 
   useEffect(() => {
@@ -48,7 +50,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ searchQuery, onSearchChang
           {(isTasks ? taskSearchQuery : searchQuery) && <button type="button" onClick={() => isTasks ? setTaskSearchQuery('') : onSearchChange('')} aria-label={t("Borrar búsqueda")} className="absolute right-1 top-1 flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"><CloseIcon size={16} /></button>}
         </div>
       )}
-      {isTasks && <div className="header-status flex justify-end"><button type="button" onClick={requestCreateTask} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{t('Nueva Tarea')}</button></div>}
+      {isTasks && isAdmin && <div className="header-status flex justify-end"><button type="button" onClick={requestCreateTask} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{t('Nueva Tarea')}</button></div>}
       {isRadar && <div className="header-status flex items-center justify-end gap-3 text-xs tabular-nums">
         <div className="flex items-center gap-1.5 text-emerald-700" title={t('header.onlineTitle')}><span className="h-2 w-2 rounded-full bg-emerald-500" /><span className="font-semibold">{onlineCount}</span><span className="hidden sm:inline">{t('header.online')}</span></div>
         {movingCount > 0 && <div className="flex items-center gap-1.5 text-orange-700" title={t('header.inRouteTitle')}><Car size={14} /><span className="font-semibold">{movingCount}</span><span className="hidden xl:inline">{t('header.inRoute')}</span></div>}

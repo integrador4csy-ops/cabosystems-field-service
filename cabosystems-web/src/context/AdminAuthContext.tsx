@@ -46,13 +46,13 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         } as Profile);
         return data as Profile;
       } else {
-        // Fallback default admin profile
+        // A missing database profile must never confer administrator privileges.
         const fallback: Profile = {
           id: userId,
           nombre: userEmail?.split('@')[0] || 'Admin CaboSystems',
-          rol: 'admin',
+          rol: 'aux_instalacion',
           avatar_url: null,
-          activo: true,
+          activo: false,
           email: userEmail,
         };
         setAdminProfile(fallback);
@@ -174,17 +174,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         .eq('id', user.id);
 
       if (error) {
-        // If profile doesn't exist, insert it
-        const { error: upsertErr } = await supabase
-          .from('profiles')
-          .upsert({
-            id: user.id,
-            nombre: data.nombre.trim(),
-            avatar_url: data.avatar_url,
-            rol: 'admin',
-            activo: true,
-          });
-        if (upsertErr) throw upsertErr;
+        throw error;
       }
 
       setAdminProfile((prev) =>
@@ -194,8 +184,8 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               id: user.id,
               nombre: data.nombre.trim(),
               avatar_url: data.avatar_url,
-              rol: 'admin',
-              activo: true,
+              rol: 'aux_instalacion',
+              activo: false,
               email: user.email,
             }
       );
@@ -213,7 +203,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  const isAdmin = Boolean(user);
+  const isAdmin = Boolean(user && adminProfile?.rol === 'admin' && adminProfile.activo === true);
 
   return (
     <AdminAuthContext.Provider

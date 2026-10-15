@@ -1,4 +1,5 @@
 import { AppSelect } from '../ui/AppSelect';
+import { useAdminAuth } from '../../context/AdminAuthContext';
 import { useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import {
@@ -45,6 +46,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onEditTask,
 }) => {
   const { t, locale } = useTranslation();
+  const { user, isAdmin } = useAdminAuth();
+  const canProgress = isAdmin || task.asignado_a === user?.id;
   const scheduledLabel = showScheduledDate && task.fecha_programada ? parseDateKey(task.fecha_programada).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : '';
   const contextLabel = [projectLabel, scheduledLabel].filter(Boolean).join(' · ');
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
@@ -211,7 +214,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             <AppSelect
               value={task.estatus}
               onChange={(event) => handleStatusChange(event.target.value as Tarea['estatus'])}
-              disabled={updatingStatus}
+              disabled={updatingStatus || !canProgress}
               aria-label={t("Cambiar estatus de la tarea")}
               className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${statusConfig.badgeClass}`}
               triggerContent={<>
@@ -255,7 +258,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             {task.profiles?.avatar_url ? <img src={task.profiles.avatar_url} alt="" /> : <span className="task-board-initials">{task.profiles?.nombre?.split(' ').filter(Boolean).map((part) => part[0]).slice(0, 2).join('') || '—'}</span>}
             <span>{task.profiles?.nombre || t("Sin asignar")}</span>
           </div>}
-          <button
+          {isAdmin && <button
             onClick={() => {
               if (!isExpanded) toggleExpand();
               setIsAddingSubtask(true);
@@ -264,15 +267,15 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             title={t("Añadir subtarea")}
           >
             <Plus size={15} />
-          </button>
+          </button>}
           {variant === 'board' ? <>
-              <AppSelect className="task-board-status-control" title={t("Cambiar estado")} triggerContent={updatingStatus ? <Loader2 size={15} className="animate-spin" /> : <ArrowRightLeft size={15} aria-hidden="true" />} value={task.estatus} onChange={(event) => handleStatusChange(event.target.value as Tarea['estatus'])} disabled={updatingStatus || isDeleting} aria-label={t("Cambiar estado de {value0}", { value0: task.titulo })}>
+              <AppSelect className="task-board-status-control" title={t("Cambiar estado")} triggerContent={updatingStatus ? <Loader2 size={15} className="animate-spin" /> : <ArrowRightLeft size={15} aria-hidden="true" />} value={task.estatus} onChange={(event) => handleStatusChange(event.target.value as Tarea['estatus'])} disabled={updatingStatus || isDeleting || !canProgress} aria-label={t("Cambiar estado de {value0}", { value0: task.titulo })}>
                 <option value="pendiente">{t("Pendiente")}</option>
                 <option value="en_proceso">{t("En proceso")}</option>
                 <option value="completada">{t("Completada")}</option>
               </AppSelect>
-            <TaskActionsMenu title={task.titulo} deleting={isDeleting} onEdit={() => onEditTask(task)} onDelete={handleDeleteTask} />
-          </> : <>
+            {isAdmin && <TaskActionsMenu title={task.titulo} deleting={isDeleting} onEdit={() => onEditTask(task)} onDelete={handleDeleteTask} />}
+          </> : isAdmin ? <>
           <button
             onClick={() => onEditTask(task)}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
@@ -288,7 +291,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           >
             {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
           </button>
-          </>}
+          </> : null}
         </div>
       </div>
 
@@ -331,6 +334,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                         type="checkbox"
                         className="w-4.5 h-4.5 appearance-none cursor-pointer border border-slate-300 rounded-md checked:bg-brand-500 checked:border-transparent transition-all focus:outline-hidden focus:ring-2 focus:ring-orange-500/20"
                         checked={sub.completada}
+                        disabled={!canProgress}
                         onChange={() => handleToggleSubtask(sub)}
                       />
                       {sub.completada && (
@@ -364,21 +368,21 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                     </span>
                   </label>
 
-                  <button
+                  {isAdmin && <button
                     type="button"
                     onClick={() => handleDeleteSubtask(sub.id)}
                     className="opacity-0 group-hover:opacity-100 flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all shrink-0"
                     title={t("Eliminar subtarea")}
                   >
                     <Trash2 size={13} />
-                  </button>
+                  </button>}
                 </div>
               ))}
             </div>
           )}
 
           {/* Subtask form opened from the header action. */}
-          {isAddingSubtask ? (
+          {isAdmin && isAddingSubtask ? (
             <form onSubmit={handleAddSubtask} className="flex items-center gap-1.5 pt-1">
               <input
                 type="text"

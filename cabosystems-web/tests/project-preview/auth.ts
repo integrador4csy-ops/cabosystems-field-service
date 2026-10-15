@@ -1,0 +1,1 @@
+export function useAdminAuth() { return { adminProfile: { id: 'admin', nombre: 'Usuario de prueba', rol: new URLSearchParams(window.location.search).get('role') === 'member' ? 'integrador' : 'admin', activo: true } }; }
