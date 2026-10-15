@@ -1,37 +1,33 @@
+import { getRoleLabel } from '../../lib/uiTranslations';
+import { useDialog } from '../ui/useDialog';
 import React, { useState, useRef, useEffect } from 'react';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { cn } from '../../utils';
 import {
-  GridIcon,
   GroupIcon,
   ChatIcon,
 } from '../../icons';
 import {
-  Clock,
-  UserPlus,
+  Map,
   Settings,
   User,
   LogOut,
   LogIn,
   Globe,
-  Building2,
+  ListTodo,
+  CalendarDays,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 
-interface AppSidebarProps {
-  onOpenCollaboratorsModal: () => void;
-  onOpenInvitationsModal: () => void;
-  onOpenInviteModal: () => void;
-  workersCount?: number;
-}
-
-export const AppSidebar: React.FC<AppSidebarProps> = ({
-  onOpenCollaboratorsModal,
-  onOpenInvitationsModal,
-  onOpenInviteModal,
-}) => {
+export const AppSidebar: React.FC = () => {
   const {
+    isExpanded,
+    isMobileOpen,
+    setIsExpanded,
+    setIsMobileOpen,
     isHovered,
     setIsHovered,
     activeItem,
@@ -53,7 +49,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const isWide = isHovered;
+  const navigationRef = useDialog<HTMLElement>(isMobileOpen, () => setIsMobileOpen(false));
+
+  const isWide = isExpanded || isHovered || isMobileOpen;
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -79,45 +77,27 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     {
       id: 'radar',
       name: t('sidebar.radar'),
-      icon: <GridIcon size={20} className="shrink-0" />,
+      icon: <Map size={20} className="shrink-0" />,
       action: () => setActiveItem('radar'),
     },
     {
       id: 'proyectos',
       name: t('sidebar.projects'),
-      icon: <Building2 size={20} className="shrink-0" />,
-      badge: t('sidebar.projectsBadge'),
-      badgeColor: 'bg-orange-50 text-[#f78c26] border border-orange-200/80 font-bold',
+      icon: <ListTodo size={20} className="shrink-0" />,
       action: () => setActiveItem('proyectos'),
     },
     {
+      id: 'agenda',
+      name: t('sidebar.agenda'),
+      icon: <CalendarDays size={20} className="shrink-0" />,
+      action: () => setActiveItem('agenda'),
+    },
+    {
       id: 'colaboradores',
-      name: t('sidebar.collaborators'),
+      name: language === 'es' ? t("Equipo") : 'Team',
       icon: <GroupIcon size={20} className="shrink-0" />,
-      badge: t('sidebar.collaboratorsBadge'),
-      badgeColor: 'bg-slate-100 text-slate-600',
       action: () => {
-        onOpenCollaboratorsModal();
-      },
-    },
-    {
-      id: 'invitaciones',
-      name: t('sidebar.invitations'),
-      icon: <Clock size={19} className="shrink-0" />,
-      badge: t('sidebar.invitationsBadge'),
-      badgeColor: 'bg-slate-100 text-slate-600',
-      action: () => {
-        onOpenInvitationsModal();
-      },
-    },
-    {
-      id: 'invitar',
-      name: t('sidebar.invite'),
-      icon: <UserPlus size={19} className="shrink-0" />,
-      badge: t('sidebar.inviteBadge'),
-      badgeColor: 'bg-orange-50 text-orange-700 border border-orange-200/80',
-      action: () => {
-        onOpenInviteModal();
+        setActiveItem('colaboradores');
       },
     },
     {
@@ -154,7 +134,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   const adminRoleLabel =
     adminProfile?.rol === 'admin'
       ? t('sidebar.superAdmin')
-      : (adminProfile?.rol?.replace(/_/g, ' ') || t('sidebar.superAdmin'));
+      : (adminProfile?.rol ? getRoleLabel(adminProfile.rol, t) : t('sidebar.superAdmin'));
 
   const initials = adminName
     .split(' ')
@@ -165,7 +145,18 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     .toUpperCase();
 
   return (
+    <>
+    {isMobileOpen && <button type="button" aria-label={t("Cerrar navegación")} onClick={() => setIsMobileOpen(false)} className="fixed inset-0 z-40 bg-slate-900/40 md:hidden" />}
     <aside
+      ref={navigationRef}
+      role={isMobileOpen ? 'dialog' : undefined}
+      aria-modal={isMobileOpen || undefined}
+      tabIndex={-1}
+      id="app-navigation"
+      aria-label={t("Navegación principal")}
+      onFocus={() => setIsHovered(true)}
+      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setIsHovered(false); }}
+      onKeyDown={(event) => { if (event.key === 'Escape') { setIsMobileOpen(false); setIsMenuOpen(false); setIsHovered(false); } }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => {
         setIsHovered(false);
@@ -173,12 +164,13 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
       }}
       className={cn(
         'fixed top-0 bottom-0 left-0 z-50 flex flex-col justify-between border-r border-slate-200 bg-white select-none font-sans transition-all duration-300 ease-in-out',
-        isWide ? 'w-64 shadow-2xl' : 'w-[72px] shadow-xs'
+        isWide ? 'w-64' : 'w-[72px]',
+        isMobileOpen ? 'flex' : 'hidden md:flex'
       )}
     >
       {/* Top: Logo & Branding */}
-      <div>
-        <div className="flex h-16 items-center px-4 border-b border-slate-100">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="flex h-16 items-center justify-between px-4 border-b border-slate-100">
           {isWide ? (
             <div className="flex items-center gap-2 overflow-hidden">
               <img
@@ -198,36 +190,38 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           )}
         </div>
 
+        <div className="hidden md:flex justify-center px-3 py-2">
+          <button type="button" onClick={() => setIsExpanded((previous) => !previous)} aria-expanded={isExpanded} aria-controls="app-navigation" title={isExpanded ? t("Contraer menú") : t("Fijar menú abierto")} className="hidden md:flex h-9 w-full items-center justify-center gap-2 rounded-lg text-slate-500 hover:bg-slate-100">
+            {isExpanded ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+            {isWide && <span className="text-xs">{isExpanded ? t("Contraer menú") : t("Fijar menú abierto")}</span>}
+          </button>
+        </div>
         {/* Navigation Section */}
         <div className="px-2.5 pt-3">
-          {isWide && (
-            <p className="px-2.5 pb-2 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-              {t('sidebar.operationsAndStaff')}
-            </p>
-          )}
-
           <nav className="flex flex-col gap-1.5">
             {navItems.map((item) => {
-              const isActive = activeItem === item.id;
+              const isActive = activeItem === item.id || (item.id === 'colaboradores' && activeItem === 'invitaciones');
               const isDisabled = item.disabled;
 
               return (
                 <button
                   key={item.id}
-                  onClick={isDisabled ? undefined : item.action}
+                  aria-label={item.name}
+                  aria-current={isActive ? 'page' : undefined}
+                  onClick={isDisabled ? undefined : () => { item.action(); setIsMobileOpen(false); setIsHovered(false); }}
                   disabled={isDisabled}
                   className={cn(
-                    'group relative flex items-center rounded-xl py-2.5 text-xs font-semibold transition-all duration-150 text-left',
+                    'group relative flex h-11 items-center rounded-lg py-2.5 text-sm font-semibold transition-all duration-150 text-left',
                     isDisabled
                       ? 'text-slate-400 opacity-60 cursor-not-allowed hover:bg-transparent border border-transparent'
                       : isActive
-                        ? 'bg-orange-50 text-[#f78c26] border border-orange-200 shadow-2xs font-bold'
+                        ? 'bg-orange-50 text-brand-500 border border-orange-200 shadow-2xs font-bold'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-transparent',
                     isWide ? 'px-3 justify-between' : 'justify-center px-0'
                   )}
                   title={
                     isDisabled
-                      ? `${item.name} (Próximamente)`
+                      ? t("{value0} (Próximamente)", { value0: item.name })
                       : !isWide
                         ? item.id === 'chat' && unreadChatCount > 0
                           ? `${item.name} (${unreadChatCount})`
@@ -241,7 +235,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                         isDisabled
                           ? 'text-slate-400'
                           : isActive
-                            ? 'text-[#f78c26]'
+                            ? 'text-brand-500'
                             : 'text-slate-400 group-hover:text-slate-600',
                         'relative shrink-0 overflow-visible'
                       )}
@@ -274,12 +268,14 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           <>
             {isWide ? (
               <div
+                role="button" tabIndex={0} aria-label={t("Opciones de perfil")} aria-expanded={isMenuOpen}
+                onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); setIsMenuOpen(!isMenuOpen); } }}
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
                 className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-2.5 shadow-2xs hover:border-slate-300 transition-all cursor-pointer group"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="relative flex h-8.5 w-8.5 shrink-0 items-center justify-center">
-                    <div className="flex h-full w-full items-center justify-center rounded-xl bg-orange-100 text-[#f78c26] font-bold text-xs overflow-hidden border border-orange-200/80">
+                    <div className="flex h-full w-full items-center justify-center rounded-xl bg-orange-100 text-brand-500 font-bold text-xs overflow-hidden border border-orange-200/80">
                       {adminProfile?.avatar_url ? (
                         <img
                           src={adminProfile.avatar_url}
@@ -293,7 +289,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                     <span className="absolute -bottom-0.5 -right-0.5 z-10 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 shadow-xs" />
                   </div>
                   <div className="overflow-hidden text-left">
-                    <h4 className="truncate text-xs font-bold text-[#343e48] group-hover:text-[#f78c26] transition-colors">
+                    <h4 className="truncate text-xs font-bold text-[#343e48] group-hover:text-brand-500 transition-colors">
                       {adminName}
                     </h4>
                     <p className="truncate text-[10.5px] text-slate-500 font-medium">
@@ -308,8 +304,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                     e.stopPropagation();
                     setIsMenuOpen(!isMenuOpen);
                   }}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:text-[#f78c26] hover:bg-orange-50 transition-colors"
-                  title="Opciones de perfil"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:text-brand-500 hover:bg-orange-50 transition-colors"
+                  title={t("Opciones de perfil")}
                 >
                   <Settings size={15} />
                 </button>
@@ -320,7 +316,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                 className="relative mx-auto flex h-9 w-9 items-center justify-center cursor-pointer group"
                 title={`${adminName} (${adminRoleLabel})`}
               >
-                <div className="flex h-full w-full items-center justify-center rounded-xl border border-slate-200 bg-white text-[#f78c26] hover:border-orange-300 shadow-2xs overflow-hidden">
+                <div className="flex h-full w-full items-center justify-center rounded-xl border border-slate-200 bg-white text-brand-500 hover:border-orange-300 shadow-2xs overflow-hidden">
                   {adminProfile?.avatar_url ? (
                     <img
                       src={adminProfile.avatar_url}
@@ -350,9 +346,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                       setIsMenuOpen(false);
                       setIsEditProfileModalOpen(true);
                     }}
-                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#343e48] hover:bg-orange-50 hover:text-[#f78c26] transition-colors cursor-pointer"
+                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#343e48] hover:bg-orange-50 hover:text-brand-500 transition-colors cursor-pointer"
                   >
-                    <User size={15} className="text-slate-400 group-hover:text-[#f78c26]" />
+                    <User size={15} className="text-slate-400 group-hover:text-brand-500" />
                     <span>{t('sidebar.editProfile')}</span>
                   </button>
 
@@ -361,11 +357,11 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                     onClick={() => {
                       setLanguage(language === 'es' ? 'en' : 'es');
                     }}
-                    className="flex items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#343e48] hover:bg-orange-50 hover:text-[#f78c26] transition-colors cursor-pointer"
+                    className="flex items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#343e48] hover:bg-orange-50 hover:text-brand-500 transition-colors cursor-pointer"
                     title={language === 'es' ? 'Cambiar a English' : 'Switch to Spanish'}
                   >
                     <div className="flex items-center gap-2.5">
-                      <Globe size={15} className="text-slate-400 group-hover:text-[#f78c26]" />
+                      <Globe size={15} className="text-slate-400 group-hover:text-brand-500" />
                       <span>{t('sidebar.language')}</span>
                     </div>
                     <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 border border-slate-200">
@@ -398,7 +394,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
               'flex items-center justify-center gap-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs py-2.5 transition-all shadow-xs cursor-pointer',
               isWide ? 'w-full px-3' : 'w-10 h-10 mx-auto p-0'
             )}
-            title="Iniciar Sesión de Administrador"
+            title={t("Iniciar Sesión de Administrador")}
           >
             <LogIn size={16} />
             {isWide && <span>{t('sidebar.login')}</span>}
@@ -406,5 +402,6 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         )}
       </div>
     </aside>
+    </>
   );
 };

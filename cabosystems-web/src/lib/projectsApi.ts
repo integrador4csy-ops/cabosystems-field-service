@@ -111,8 +111,8 @@ export async function deleteProject(id: string): Promise<void> {
 /**
  * Obtener tareas de una villa/proyecto con perfiles asignados y subtareas
  */
-export async function getTasksByProject(projectId: string): Promise<Tarea[]> {
-  const { data, error } = await supabase
+export async function getTasksByProject(projectId?: string): Promise<Tarea[]> {
+  let query = supabase
     .from('tareas')
     .select(`
       id,
@@ -121,6 +121,7 @@ export async function getTasksByProject(projectId: string): Promise<Tarea[]> {
       titulo,
       descripcion,
       estatus,
+      fecha_programada,
       created_at,
       profiles:asignado_a (
         id,
@@ -135,22 +136,25 @@ export async function getTasksByProject(projectId: string): Promise<Tarea[]> {
         completada,
         created_at
       )
-    `)
-    .eq('proyecto_id', projectId)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching tasks for project:', error);
-    throw error;
+    `);
+  if (projectId) query = query.eq('proyecto_id', projectId);
+  query = query.order('created_at', { ascending: false }).order('id');
+  const allRows: any[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await query.range(offset, offset + 499);
+    if (error) throw error;
+    allRows.push(...(data || []));
+    if (!data || data.length < 500) break;
   }
 
-  return (data || []).map((t: any) => ({
+  return allRows.map((t: any) => ({
     id: t.id,
     proyecto_id: t.proyecto_id,
     asignado_a: t.asignado_a,
     titulo: t.titulo,
     descripcion: t.descripcion,
     estatus: t.estatus,
+    fecha_programada: t.fecha_programada ?? null,
     created_at: t.created_at,
     profiles: t.profiles,
     subtareas: (t.subtareas || []).sort(
@@ -165,20 +169,22 @@ export async function getTasksByProject(projectId: string): Promise<Tarea[]> {
  */
 export async function createTask(payload: {
   proyecto_id: string;
-  asignado_a: string;
+  asignado_a?: string | null;
   titulo: string;
   descripcion?: string;
   estatus?: 'pendiente' | 'en_proceso' | 'completada';
+  fecha_programada?: string | null;
 }): Promise<Tarea> {
   const { data, error } = await supabase
     .from('tareas')
     .insert([
       {
         proyecto_id: payload.proyecto_id,
-        asignado_a: payload.asignado_a,
+        asignado_a: payload.asignado_a || null,
         titulo: payload.titulo.trim(),
         descripcion: payload.descripcion?.trim() || null,
         estatus: payload.estatus || 'pendiente',
+        fecha_programada: payload.fecha_programada || null,
       },
     ])
     .select(`

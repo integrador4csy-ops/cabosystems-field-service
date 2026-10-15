@@ -1,3 +1,5 @@
+import { formatRelativeTime } from '../../lib/timeAgo';
+import { useTranslation } from '../../context/LanguageContext';
 import React from 'react';
 import type { LiveWorker } from '../../types/fleet';
 import { detectPlace, formatDwellTime } from '../../lib/places';
@@ -28,6 +30,7 @@ export const TeamListCard: React.FC<TeamListCardProps> = ({
   loading,
   dwellStartTimesRef,
 }) => {
+  const { t, language } = useTranslation();
   return (
     <div className="flex flex-col h-full rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-xs">
       {/* Card Header - Clean Minimalist */}
@@ -37,14 +40,14 @@ export const TeamListCard: React.FC<TeamListCardProps> = ({
             <GroupIcon size={15} />
           </div>
           <div>
-            <h3 className="text-xs font-bold text-slate-800 tracking-tight">Equipo de Campo</h3>
-            <p className="text-[10.5px] text-slate-500">Telemetría y paradas</p>
+            <h3 className="text-xs font-bold text-slate-800 tracking-tight">{t("Equipo de Campo")}</h3>
+            <p className="text-[10.5px] text-slate-500">{t("Telemetría y paradas")}</p>
           </div>
         </div>
 
         <span className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-bold text-slate-700 shadow-2xs">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          {workers.length} {workers.length === 1 ? 'técnico' : 'técnicos'}
+          {workers.length} {workers.length === 1 ? t("técnico") : t("técnicos")}
         </span>
       </div>
 
@@ -55,21 +58,21 @@ export const TeamListCard: React.FC<TeamListCardProps> = ({
             {loading ? (
               <div className="flex flex-col items-center gap-2 text-slate-400">
                 <RegenerateIcon size={22} className="animate-spin text-[#f78c26]" />
-                <span className="text-xs font-semibold text-slate-600">Sincronizando flota...</span>
+                <span className="text-xs font-semibold text-slate-600">{t("Sincronizando flota...")}</span>
               </div>
             ) : (
               <div className="text-slate-400 space-y-1">
-                <p className="text-xs font-semibold text-slate-700">Sin técnicos en radar</p>
-                <p className="text-[11px] text-slate-400">Ajusta el filtro de búsqueda</p>
+                <p className="text-xs font-semibold text-slate-700">{t("Sin técnicos en radar")}</p>
+                <p className="text-[11px] text-slate-400">{t("Ajusta el filtro de búsqueda")}</p>
               </div>
             )}
           </div>
         ) : (
           workers.map((worker) => {
-            const { profile, location, isOffline, relativeTime } = worker;
+            const { profile, location, isOffline } = worker;
             const isSelected = selectedWorkerId === profile.id;
             const displayName =
-              profile.nombre || profile.full_name || profile.email || 'Técnico CSY';
+              profile.nombre || profile.full_name || profile.email || t("Técnico CSY");
             const initials =
               displayName
                 .split(' ')
@@ -102,7 +105,7 @@ export const TeamListCard: React.FC<TeamListCardProps> = ({
                     : 'border-transparent hover:border-slate-200 hover:bg-slate-50',
                   isOffline && !isSelected && 'opacity-65'
                 )}
-                title="Clic para enfocar en el mapa satelital"
+                title={t("Clic para enfocar en el mapa satelital")}
               >
                 {/* Avatar with Online/Offline Dot */}
                 <div className="relative shrink-0 mt-0.5">
@@ -140,7 +143,7 @@ export const TeamListCard: React.FC<TeamListCardProps> = ({
                         isOffline ? 'text-slate-400' : 'text-emerald-700'
                       )}
                     >
-                      {isOffline ? relativeTime : 'En línea'}
+                      {isOffline ? formatRelativeTime(location.updated_at, language) : t("En línea")}
                     </span>
                   </div>
 
@@ -148,7 +151,7 @@ export const TeamListCard: React.FC<TeamListCardProps> = ({
                   <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-600">
                     <MapPinIcon size={12} className="text-[#f78c26] shrink-0" />
                     <span className="truncate font-medium">
-                      {detectedPlace ? detectedPlace.name : (isDriving ? 'En ruta' : 'En sitio')}
+                      {detectedPlace ? detectedPlace.name : (isDriving ? t("En ruta") : t("En sitio"))}
                     </span>
                     <span className="text-slate-400 shrink-0 font-normal">· {dwellText}</span>
                   </div>
@@ -165,7 +168,7 @@ export const TeamListCard: React.FC<TeamListCardProps> = ({
                           ? 'border-red-200 bg-red-50 text-red-600'
                           : 'border-slate-200 bg-slate-100 text-slate-700'
                       )}
-                      title={location.esta_cargando ? 'Cargando batería' : 'Nivel de batería'}
+                      title={location.esta_cargando ? t("Cargando batería") : t("Nivel de batería")}
                     >
                       {location.esta_cargando ? (
                         <Zap size={10} className="text-[#f78c26] fill-[#f78c26]" />
@@ -179,17 +182,17 @@ export const TeamListCard: React.FC<TeamListCardProps> = ({
                     {isDriving ? (
                       <span className="inline-flex items-center gap-1 rounded-md border border-orange-200 bg-orange-50 px-1.5 py-0.5 text-[10px] font-bold text-orange-700">
                         <Car size={10} />
-                        <span>{speed > 0 ? `${Math.round(speed)} km/h` : 'En ruta'}</span>
+                        <span>{speed > 0 ? `${Math.round(speed)} km/h` : t("En ruta")}</span>
                       </span>
                     ) : isWalking ? (
                       <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
                         <Footprints size={10} />
-                        <span>Caminando</span>
+                        <span>{t("Caminando")}</span>
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
                         <CircleDot size={9} />
-                        <span>Detenido</span>
+                        <span>{t("Detenido")}</span>
                       </span>
                     )}
                   </div>

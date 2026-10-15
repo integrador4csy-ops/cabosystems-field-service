@@ -3,6 +3,7 @@
 import { Platform } from 'react-native';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Device from 'expo-device';
+import * as Application from 'expo-application';
 import { supabase } from './supabase';
 
 // Detectar si la app se ejecuta dentro de la aplicación cliente "Expo Go"
@@ -112,6 +113,9 @@ export async function registerForPushNotificationsAsync(userId: string): Promise
         user_id: userId,
         expo_push_token: pushToken,
         platform: Platform.OS,
+        // Build 9 introduces the native MessagingStyle receiver. Do not use the
+        // JS/app config version here: an OTA must never upgrade native capabilities.
+        chat_notification_version: Platform.OS === 'android' && Number(Application.nativeBuildVersion || 0) >= 9 ? 1 : 0,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'user_id,expo_push_token' }

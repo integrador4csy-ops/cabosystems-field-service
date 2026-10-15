@@ -9,8 +9,8 @@
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -29,10 +29,10 @@
 .admin-modal-card {
   width: 100%;
   max-width: 650px;
-  max-height: 88vh;
+  max-height: calc(100dvh - 40px);
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 24px;
+  border-radius: 16px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.02);
   display: flex;
   flex-direction: column;
@@ -1142,3 +1142,46 @@
 .confirm-btn-action.danger:hover {
   background: #b91c1c;
 }
+
+/* Match the project and chat forms to the shared TailAdmin dialog language. */
+.admin-modal-card { box-shadow: 0 8px 24px rgba(16, 24, 40, .12); animation: adminFadeIn .15s ease; }
+.admin-modal-body { min-height: 0; overscroll-behavior: contain; }
+.admin-modal-card :where(input:not([type="checkbox"]), select, textarea) { font-size: 14px; }
+.admin-modal-card :where(button) { transition-property: background-color, color, border-color; }
+.admin-modal-header { gap: 12px; flex-wrap: wrap; }
+.admin-modal-title-row { min-width: 0; flex: 1; }
+@media (max-width: 639px) {
+  .admin-modal-backdrop { padding: 12px; }
+  .admin-modal-card { max-height: calc(100dvh - 24px); }
+  .admin-modal-header { padding: 16px; }
+  .admin-modal-body { padding: 16px; }
+}
+
+.admin-users-table-wrapper { overflow-x: auto; overscroll-behavior-x: contain; }
+.admin-users-table { min-width: 560px; }
+.admin-users-table th { text-transform: none; letter-spacing: normal; font-size: 12px; }
+.user-email { font-family: inherit; color: #64748b; }
+.role-tag { border-radius: 6px; color: #9a3412; }
+.user-cell-info { min-width: 0; }
+.admin-edit-submodal { z-index: 1; }
+
+/* Minimal TailAdmin dialogs: neutrals for secondary controls and metadata. */
+.admin-modal-backdrop { background: rgba(16,24,40,.4); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.minimal-modal { border: 1px solid #e2e8f0; border-radius: 16px; background: #fff; box-shadow: 0 8px 24px rgba(16,24,40,.1); }
+.minimal-modal :where(input:not([type="checkbox"]):not([type="file"]), textarea, select) { border-radius: 8px; background-color: #fff; box-shadow: none; }
+.minimal-modal :where(button) { box-shadow: none; }
+.minimal-modal :where(label) { font-weight: 500; }
+.minimal-modal .role-tag, .minimal-modal .status-tag,
+.minimal-modal .status-tag.active, .minimal-modal .status-tag.inactive,
+.minimal-modal .status-tag.pending, .minimal-modal .status-tag.accepted {
+  background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; border-radius: 6px; font-weight: 500;
+}
+.minimal-modal .user-cell-avatar, .minimal-modal .avatar-fallback { background: #f8fafc; color: #475569; border-color: #e2e8f0; }
+.minimal-modal .action-btn { background: #fff; color: #475569; border: 1px solid #e2e8f0; border-radius: 8px; font-weight: 500; white-space: nowrap; }
+.minimal-modal .action-btn:hover { background: #f8fafc; border-color: #cbd5e1; color: #343e48; }
+.minimal-modal .action-btn.delete { background: #fff; color: #64748b; border-color: #e2e8f0; }
+.minimal-modal .action-btn.delete:hover { background: #fff; color: #b91c1c; border-color: #fecaca; }
+.minimal-modal .user-name, .minimal-modal .invite-email-cell strong { font-weight: 500; }
+.minimal-modal .admin-modal-close { background: #fff; border-color: #e2e8f0; border-radius: 8px; }
+.minimal-modal .admin-modal-close:hover { background: #f8fafc; }
+.minimal-modal .admin-edit-submodal-card, .minimal-modal .admin-confirm-card { border-radius: 16px; box-shadow: 0 8px 24px rgba(16,24,40,.1); }

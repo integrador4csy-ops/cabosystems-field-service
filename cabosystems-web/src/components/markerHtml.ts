@@ -1,4 +1,5 @@
 import type { LiveWorker } from '../types/fleet';
+import { translateUiText, getLocale, type Translator } from '../lib/uiTranslations';
 
 // SVG Icons (Clean vector aesthetics matching template and mobile card)
 const LIGHTNING_BOLT_SVG = `<svg width="11" height="11" viewBox="0 0 24 24" fill="#f78c26" stroke="#f78c26" stroke-width="1.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
@@ -15,8 +16,10 @@ export function createLife360MarkerHtml(
   worker: LiveWorker,
   heading?: number | null,
   placeName?: string | null,
-  dwellTime?: string | null
+  dwellTime?: string | null,
+  language: 'es' | 'en' = 'es'
 ): string {
+  const t: Translator = (text, params) => translateUiText(text, language, params);
   const { profile, location, isOffline } = worker;
   
   // Speed & Activity status
@@ -30,7 +33,7 @@ export function createLife360MarkerHtml(
   if (!isOffline && !isMoving && (placeName || dwellTime)) {
     const badgeText = placeName
       ? (dwellTime ? `${placeName} · ${dwellTime}` : placeName)
-      : (dwellTime || 'En sitio');
+      : (dwellTime || t('En sitio'));
 
     placeBadge = `
       <div class="life360-place-pill" title="${badgeText}">
@@ -44,7 +47,7 @@ export function createLife360MarkerHtml(
   const effectiveHeading = (heading !== undefined && heading !== null) ? heading : location.rumbo;
   if (!isOffline && isMoving && effectiveHeading !== null && effectiveHeading !== undefined) {
     headingCone = `
-      <div class="life360-heading-cone" style="transform: rotate(${effectiveHeading}deg);" title="Rumbo: ${effectiveHeading}°">
+      <div class="life360-heading-cone" style="transform: rotate(${effectiveHeading}deg);" title="${t('Rumbo')}: ${effectiveHeading}°">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
           <path d="M12 2L18 18L12 14L6 18L12 2Z" fill="#f78c26" stroke="#ffffff" stroke-width="1.8" stroke-linejoin="round"/>
         </svg>
@@ -58,6 +61,10 @@ export function createLife360MarkerHtml(
   } else if (isWalking) {
     speedBadge = '<div class="life360-speed-badge" title="Caminando"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.5"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.5-2 8.5V16"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.5 2 8.5V20"/></svg></div>';
   }
+
+  speedBadge = speedBadge
+    .replace('title="En vehículo"', `title="${t('En vehículo')}"`)
+    .replace('title="Caminando"', `title="${t('Caminando')}"`);
 
   // Avatar or Initials
   const displayName = profile.nombre || profile.full_name || profile.email || 'CS';
@@ -108,20 +115,32 @@ export function createLife360MarkerHtml(
 export function createHoverCardHtml(
   worker: LiveWorker,
   placeName?: string | null,
-  dwellTime?: string | null
+  dwellStartedAt?: number | null,
+  language: 'es' | 'en' = 'es'
 ): string {
+  const t: Translator = (text, params) => translateUiText(text, language, params);
+  const locale = getLocale(language);
   const { profile, location, isOffline } = worker;
   const updatedDate = new Date(location.updated_at);
-  const timeFormatted = updatedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const dateOptions: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric' };
+  const timeOptions: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
+  const validUpdate = Number.isFinite(updatedDate.getTime());
+  const dateFormatted = validUpdate ? updatedDate.toLocaleDateString(locale, dateOptions) : t('No disponible');
+  const timeFormatted = validUpdate ? updatedDate.toLocaleTimeString(locale, timeOptions) : '';
+  const sinceDate = dwellStartedAt != null && Number.isFinite(dwellStartedAt)
+    ? new Date(dwellStartedAt)
+    : null;
+  const sinceDisplay = sinceDate
+    ? sinceDate.toLocaleString(locale, { ...dateOptions, hour: '2-digit', minute: '2-digit' })
+    : null;
 
-  // Determine if update is recent (< 60s) -> show "Ahora"
+  // Keep recent updates highlighted while always displaying their date and time.
   const now = Date.now();
   const updateTime = updatedDate.getTime();
   const diffSec = Math.max(0, Math.floor((now - updateTime) / 1000));
   const isRecent = !isOffline && diffSec < 60;
-  const timeDisplay = isRecent ? 'Ahora' : timeFormatted;
 
-  const displayName = profile.nombre || profile.full_name || profile.email || 'Técnico CaboSystems';
+  const displayName = profile.nombre || profile.full_name || profile.email || t('Técnico CaboSystems');
   const initials = displayName
     .split(' ')
     .filter(Boolean)
@@ -135,27 +154,27 @@ export function createHoverCardHtml(
     : `<div class="hover-card-avatar-fallback">${initials}</div>`;
 
   const statusBadge = isOffline
-    ? `<span class="hover-card-badge offline">Desconectado</span>`
-    : `<span class="hover-card-badge online"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;margin-right:4px;"></span>En línea</span>`;
+    ? `<span class="hover-card-badge offline">${t('Desconectado')}</span>`
+    : `<span class="hover-card-badge online"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;margin-right:4px;"></span>${t('En línea')}</span>`;
 
   const roleValue = profile.rol || profile.role || 'tecnico';
-  const roleName = roleValue === 'admin' ? 'Administrador' : 'Técnico de Campo';
+  const roleName = roleValue === 'admin' ? t('Administrador') : t('Técnico de Campo');
   const speed = location.velocidad ? Math.round(location.velocidad) : 0;
   const isDrivingCard = location.actividad === 'conduciendo' || speed > 12;
   const isWalkingCard = location.actividad === 'caminando' || (!isDrivingCard && speed >= 2.5 && speed <= 12);
 
-  let speedText = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;margin-right:6px;"></span>En sitio / Detenido';
+  let speedText = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;margin-right:6px;"></span>${t('En sitio / Detenido')}`;
   if (isDrivingCard) {
-    speedText = speed > 0 ? `Conduciendo (${speed} km/h)` : 'En vehículo';
+    speedText = speed > 0 ? t('Conduciendo ({value0} km/h)', { value0: speed }) : t('En vehículo');
   } else if (isWalkingCard) {
-    speedText = speed > 0 ? `Caminando (${speed} km/h)` : 'Caminando a pie';
+    speedText = speed > 0 ? t('Caminando ({value0} km/h)', { value0: speed }) : t('Caminando a pie');
   }
 
   // Battery: charging battery icon, percentage, NO word "(cargando)", NO lightning emoji
   const batteryIcon = location.esta_cargando ? HOVER_BATTERY_CHARGING_SVG : HOVER_BATTERY_NORMAL_SVG;
   const batteryText = location.bateria !== null
     ? `${batteryIcon}<span style="font-weight:700;">${location.bateria}%</span>`
-    : 'No disponible';
+    : t('No disponible');
 
   return `
     <div class="hover-card-inner">
@@ -172,30 +191,30 @@ export function createHoverCardHtml(
       </div>
 
       <div class="hover-card-row">
-        <span class="hover-card-label">Ubicación</span>
+        <span class="hover-card-label">${t('Ubicación')}</span>
         <span class="hover-card-value" style="color: #f78c26; font-weight: 700;">${placeName || 'San José del Cabo'}</span>
       </div>
 
-      ${dwellTime ? `
+      ${sinceDisplay ? `
       <div class="hover-card-row">
-        <span class="hover-card-label">Desde:</span>
-        <span class="hover-card-value" style="color: #0284c7; font-weight: 600;">${dwellTime}</span>
+        <span class="hover-card-label">${t('Desde:')}</span>
+        <span class="hover-card-value" style="color: #0284c7; font-weight: 600;">${sinceDisplay}</span>
       </div>
       ` : ''}
 
       <div class="hover-card-row">
-        <span class="hover-card-label">Estado</span>
+        <span class="hover-card-label">${t('Estado')}</span>
         <span class="hover-card-value">${speedText}</span>
       </div>
 
       <div class="hover-card-row">
-        <span class="hover-card-label">Batería</span>
+        <span class="hover-card-label">${t('Batería')}</span>
         <span class="hover-card-value" style="display:flex; align-items:center;">${batteryText}</span>
       </div>
 
       <div class="hover-card-footer">
-        <span>Última actualización:</span>
-        <strong style="color: ${isRecent ? '#059669' : '#64748b'}; font-weight: 700;">${timeDisplay}</strong>
+        <span>${t('Última actualización:')}</span>
+        <strong style="color: ${isRecent ? '#059669' : '#64748b'}; font-weight: 700; text-align: right;">${dateFormatted}${timeFormatted ? `<br />${timeFormatted}` : ''}</strong>
       </div>
     </div>
   `;

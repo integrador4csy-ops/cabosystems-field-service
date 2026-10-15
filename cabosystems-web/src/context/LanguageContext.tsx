@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { translateUiText, interpolate, getLocale, type TranslationParams } from '../lib/uiTranslations';
 
 export type SupportedLanguage = 'es' | 'en';
 
@@ -6,10 +7,14 @@ const LANGUAGE_STORAGE_KEY = 'csy_web_language';
 
 export const WEB_TRANSLATIONS = {
   es: {
+    'invite.emailSubject': 'Invitación al equipo de campo · CaboSystems Field Service',
+    'invite.emailBody': 'Hola,\n\nHas sido registrado e invitado para unirte al equipo de operaciones de CaboSystems con rol: {role}.\n\nPara activar tu cuenta y configurar tu contraseña y foto de perfil en la aplicación móvil, haz clic en el siguiente enlace desde tu teléfono móvil:\n\n{link}\n\nSi abres la app manualmente, puedes validar tu registro con tu código de invitación:\n{token}\n\nAtentamente,\nDirección de Operaciones · CaboSystems',
     // Sidebar
     'sidebar.operationsAndStaff': 'Operaciones y Personal',
     'sidebar.radar': 'Radar Satelital',
-    'sidebar.projects': 'Desarrollos y Villas',
+    'sidebar.projects': 'Tareas',
+    'sidebar.agenda': 'Agenda',
+    'sidebar.comingSoon': 'Próximamente',
     'sidebar.projectsBadge': 'Obras',
     'sidebar.collaborators': 'Colaboradores',
     'sidebar.collaboratorsBadge': 'Equipo',
@@ -68,10 +73,14 @@ export const WEB_TRANSLATIONS = {
     'lang.en': 'English',
   },
   en: {
+    'invite.emailSubject': 'Field team invitation · CaboSystems Field Service',
+    'invite.emailBody': 'Hello,\n\nYou have been invited to join the CaboSystems operations team as: {role}.\n\nTo activate your account and set your password and profile photo in the mobile app, open this link on your phone:\n\n{link}\n\nIf you open the app manually, use your invitation code to complete registration:\n{token}\n\nBest regards,\nCaboSystems Operations',
     // Sidebar
     'sidebar.operationsAndStaff': 'Operations & Personnel',
     'sidebar.radar': 'Satellite Radar',
-    'sidebar.projects': 'Developments & Villas',
+    'sidebar.projects': 'Tasks',
+    'sidebar.agenda': 'Schedule',
+    'sidebar.comingSoon': 'Coming soon',
     'sidebar.projectsBadge': 'Sites',
     'sidebar.collaborators': 'Collaborators',
     'sidebar.collaboratorsBadge': 'Team',
@@ -136,7 +145,8 @@ export type WebTranslationKey = keyof typeof WEB_TRANSLATIONS.es;
 interface LanguageContextType {
   language: SupportedLanguage;
   setLanguage: (lang: SupportedLanguage) => void;
-  t: (key: WebTranslationKey | string) => string;
+  t: (key: WebTranslationKey | string, params?: TranslationParams) => string;
+  locale: string;
   isSpanish: boolean;
   isEnglish: boolean;
 }
@@ -145,6 +155,7 @@ const LanguageContext = createContext<LanguageContextType>({
   language: 'es',
   setLanguage: () => {},
   t: (key) => key,
+  locale: 'es-MX',
   isSpanish: true,
   isEnglish: false,
 });
@@ -169,17 +180,21 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
-  const t = (key: WebTranslationKey | string): string => {
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
+
+  const t = useCallback((key: WebTranslationKey | string, params?: TranslationParams): string => {
     const currentDict = WEB_TRANSLATIONS[language] as Record<string, string>;
     if (currentDict && currentDict[key]) {
-      return currentDict[key];
+      return interpolate(currentDict[key], params);
     }
     const fallbackDict = WEB_TRANSLATIONS.es as Record<string, string>;
     if (fallbackDict[key]) {
-      return fallbackDict[key];
+      return interpolate(fallbackDict[key], params);
     }
-    return key;
-  };
+    return translateUiText(key, language, params);
+  }, [language]);
 
   return (
     <LanguageContext.Provider
@@ -187,6 +202,7 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
         language,
         setLanguage,
         t,
+        locale: getLocale(language),
         isSpanish: language === 'es',
         isEnglish: language === 'en',
       }}

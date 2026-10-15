@@ -6,6 +6,8 @@ node_modules/
 # Expo
 .expo/
 dist/
+dist-chat-android/
+dist-agenda-android/
 web-build/
 expo-env.d.ts
 

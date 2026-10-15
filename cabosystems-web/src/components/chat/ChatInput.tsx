@@ -1,4 +1,8 @@
-import React, { useState, useRef } from 'react';
+import { ChatPopover } from './ChatPopover';
+import { ReplyPreview } from './ReplyPreview';
+import { useTranslation } from '../../context/LanguageContext';
+import React, { lazy, Suspense, useCallback, useEffect, useState, useRef } from 'react';
+const EmojiPicker = lazy(() => import('./EmojiPicker'));
 import {
   Send,
   Camera,
@@ -8,7 +12,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { sendChatMessage } from '../../lib/chatApi';
-import type { ChatMessageType } from '../../types/chat';
+import type { ChatMessage, ChatMessageType } from '../../types/chat';
 
 interface ChatInputProps {
   groupId: string;
@@ -16,26 +20,34 @@ interface ChatInputProps {
   isAdmin: boolean;
   soloMultimedia: boolean;
   onMessageSent: () => void;
+  replyTo: ChatMessage | null;
+  onCancelReply: () => void;
 }
 
-const EMOJI_LIST = ['👍', '❤️', '🔥', '🛠️', '✅', '😂', '👏', '🙏', '⚡', '📍', '📦', '⚠️'];
+
 
 export const ChatInput: React.FC<ChatInputProps> = ({
   groupId,
   currentUserId,
   isAdmin,
   soloMultimedia,
-  onMessageSent,
+  onMessageSent, replyTo, onCancelReply,
 }) => {
+  const { t } = useTranslation();
   const [text, setText] = useState('');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<ChatMessageType>('texto');
   const [sending, setSending] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
+  const closePicker = useCallback(() => setEmojiAnchor(null), []);
+  const [sendError, setSendError] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => { if (replyTo) textareaRef.current?.focus(); }, [replyTo]);
+  useEffect(() => { return () => { if (mediaPreview) URL.revokeObjectURL(mediaPreview); }; }, [mediaPreview]);
 
   // When solo_multimedia is active and user is not admin, disable regular text
   const isTextBlocked = soloMultimedia && !isAdmin;
@@ -48,7 +60,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     const isImage = file.type.startsWith('image/');
 
     if (!isVideo && !isImage) {
-      alert('Por favor selecciona una imagen (JPG, PNG) o un video (MP4).');
+      alert(t("Por favor selecciona una imagen (JPG, PNG) o un video (MP4)."));
       return;
     }
 
@@ -72,29 +84,33 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
     // Solo multimedia enforcement
     if (isTextBlocked && !mediaFile) {
-      alert('Este grupo está configurado como Solo Multimedia. Debes adjuntar una foto o video.');
+      alert(t("Este grupo está configurado como Solo Multimedia. Debes adjuntar una foto o video."));
       return;
     }
 
     try {
       setSending(true);
+      setSendError(false);
       await sendChatMessage({
         grupo_id: groupId,
         remitente_id: currentUserId,
         tipo: mediaFile ? mediaType : 'texto',
         contenido: text.trim() || undefined,
         mediaFile,
+        reply_to_id: replyTo?.id,
       });
 
       setText('');
       removeMedia();
-      setShowEmojiPicker(false);
+      closePicker();
+      onCancelReply();
       onMessageSent();
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
     } catch (err) {
       console.error('Error sending message:', err);
+      setSendError(true);
     } finally {
       setSending(false);
     }
@@ -108,13 +124,21 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const handleInsertEmoji = (emoji: string) => {
-    setText((prev) => prev + emoji);
-    setShowEmojiPicker(false);
-    textareaRef.current?.focus();
+    const input = textareaRef.current;
+    const start = input?.selectionStart ?? text.length;
+    const end = input?.selectionEnd ?? start;
+    setText((prev) => prev.slice(0, start) + emoji + prev.slice(end));
+    closePicker();
+    requestAnimationFrame(() => { input?.focus(); input?.setSelectionRange(start + emoji.length, start + emoji.length); });
   };
 
   return (
     <div className="border-t border-slate-200 bg-white p-3 sm:p-4">
+      {replyTo && <div className="mb-3 flex items-center gap-2" aria-label={t('Respondiendo mensaje')}>
+        <ReplyPreview message={replyTo} currentUserId={currentUserId} />
+        <button type="button" onClick={onCancelReply} aria-label={t('Cancelar respuesta')} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"><X size={18} /></button>
+      </div>}
+      {sendError && <p role="alert" className="mb-2 text-xs text-red-600">{t('No se pudo enviar el mensaje. Intenta de nuevo.')}</p>}
       {/* Solo Multimedia Info Banner if active */}
       {soloMultimedia && (
         <div className="mb-2.5 flex items-center justify-between rounded-xl bg-amber-50 border border-amber-200/80 px-3 py-1.5 text-xs text-amber-800">
@@ -122,8 +146,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             <Video size={14} className="text-amber-600 shrink-0" />
             <span>
               {isTextBlocked
-                ? 'Modo Solo Multimedia activo: Envía fotos o videos de evidencia técnica.'
-                : 'Modo Solo Multimedia activo (Tienes permisos de administrador para texto).'}
+                ? t("Modo Solo Multimedia activo: Envía fotos o videos de evidencia técnica.")
+                : t("Modo Solo Multimedia activo (Tienes permisos de administrador para texto).")}
             </span>
           </div>
         </div>
@@ -141,7 +165,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             ) : (
               <img
                 src={mediaPreview}
-                alt="Preview"
+                alt={t("Preview")}
                 className="h-full w-full object-cover"
               />
             )}
@@ -152,7 +176,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             </p>
             <p className="text-[11px] text-slate-400">
               {((mediaFile?.size || 0) / (1024 * 1024)).toFixed(2)} MB ·{' '}
-              {mediaType === 'video' ? 'Video técnico' : 'Foto de evidencia'}
+              {mediaType === 'video' ? t("Video técnico") : t("Foto de evidencia")}
             </p>
           </div>
           <button
@@ -180,8 +204,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 hover:text-[#f78c26] hover:border-orange-200 hover:bg-orange-50 transition-all shrink-0 cursor-pointer"
-          title="Adjuntar foto o video de evidencia"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 hover:text-brand-500 hover:border-orange-200 hover:bg-orange-50 transition-all shrink-0 cursor-pointer"
+          title={t("Adjuntar foto o video de evidencia")}
         >
           <Camera size={18} />
         </button>
@@ -190,35 +214,29 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <div className="relative shrink-0">
           <button
             type="button"
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 hover:text-[#f78c26] hover:border-orange-200 hover:bg-orange-50 transition-all cursor-pointer"
-            title="Insertar emoji"
+            onClick={(event) => emojiAnchor ? closePicker() : setEmojiAnchor(event.currentTarget)}
+            disabled={isTextBlocked || sending}
+            aria-expanded={Boolean(emojiAnchor)}
+            aria-haspopup="dialog"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 hover:text-brand-500 hover:border-orange-200 hover:bg-orange-50 transition-all cursor-pointer"
+            title={t("Insertar emoji")}
           >
             <Smile size={18} />
           </button>
 
-          {showEmojiPicker && (
-            <div className="absolute bottom-full mb-2 left-0 z-30 grid grid-cols-4 gap-1.5 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-xl animate-in fade-in zoom-in-95 w-44">
-              {EMOJI_LIST.map((em) => (
-                <button
-                  key={em}
-                  type="button"
-                  onClick={() => handleInsertEmoji(em)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-base hover:scale-125 hover:bg-slate-100 transition-all cursor-pointer"
-                >
-                  {em}
-                </button>
-              ))}
-            </div>
-          )}
+          {emojiAnchor && <ChatPopover anchor={emojiAnchor} onClose={closePicker} label={t('Selector de emojis')}>
+            <Suspense fallback={<div className="p-6"><Loader2 className="animate-spin" /></div>}><EmojiPicker onSelect={handleInsertEmoji} onClose={closePicker} /></Suspense>
+          </ChatPopover>}
+
         </div>
 
         {/* Text Input Area */}
         <div className="relative flex-1 min-w-0">
           <textarea
+            aria-label={t("Mensaje para el grupo")}
             ref={textareaRef}
             rows={1}
-            disabled={isTextBlocked}
+            disabled={isTextBlocked || sending}
             value={text}
             onChange={(e) => {
               setText(e.target.value);
@@ -229,8 +247,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             onKeyDown={handleKeyDown}
             placeholder={
               isTextBlocked
-                ? 'Solo multimedia activo. Adjunta una foto o video arriba.'
-                : 'Escribe un mensaje técnico... (Enter para enviar)'
+                ? t("Solo multimedia activo. Adjunta una foto o video arriba.")
+                : t("Escribe un mensaje técnico... (Enter para enviar)")
             }
             className={`w-full resize-none rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-xs font-medium text-[#343e48] placeholder-slate-400 focus:border-[#f78c26] focus:bg-white focus:ring-2 focus:ring-orange-100 outline-hidden transition-all max-h-24 ${
               isTextBlocked ? 'opacity-60 cursor-not-allowed' : ''
@@ -242,8 +260,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <button
           type="submit"
           disabled={sending || (!text.trim() && !mediaFile) || (isTextBlocked && !mediaFile)}
-          className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f78c26] hover:bg-[#ea580c] text-white shadow-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0 cursor-pointer"
-          title="Enviar mensaje"
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500 hover:bg-brand-700 text-white shadow-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0 cursor-pointer"
+          title={t("Enviar mensaje")}
         >
           {sending ? (
             <Loader2 size={16} className="animate-spin" />

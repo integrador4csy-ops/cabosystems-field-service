@@ -2,6 +2,7 @@
 // Función Serverless para enviar notificaciones push de chat grupal a dispositivos móviles
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { buildChatNotification } from './presentation.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -100,22 +101,17 @@ serve(async (req) => {
         .single(),
     ]);
 
-    const groupName = groupRes.data?.nombre || 'Chat de Cuadrilla';
-    const senderName = senderRes.data?.nombre || 'Compañero de equipo';
-
-    // 2. Formatear vista previa del mensaje según el tipo
-    let previewText = contenido;
-    if (tipo === 'imagen') {
-      previewText = '📷 Foto';
-    } else if (tipo === 'video') {
-      previewText = '🎥 Video';
-    } else if (tipo === 'sticker') {
-      previewText = '🎨 Sticker';
-    }
-
-    if (!previewText || previewText.trim() === '') {
-      previewText = 'Nuevo mensaje';
-    }
+    // 2. Foto del grupo y estructura de conversación; el sistema conserva su icono de app.
+    const presentationInput = {
+      groupId: grupoId,
+      messageId: mensajeId,
+      groupName: groupRes.data?.nombre,
+      groupPhotoUrl: groupRes.data?.foto_url,
+      senderName: senderRes.data?.nombre,
+      senderId: remitenteId,
+      messageType: tipo,
+      content: contenido,
+    };
 
     // 3. Obtener tokens push de los demás miembros del grupo
     const { data: members, error: memError } = await supabaseAdmin
@@ -140,7 +136,7 @@ serve(async (req) => {
     // Obtener tokens válidos de esos miembros
     const { data: tokensData, error: tokError } = await supabaseAdmin
       .from('user_push_tokens')
-      .select('expo_push_token, user_id')
+      .select('expo_push_token, user_id, platform, chat_notification_version')
       .in('user_id', memberIds);
 
     console.log('[chat-push] Tokens encontrados:', tokensData?.length ?? 0, '| Error:', tokError?.message ?? 'ninguno');
@@ -173,20 +169,13 @@ serve(async (req) => {
     }
 
     // 4. Construir mensajes de notificación para la API de Expo
-    const notifications = uniqueTokens.map((token) => ({
-      to: token,
-      sound: 'default',
-      title: `💬 ${groupName}`,
-      body: `${senderName}: ${previewText}`,
-      data: {
-        groupId: grupoId,
-        messageId: mensajeId,
-        url: `/chat/${grupoId}`,
-      },
-      channelId: 'chat-messages',
-      priority: 'high',
-      _displayInForeground: true,
-    }));
+    const notifications = uniqueTokens.map((token) => {
+      const device = tokensData.find((item) => item.expo_push_token === token);
+      return {
+        to: token,
+        ...buildChatNotification({ ...presentationInput, platform: device?.platform, nativeChatVersion: device?.chat_notification_version }),
+      };
+    });
 
     // 5. Enviar a la API de Expo Push en lotes de 100
     const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';

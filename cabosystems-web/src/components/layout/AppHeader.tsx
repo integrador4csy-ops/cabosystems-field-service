@@ -1,10 +1,8 @@
 import React, { useRef, useEffect } from 'react';
-import {
-  SearchIcon,
-  CloseIcon,
-} from '../../icons';
-import { Car, MapPin } from 'lucide-react';
+import { SearchIcon, CloseIcon } from '../../icons';
+import { Car, Menu, MapPin, Plus } from 'lucide-react';
 import { useTranslation } from '../../context/LanguageContext';
+import { useSidebar } from '../../context/SidebarContext';
 
 interface AppHeaderProps {
   searchQuery: string;
@@ -14,94 +12,48 @@ interface AppHeaderProps {
   offlineCount: number;
 }
 
-export const AppHeader: React.FC<AppHeaderProps> = ({
-  searchQuery,
-  onSearchChange,
-  onlineCount,
-  movingCount,
-  offlineCount,
-}) => {
+export const AppHeader: React.FC<AppHeaderProps> = ({ searchQuery, onSearchChange, onlineCount, movingCount, offlineCount }) => {
   const { t } = useTranslation();
+  const { activeItem, isMobileOpen, setIsMobileOpen, taskSearchQuery, setTaskSearchQuery, requestCreateTask } = useSidebar();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const isRadar = activeItem === 'radar';
+  const isTasks = activeItem === 'proyectos' || activeItem === 'agenda';
+  const teamTitles: Record<string, string> = { colaboradores: t('sidebar.collaborators'), invitaciones: t('sidebar.invitations') };
+  const title = teamTitles[activeItem] || (activeItem === 'chat' ? t('sidebar.chat') : activeItem === 'agenda' ? t('sidebar.agenda') : activeItem === 'proyectos' ? t('sidebar.projects') : t('sidebar.radar'));
 
-  // Keyboard shortcut: Cmd+K / Ctrl+K still focuses input
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isRadar && (event.metaKey || event.ctrlKey) && event.key === 'k') {
+        event.preventDefault();
         searchInputRef.current?.focus();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isRadar]);
 
   return (
-    <header className="sticky top-0 z-30 relative flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white px-4 lg:px-6 shadow-2xs">
-      {/* Left: City of the company */}
-      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-        <MapPin size={14} className="text-[#f78c26] shrink-0" />
-        <span className="hidden sm:inline">{t('header.location')}</span>
-      </div>
-
-      {/* Center: Search Bar in the Exact Middle (No ⌘K icon) */}
-      <div className="absolute left-1/2 -translate-x-1/2 w-full max-w-md px-4">
-        <div className="relative flex items-center">
-          <SearchIcon size={15} className="absolute left-3.5 text-slate-400 pointer-events-none" />
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={t('header.searchPlaceholder')}
-            className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-9.5 pr-9 text-xs font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#f78c26] focus:ring-4 focus:ring-orange-500/10 focus:outline-none transition-all shadow-2xs"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => onSearchChange('')}
-              className="absolute right-3 flex h-5 w-5 items-center justify-center rounded text-slate-400 hover:text-slate-600"
-              title="Borrar búsqueda"
-            >
-              <CloseIcon size={13} />
-            </button>
-          )}
+    <header className="app-header shrink-0 border-b border-slate-200 bg-white px-4 py-3 lg:px-6">
+      <div className="flex min-w-0 items-center gap-3">
+        <button type="button" onClick={() => setIsMobileOpen(true)} aria-label={t("Abrir navegación")} aria-expanded={isMobileOpen} aria-controls="app-navigation" className="md:hidden flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"><Menu size={20} /></button>
+        <div className="min-w-0">
+          <h1 className="truncate text-base font-semibold text-slate-800">{title}</h1>
+          {isRadar && <div className="hidden lg:flex items-center gap-1 text-xs text-slate-500"><MapPin size={12} className="text-brand-600" /><span>{t('header.location')}</span></div>}
         </div>
       </div>
-
-      {/* Right: Live Telemetry counters */}
-      <div className="flex items-center gap-2">
-        {/* Online pill */}
-        <div
-          className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700"
-          title={t('header.onlineTitle')}
-        >
-          <span className="h-2 w-2 rounded-full bg-emerald-500 beacon-pulse" />
-          <span>{onlineCount}</span>
-          <span className="hidden sm:inline font-normal">{t('header.online')}</span>
+      {(isRadar || isTasks) && (
+        <div className="header-search relative min-w-0">
+          <SearchIcon size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input ref={searchInputRef} type="search" aria-label={isTasks ? t('Buscar tareas') : t('header.searchPlaceholder')} value={isTasks ? taskSearchQuery : searchQuery} onChange={(event) => isTasks ? setTaskSearchQuery(event.target.value) : onSearchChange(event.target.value)} placeholder={isTasks ? t('Buscar tarea, villa o responsable...') : t('header.searchPlaceholder')} className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm text-slate-800 placeholder:text-slate-500 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/15 transition-colors" />
+          {(isTasks ? taskSearchQuery : searchQuery) && <button type="button" onClick={() => isTasks ? setTaskSearchQuery('') : onSearchChange('')} aria-label={t("Borrar búsqueda")} className="absolute right-1 top-1 flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"><CloseIcon size={16} /></button>}
         </div>
-
-        {/* Moving pill */}
-        {movingCount > 0 && (
-          <div
-            className="flex items-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700"
-            title={t('header.inRouteTitle')}
-          >
-            <Car size={13} className="text-[#f78c26]" />
-            <span>{movingCount}</span>
-            <span className="hidden sm:inline font-normal">{t('header.inRoute')}</span>
-          </div>
-        )}
-
-        {/* Offline pill */}
-        <div
-          className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600"
-          title={t('header.offlineTitle')}
-        >
-          <span className="h-2 w-2 rounded-full bg-slate-400" />
-          <span>{offlineCount}</span>
-          <span className="hidden sm:inline text-slate-500">{t('header.offline')}</span>
-        </div>
-      </div>
+      )}
+      {isTasks && <div className="header-status flex justify-end"><button type="button" onClick={requestCreateTask} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{t('Nueva Tarea')}</button></div>}
+      {isRadar && <div className="header-status flex items-center justify-end gap-3 text-xs tabular-nums">
+        <div className="flex items-center gap-1.5 text-emerald-700" title={t('header.onlineTitle')}><span className="h-2 w-2 rounded-full bg-emerald-500" /><span className="font-semibold">{onlineCount}</span><span className="hidden sm:inline">{t('header.online')}</span></div>
+        {movingCount > 0 && <div className="flex items-center gap-1.5 text-orange-700" title={t('header.inRouteTitle')}><Car size={14} /><span className="font-semibold">{movingCount}</span><span className="hidden xl:inline">{t('header.inRoute')}</span></div>}
+        <div className="flex items-center gap-1.5 text-slate-500" title={t('header.offlineTitle')}><span className="h-2 w-2 rounded-full bg-slate-400" /><span className="font-semibold">{offlineCount}</span><span className="hidden sm:inline">{t('header.offline')}</span></div>
+      </div>}
     </header>
   );
 };

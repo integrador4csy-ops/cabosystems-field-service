@@ -1,3 +1,6 @@
+import { getRoleLabel } from '../../lib/uiTranslations';
+import { useTranslation } from '../../context/LanguageContext';
+import { useDialog } from '../ui/useDialog';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
@@ -44,6 +47,7 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
   onGroupUpdated,
   onGroupDeleted,
 }) => {
+  const { t } = useTranslation();
   const [members, setMembers] = useState<ChatMember[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
 
@@ -135,7 +139,7 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
     if (!group) return;
     if (
       !window.confirm(
-        `¿Estás seguro de expulsar a ${memberName} de este grupo de trabajo?`
+        t("¿Estás seguro de expulsar a {value0} de este grupo de trabajo?", { value0: memberName })
       )
     ) {
       return;
@@ -186,21 +190,24 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
     }
   };
 
+  const dialogRef = useDialog(isOpen && !!group, onClose);
+
   if (!isOpen || !group) return null;
 
   const groupInitial = group.nombre.charAt(0).toUpperCase();
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[10000] flex justify-end bg-slate-950/40 backdrop-blur-xs animate-in fade-in duration-200">
       <div
-        className="w-full max-w-md bg-white shadow-2xl h-full flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-200"
+        ref={dialogRef} role="dialog" aria-modal="true" aria-label={t("Detalles del grupo")} tabIndex={-1}
+        className="minimal-modal w-full max-w-md bg-white shadow-theme-md h-full flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 bg-slate-50/60">
-          <h3 className="text-sm font-bold text-[#343e48] flex items-center gap-2">
-            <Users size={17} className="text-[#f78c26]" />
-            <span>Detalles del Grupo</span>
+          <h3 className="text-sm font-semibold text-[#343e48] flex items-center gap-2">
+            <Users size={17} className="text-slate-600" />
+            <span>{t("Detalles del Grupo")}</span>
           </h3>
           <button
             type="button"
@@ -215,18 +222,16 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* Main Info Card / Edit Form */}
           {isEditing ? (
-            <form onSubmit={handleSaveGroupEdit} className="space-y-4 rounded-2xl border border-orange-200 bg-orange-50/20 p-4">
+            <form onSubmit={handleSaveGroupEdit} className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs font-bold text-[#f78c26]">
-                  Editar Información
-                </h4>
+                <h4 className="text-xs font-semibold text-slate-600">
+                  {t("Editar Información")}</h4>
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
                   className="text-[11px] font-semibold text-slate-500 hover:underline"
                 >
-                  Cancelar
-                </button>
+                  {t("Cancelar")}</button>
               </div>
 
               {/* Photo Input */}
@@ -247,7 +252,7 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-dashed border-[#f78c26] bg-white overflow-hidden text-slate-400 hover:text-[#f78c26]"
+                  className="flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-dashed border-[#f78c26] bg-white overflow-hidden text-slate-400 hover:text-slate-600"
                 >
                   {editPhotoPreview ? (
                     <img
@@ -260,49 +265,46 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
                   )}
                 </button>
                 <div className="text-xs text-slate-500">
-                  <p className="font-bold text-[#343e48]">Foto del Grupo</p>
-                  <p className="text-[10px]">Haz clic para cambiar imagen</p>
+                  <p className="font-semibold text-[#343e48]">{t("Foto del Grupo")}</p>
+                  <p className="text-[10px]">{t("Haz clic para cambiar imagen")}</p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#343e48] mb-1">
-                  Nombre del Grupo
-                </label>
+                <label className="block text-xs font-semibold text-[#343e48] mb-1">
+                  {t("Nombre del Grupo")}</label>
                 <input
                   type="text"
                   required
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-[#343e48] focus:border-[#f78c26] outline-hidden"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-[#343e48] focus:border-[#f78c26] outline-hidden"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#343e48] mb-1">
-                  Descripción
-                </label>
+                <label className="block text-xs font-semibold text-[#343e48] mb-1">
+                  {t("Descripción")}</label>
                 <textarea
                   rows={2}
                   value={editDesc}
                   onChange={(e) => setEditDesc(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-[#343e48] focus:border-[#f78c26] outline-hidden"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-[#343e48] focus:border-[#f78c26] outline-hidden"
                 />
               </div>
 
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <label className="flex items-center justify-between cursor-pointer">
                   <div className="flex items-center gap-2">
-                    <Video size={15} className="text-amber-700" />
-                    <span className="text-xs font-bold text-[#343e48]">
-                      Solo Multimedia
-                    </span>
+                    <Video size={15} className="text-slate-600" />
+                    <span className="text-xs font-semibold text-[#343e48]">
+                      {t("Solo Multimedia")}</span>
                   </div>
                   <input
                     type="checkbox"
                     checked={editSoloMulti}
                     onChange={(e) => setEditSoloMulti(e.target.checked)}
-                    className="h-4 w-4 rounded text-[#f78c26] focus:ring-[#f78c26]"
+                    className="h-4 w-4 rounded text-slate-600 focus:ring-[#f78c26]"
                   />
                 </label>
               </div>
@@ -311,28 +313,27 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                 >
-                  Cancelar
-                </button>
+                  {t("Cancelar")}</button>
                 <button
                   type="submit"
                   disabled={savingEdit}
-                  className="flex items-center gap-1.5 rounded-xl bg-[#f78c26] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#ea580c] disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-1.5 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
                 >
                   {savingEdit ? (
                     <Loader2 size={13} className="animate-spin" />
                   ) : (
                     <Check size={13} />
                   )}
-                  <span>Guardar</span>
+                  <span>{t("Guardar")}</span>
                 </button>
               </div>
             </form>
           ) : (
-            <div className="flex flex-col items-center text-center p-4 rounded-2xl border border-slate-200 bg-slate-50/50">
+            <div className="flex flex-col items-center text-center p-4 rounded-2xl border border-slate-200 bg-white">
               <div className="relative mb-3">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-orange-100 border-2 border-[#f78c26] text-[#f78c26] font-extrabold text-2xl shadow-xs overflow-hidden">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-50 border-2 border-[#f78c26] text-slate-600 font-extrabold text-2xl shadow-xs overflow-hidden">
                   {group.foto_url ? (
                     <img
                       src={group.foto_url}
@@ -345,7 +346,7 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
                 </div>
               </div>
 
-              <h3 className="text-base font-bold text-[#343e48]">
+              <h3 className="text-base font-semibold text-[#343e48]">
                 {group.nombre}
               </h3>
               {group.descripcion && (
@@ -357,14 +358,14 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
               {/* Status Badges */}
               <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
                 {group.solo_multimedia && (
-                  <span className="flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10.5px] font-bold text-amber-800 border border-amber-200">
+                  <span className="flex items-center gap-1 rounded-md bg-slate-50 px-2 py-0.5 text-[10.5px] font-semibold text-slate-600 border border-slate-200">
                     <Video size={12} />
-                    <span>Solo Multimedia</span>
+                    <span>{t("Solo Multimedia")}</span>
                   </span>
                 )}
-                <span className="flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-600 border border-slate-200">
+                <span className="flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[10.5px] font-semibold text-slate-600 border border-slate-200">
                   <Users size={12} />
-                  <span>{members.length} colaboradores</span>
+                  <span>{members.length} {' '}{t("colaboradores")}</span>
                 </span>
               </div>
 
@@ -373,10 +374,10 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsEditing(true)}
-                  className="mt-3.5 flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:text-[#f78c26] hover:border-orange-200 shadow-2xs transition-all"
+                  className="mt-3.5 flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-600 hover:border-slate-200 shadow-2xs transition-all"
                 >
                   <Settings size={13} />
-                  <span>Editar Grupo</span>
+                  <span>{t("Editar Grupo")}</span>
                 </button>
               )}
             </div>
@@ -385,35 +386,33 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
           {/* Members List Section */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold text-[#343e48] tracking-wider uppercase">
-                Colaboradores ({members.length})
+              <h4 className="text-xs font-semibold text-[#343e48] tracking-wider uppercase">
+                {t("Colaboradores (")}{members.length})
               </h4>
               {isAdminOfGroup && !isAddingMembers && (
                 <button
                   type="button"
                   onClick={handleOpenAddMembers}
-                  className="flex items-center gap-1 text-xs font-bold text-[#f78c26] hover:underline"
+                  className="flex items-center gap-1 text-xs font-semibold text-slate-600 hover:underline"
                 >
                   <UserPlus size={14} />
-                  <span>Agregar</span>
+                  <span>{t("Agregar")}</span>
                 </button>
               )}
             </div>
 
             {/* Add Members Sub-Panel */}
             {isAddingMembers && (
-              <div className="rounded-2xl border border-orange-200 bg-orange-50/30 p-3.5 space-y-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[#343e48]">
-                    Seleccionar colaboradores
-                  </span>
+                  <span className="text-xs font-semibold text-[#343e48]">
+                    {t("Seleccionar colaboradores")}</span>
                   <button
                     type="button"
                     onClick={() => setIsAddingMembers(false)}
                     className="text-[11px] font-semibold text-slate-500 hover:underline"
                   >
-                    Cerrar
-                  </button>
+                    {t("Cerrar")}</button>
                 </div>
 
                 <div className="relative">
@@ -423,18 +422,17 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
                   />
                   <input
                     type="text"
-                    placeholder="Buscar por nombre o rol..."
+                    placeholder={t("Buscar por nombre o rol...")}
                     value={searchMemberQuery}
                     onChange={(e) => setSearchMemberQuery(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white pl-7.5 pr-2.5 py-1 text-xs font-medium text-[#343e48] outline-hidden focus:border-[#f78c26]"
+                    className="w-full rounded-lg border border-slate-200 bg-white pl-7.5 pr-2.5 py-1 text-xs font-medium text-[#343e48] outline-hidden focus:border-[#f78c26]"
                   />
                 </div>
 
-                <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
+                <div className="max-h-36 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100">
                   {availableProfiles.length === 0 ? (
                     <div className="p-3 text-center text-xs text-slate-400">
-                      Todos los técnicos ya están en este grupo
-                    </div>
+                      {t("Todos los técnicos ya están en este grupo")}</div>
                   ) : (
                     availableProfiles
                       .filter((p) => {
@@ -457,16 +455,16 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
                               );
                             }}
                             className={`flex items-center justify-between p-2 cursor-pointer text-xs hover:bg-slate-50 ${
-                              isSelected ? 'bg-orange-50/60' : ''
+                              isSelected ? 'bg-slate-50' : ''
                             }`}
                           >
-                            <span className="font-bold text-[#343e48]">
+                            <span className="font-semibold text-[#343e48]">
                               {p.nombre}
                             </span>
                             <div
                               className={`flex h-4.5 w-4.5 items-center justify-center rounded-md border ${
                                 isSelected
-                                  ? 'bg-[#f78c26] border-[#f78c26] text-white'
+                                  ? 'bg-brand-500 border-[#f78c26] text-white'
                                   : 'border-slate-300 bg-white'
                               }`}
                             >
@@ -484,20 +482,19 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
                     onClick={() => setIsAddingMembers(false)}
                     className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600"
                   >
-                    Cancelar
-                  </button>
+                    {t("Cancelar")}</button>
                   <button
                     type="button"
                     disabled={savingNewMembers || selectedToAdd.length === 0}
                     onClick={handleSaveAddMembers}
-                    className="flex items-center gap-1.5 rounded-lg bg-[#f78c26] px-3 py-1 text-xs font-bold text-white hover:bg-[#ea580c] disabled:opacity-50"
+                    className="flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
                   >
                     {savingNewMembers ? (
                       <Loader2 size={12} className="animate-spin" />
                     ) : (
                       <Check size={12} />
                     )}
-                    <span>Agregar ({selectedToAdd.length})</span>
+                    <span>{t("Agregar (")}{selectedToAdd.length})</span>
                   </button>
                 </div>
               </div>
@@ -507,17 +504,16 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
             <div className="rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden bg-white">
               {loadingMembers ? (
                 <div className="flex items-center justify-center p-6 text-xs text-slate-400 gap-2">
-                  <Loader2 size={15} className="animate-spin text-[#f78c26]" />
-                  <span>Cargando miembros...</span>
+                  <Loader2 size={15} className="animate-spin text-slate-600" />
+                  <span>{t("Cargando miembros...")}</span>
                 </div>
               ) : members.length === 0 ? (
                 <div className="p-4 text-center text-xs text-slate-400">
-                  Sin miembros registrados
-                </div>
+                  {t("Sin miembros registrados")}</div>
               ) : (
                 members.map((m) => {
                   const prof = m.profiles;
-                  const name = prof?.nombre || 'Técnico';
+                  const name = prof?.nombre || t("Técnico");
                   const initials = name
                     .split(' ')
                     .filter(Boolean)
@@ -537,7 +533,7 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
                       className="flex items-center justify-between p-3 hover:bg-slate-50 transition-colors"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-orange-100 text-[#f78c26] text-xs font-bold shrink-0 overflow-hidden">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 text-slate-600 text-xs font-semibold shrink-0 overflow-hidden">
                           {prof?.avatar_url ? (
                             <img
                               src={prof.avatar_url}
@@ -549,20 +545,20 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
                           )}
                         </div>
                         <div className="truncate">
-                          <p className="text-xs font-bold text-[#343e48] truncate">
+                          <p className="text-xs font-semibold text-[#343e48] truncate">
                             {name}
                           </p>
                           <p className="text-[10px] text-slate-400 capitalize">
-                            {prof?.rol?.replace(/_/g, ' ') || 'Técnico'}
+                            {getRoleLabel(prof?.rol, t)}
                           </p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
                         {isMemberAdmin && (
-                          <span className="flex items-center gap-1 rounded-md bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-[#f78c26] border border-orange-200">
+                          <span className="flex items-center gap-1 rounded-md bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200">
                             <Shield size={10} />
-                            <span>Admin</span>
+                            <span>{t("Admin")}</span>
                           </span>
                         )}
 
@@ -571,7 +567,7 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
                             type="button"
                             onClick={() => handleRemoveMember(m.profile_id, name)}
                             className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                            title="Expulsar del grupo"
+                            title={t("Expulsar del grupo")}
                           >
                             <UserMinus size={14} />
                           </button>
@@ -591,33 +587,30 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
                 <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 space-y-3">
                   <div className="flex items-center gap-2 text-rose-700">
                     <AlertTriangle size={17} />
-                    <span className="text-xs font-bold">
-                      ¿Confirmar eliminación del grupo?
-                    </span>
+                    <span className="text-xs font-semibold">
+                      {t("¿Confirmar eliminación del grupo?")}</span>
                   </div>
                   <p className="text-[11px] text-rose-600 leading-relaxed">
-                    Esta acción eliminará el grupo y todos los mensajes y fotos compartidos para siempre.
-                  </p>
+                    {t("Esta acción eliminará el grupo y todos los mensajes y fotos compartidos para siempre.")}</p>
                   <div className="flex justify-end gap-2 pt-1">
                     <button
                       type="button"
                       onClick={() => setIsConfirmingDelete(false)}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                     >
-                      Cancelar
-                    </button>
+                      {t("Cancelar")}</button>
                     <button
                       type="button"
                       disabled={deleting}
                       onClick={handleDeleteGroup}
-                      className="flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-50 shadow-xs"
+                      className="flex items-center gap-1.5 rounded-lg bg-rose-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-50 shadow-xs"
                     >
                       {deleting ? (
                         <Loader2 size={13} className="animate-spin" />
                       ) : (
                         <Trash2 size={13} />
                       )}
-                      <span>Eliminar Definitivamente</span>
+                      <span>{t("Eliminar Definitivamente")}</span>
                     </button>
                   </div>
                 </div>
@@ -625,10 +618,10 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsConfirmingDelete(true)}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50/50 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-100/60 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50/50 py-2.5 text-xs font-semibold text-rose-600 hover:bg-rose-100/60 transition-colors"
                 >
                   <Trash2 size={14} />
-                  <span>Eliminar Grupo de Trabajo</span>
+                  <span>{t("Eliminar Grupo de Trabajo")}</span>
                 </button>
               )}
             </div>

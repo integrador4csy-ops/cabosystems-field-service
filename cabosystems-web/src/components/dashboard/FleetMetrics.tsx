@@ -1,3 +1,4 @@
+import { useTranslation } from '../../context/LanguageContext';
 import React from 'react';
 import { Users, Radio, Car, BatteryCharging, Zap } from 'lucide-react';
 import type { LiveWorker } from '../../types/fleet';
@@ -15,6 +16,7 @@ export const FleetMetrics: React.FC<FleetMetricsProps> = ({
   movingCount,
   offlineCount,
 }) => {
+  const { t } = useTranslation();
   // Average battery calculation
   const batteryStats = React.useMemo(() => {
     const valid = workers
@@ -41,8 +43,7 @@ export const FleetMetrics: React.FC<FleetMetricsProps> = ({
         </div>
         <div className="mt-4">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Total en Radar
-          </span>
+            {t("Total en Radar")}</span>
           <div className="mt-1 flex items-baseline gap-2">
             <h3 className="text-2xl lg:text-3xl font-extrabold text-white tracking-tight">
               {workers.length}
@@ -67,13 +68,12 @@ export const FleetMetrics: React.FC<FleetMetricsProps> = ({
         </div>
         <div className="mt-4">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            En Línea (GPS Activo)
-          </span>
+            {t("En Línea (GPS Activo)")}</span>
           <div className="mt-1 flex items-baseline gap-2">
             <h3 className="text-2xl lg:text-3xl font-extrabold text-white tracking-tight">
               {onlineCount}
             </h3>
-            <span className="text-xs font-medium text-emerald-400">transmitiendo</span>
+            <span className="text-xs font-medium text-emerald-400">{t("transmitiendo")}</span>
           </div>
         </div>
       </div>
@@ -90,13 +90,12 @@ export const FleetMetrics: React.FC<FleetMetricsProps> = ({
         </div>
         <div className="mt-4">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Unidades en Ruta
-          </span>
+            {t("Unidades en Ruta")}</span>
           <div className="mt-1 flex items-baseline gap-2">
             <h3 className="text-2xl lg:text-3xl font-extrabold text-white tracking-tight">
               {movingCount}
             </h3>
-            <span className="text-xs font-medium text-amber-400">en movimiento</span>
+            <span className="text-xs font-medium text-amber-400">{t("en movimiento")}</span>
           </div>
         </div>
       </div>
@@ -110,23 +109,20 @@ export const FleetMetrics: React.FC<FleetMetricsProps> = ({
           {batteryStats.charging > 0 ? (
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400">
               <BatteryCharging size={12} />
-              {batteryStats.charging} cargando
-            </span>
+              {batteryStats.charging} {t("cargando")}</span>
           ) : (
             <span className="inline-flex items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-bold text-cyan-400">
-              Promedio
-            </span>
+              {t("Promedio")}</span>
           )}
         </div>
         <div className="mt-4">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Telemetría de Batería
-          </span>
+            {t("Telemetría de Batería")}</span>
           <div className="mt-1 flex items-baseline gap-2">
             <h3 className="text-2xl lg:text-3xl font-extrabold text-white tracking-tight">
               {batteryStats.avg}%
             </h3>
-            <span className="text-xs font-medium text-gray-400">nivel de flota</span>
+            <span className="text-xs font-medium text-gray-400">{t("nivel de flota")}</span>
           </div>
         </div>
       </div>

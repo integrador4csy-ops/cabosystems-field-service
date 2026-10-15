@@ -1,0 +1,26 @@
+export const CHAT_COPY = {
+  es: {
+    emojiTab: 'Emojis', stickerTab: 'Stickers', mediaPicker: 'Emojis y stickers', keyboard: 'Volver al teclado', searchStickers: 'Buscar stickers...', importSticker: 'Importar sticker (.webp o .png)', noStickers: 'Todavía no tienes stickers. Importa tus favoritos para usarlos aquí.', noStickersFound: 'No se encontraron stickers.',
+    loading: 'Cargando conversación...', unavailable: 'No se pudo cargar el grupo.', retry: 'Reintentar', back: 'Volver', info: 'Información del grupo', members: 'integrantes',
+    actions: 'Opciones del mensaje', quick: 'Reacciones rápidas', more: 'Más emojis', reply: 'Responder', copy: 'Copiar mensaje', react: 'Reaccionar', pin: 'Fijar mensaje', unpin: 'Desfijar mensaje', remove: 'Eliminar mensaje',
+    deleteNotice: 'Se eliminará para todos los integrantes del grupo. Esta acción no se puede deshacer.', cancel: 'Cancelar', deleting: 'Eliminando...', failed: 'No se pudo completar la acción. Intenta de nuevo.', copied: 'Mensaje copiado',
+    pinned: 'Mensajes fijados', original: 'Ver mensaje original', missing: 'El mensaje original ya no está disponible.', you: 'Tú', colleague: 'Colaborador', photo: 'Foto', video: 'Video', sticker: 'Sticker',
+    cancelReply: 'Cancelar respuesta', message: 'Mensaje para el grupo', placeholder: 'Mensaje...', send: 'Enviar mensaje', camera: 'Tomar foto', gallery: 'Adjuntar foto o video', stickers: 'Abrir stickers', emojis: 'Abrir emojis',
+    restricted: 'Solo fotos y videos permitidos', sendFailed: 'No se pudo enviar. Tu mensaje se conservó para reintentar.',
+    picker: 'Selector de emojis', close: 'Cerrar', search: 'Buscar emojis...', results: 'Resultados de búsqueda', empty: 'No se encontraron emojis.', recentEmpty: 'Tus emojis recientes aparecerán aquí.',
+    recent: 'Recientes', smileys: 'Caras y emociones', people: 'Personas y gestos', nature: 'Animales y naturaleza', food: 'Comida y bebida', travel: 'Viajes y lugares', activities: 'Actividades', objects: 'Objetos', symbols: 'Símbolos', flags: 'Banderas',
+    emptyChat: 'Todavía no hay mensajes. Comparte un avance con el equipo.', pinStatus: 'Mensaje fijado', closeImage: 'Cerrar imagen',
+  },
+  en: {
+    emojiTab: 'Emojis', stickerTab: 'Stickers', mediaPicker: 'Emojis and stickers', keyboard: 'Back to keyboard', searchStickers: 'Search stickers...', importSticker: 'Import sticker (.webp or .png)', noStickers: 'No stickers yet. Import your favorites to use them here.', noStickersFound: 'No stickers found.',
+    loading: 'Loading conversation...', unavailable: 'Could not load the group.', retry: 'Try again', back: 'Back', info: 'Group information', members: 'members',
+    actions: 'Message options', quick: 'Quick reactions', more: 'More emojis', reply: 'Reply', copy: 'Copy message', react: 'React', pin: 'Pin message', unpin: 'Unpin message', remove: 'Delete message',
+    deleteNotice: 'It will be deleted for everyone in the group. This action cannot be undone.', cancel: 'Cancel', deleting: 'Deleting...', failed: 'Could not complete the action. Please try again.', copied: 'Message copied',
+    pinned: 'Pinned messages', original: 'View original message', missing: 'The original message is no longer available.', you: 'You', colleague: 'Team member', photo: 'Photo', video: 'Video', sticker: 'Sticker',
+    cancelReply: 'Cancel reply', message: 'Group message', placeholder: 'Type a message...', send: 'Send message', camera: 'Take photo', gallery: 'Attach photo or video', stickers: 'Open stickers', emojis: 'Open emojis',
+    restricted: 'Only photos and videos allowed', sendFailed: 'Could not send. Your message was kept so you can try again.',
+    picker: 'Emoji picker', close: 'Close', search: 'Search emojis...', results: 'Search results', empty: 'No emojis found.', recentEmpty: 'Your recent emojis will appear here.',
+    recent: 'Recent', smileys: 'Smileys and emotions', people: 'People and gestures', nature: 'Animals and nature', food: 'Food and drink', travel: 'Travel and places', activities: 'Activities', objects: 'Objects', symbols: 'Symbols', flags: 'Flags',
+    emptyChat: 'No messages yet. Share an update with your team.', pinStatus: 'Pinned message', closeImage: 'Close image',
+  },
+} as const;

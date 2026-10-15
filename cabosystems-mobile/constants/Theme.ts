@@ -59,6 +59,22 @@ export const Colors = {
   completed: '#12B76A',
 };
 
+// Chat uses only the four approved brand colors and their alpha variants.
+export const ChatPalette = {
+  accent: Colors.primary,
+  ink: '#000000',
+  slate: Colors.brandSlate,
+  white: Colors.textWhite,
+  muted: 'rgba(0,0,0,0.55)',
+  line: 'rgba(0,0,0,0.10)',
+  wash: 'rgba(0,0,0,0.035)',
+  overlay: 'rgba(0,0,0,0.40)',
+  header: 'rgba(0,0,0,0.72)',
+};
+
+// Agenda follows the same four approved corporate colors.
+export const AgendaPalette = ChatPalette;
+
 export const Glass = {
   bg: 'rgba(255, 255, 255, 0.85)',
   bgSolid: '#FFFFFF',

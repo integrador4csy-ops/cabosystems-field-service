@@ -1,3 +1,4 @@
+import { useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAdminAuth } from '../../context/AdminAuthContext';
@@ -11,6 +12,7 @@ import { GroupInfoDrawer } from './GroupInfoDrawer';
 import { MessageSquare, Plus } from 'lucide-react';
 
 export const ChatView: React.FC = () => {
+  const { t } = useTranslation();
   const { user, adminProfile } = useAdminAuth();
   const { targetGroupId, setTargetGroupId } = useSidebar();
   const currentUserId = user?.id || '';
@@ -22,6 +24,8 @@ export const ChatView: React.FC = () => {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [mobileConversationOpen, setMobileConversationOpen] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Modals / Drawers
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -30,6 +34,7 @@ export const ChatView: React.FC = () => {
   const loadGroups = useCallback(async () => {
     if (!currentUserId) return;
     try {
+      setLoadError(null);
       const data = await getMyChatGroups(currentUserId);
       setGroups(data);
       // Auto-select first group if none is selected or selected group no longer exists
@@ -39,16 +44,18 @@ export const ChatView: React.FC = () => {
       });
     } catch (err) {
       console.error('Error loading groups in ChatView:', err);
+      setLoadError(t("No se pudieron cargar los grupos. Intenta de nuevo."));
     } finally {
       setLoading(false);
     }
-  }, [currentUserId]);
+  }, [currentUserId, t]);
 
   // Si se hizo clic en una notificación para un grupo específico, seleccionarlo
   useEffect(() => {
     if (targetGroupId && groups.length > 0) {
       if (groups.some((g) => g.id === targetGroupId)) {
         setSelectedGroupId(targetGroupId);
+        setMobileConversationOpen(true);
         setTargetGroupId(null);
       }
     }
@@ -88,11 +95,12 @@ export const ChatView: React.FC = () => {
   return (
     <div className="flex h-full w-full gap-3.5 lg:gap-4.5 overflow-hidden">
       {/* 1. Left Card: Group Conversations List (Standalone Floating Card) */}
-      <div className="w-80 lg:w-96 shrink-0 h-full rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden flex flex-col">
+      <div className={`operational-panel w-full lg:w-80 xl:w-96 shrink-0 h-full overflow-hidden flex-col ${mobileConversationOpen && selectedGroup ? 'hidden lg:flex' : 'flex'}`}>
+        {loadError && <div role="alert" className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{t(loadError)}<button type="button" onClick={loadGroups} className="ml-2 underline underline-offset-2">{t("Reintentar")}</button></div>}
         <GroupList
           groups={groups}
           selectedGroupId={selectedGroupId}
-          onSelectGroup={setSelectedGroupId}
+          onSelectGroup={(id) => { setSelectedGroupId(id); setMobileConversationOpen(true); }}
           onOpenCreateGroup={() => setIsCreateModalOpen(true)}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -102,35 +110,34 @@ export const ChatView: React.FC = () => {
       </div>
 
       {/* 2. Right Card: Active Chat Conversation (Standalone Floating Card) */}
-      <div className="flex-1 min-w-0 h-full rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden flex flex-col">
+      <div className={`operational-panel flex-1 min-w-0 h-full overflow-hidden flex-col ${mobileConversationOpen && selectedGroup ? 'flex' : 'hidden lg:flex'}`}>
         {selectedGroup ? (
           <ChatConversation
             key={selectedGroup.id}
             group={selectedGroup}
             currentUserId={currentUserId}
             isGlobalAdmin={isGlobalAdmin}
+            onBack={() => setMobileConversationOpen(false)}
             onOpenInfo={() => setIsInfoDrawerOpen(true)}
             onGroupChanged={loadGroups}
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50/50">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-[#f78c26] mb-4 shadow-xs">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-brand-500 mb-4 shadow-xs">
               <MessageSquare size={32} />
             </div>
             <h3 className="text-base font-bold text-[#343e48]">
-              Chat Grupal CaboSystems
-            </h3>
+              {t("Chat Grupal CaboSystems")}</h3>
             <p className="mt-1.5 text-xs text-slate-500 max-w-sm leading-relaxed">
-              Selecciona un grupo de trabajo en la columna izquierda o crea uno nuevo para coordinar instalaciones, compartir evidencias fotográficas y videos técnicos con el equipo de campo.
-            </p>
+              {t("Selecciona un grupo de trabajo en la columna izquierda o crea uno nuevo para coordinar instalaciones, compartir evidencias fotográficas y videos técnicos con el equipo de campo.")}</p>
             {isGlobalAdmin && (
               <button
                 type="button"
                 onClick={() => setIsCreateModalOpen(true)}
-                className="mt-5 flex items-center gap-2 rounded-xl bg-[#f78c26] hover:bg-[#ea580c] px-4 py-2.5 text-xs font-bold text-white shadow-xs transition-all cursor-pointer"
+                className="mt-5 flex items-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-700 px-4 py-2.5 text-xs font-bold text-white shadow-xs transition-all cursor-pointer"
               >
                 <Plus size={15} strokeWidth={2.5} />
-                <span>Crear Primer Grupo</span>
+                <span>{t("Crear Primer Grupo")}</span>
               </button>
             )}
           </div>
@@ -145,6 +152,7 @@ export const ChatView: React.FC = () => {
         onGroupCreated={(newGrp) => {
           loadGroups();
           setSelectedGroupId(newGrp.id);
+          setMobileConversationOpen(true);
         }}
       />
 

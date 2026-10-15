@@ -1,3 +1,4 @@
+import { useTranslation } from '../context/LanguageContext';
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -52,6 +53,7 @@ export const LiveMap: React.FC<LiveMapProps> = ({
   onRefresh,
   isRefreshing,
 }) => {
+  const { t, language } = useTranslation();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersRef = useRef<Map<string, MarkerAnimationState>>(new Map());
@@ -90,8 +92,11 @@ export const LiveMap: React.FC<LiveMapProps> = ({
       map.invalidateSize();
     };
     window.addEventListener('resize', handleResize);
+    const resizeObserver = new ResizeObserver(handleResize);
+    if (mapContainerRef.current) resizeObserver.observe(mapContainerRef.current);
 
     return () => {
+      resizeObserver.disconnect();
       window.removeEventListener('resize', handleResize);
       clearTimeout(timer);
       // Clean up animations
@@ -189,8 +194,8 @@ export const LiveMap: React.FC<LiveMapProps> = ({
         currentHeading = existingState.currentHeading;
       }
 
-      const iconHtml = createLife360MarkerHtml(worker, currentHeading, detectedPlace?.name, dwellText);
-      const hoverCardHtml = createHoverCardHtml(worker, detectedPlace?.name, dwellText);
+      const iconHtml = createLife360MarkerHtml(worker, currentHeading, detectedPlace?.name, dwellText, language);
+      const hoverCardHtml = createHoverCardHtml(worker, detectedPlace?.name, dwellTimesRef.current[id], language);
 
       const divIcon = L.divIcon({
         className: 'custom-life360-icon',
@@ -282,7 +287,7 @@ export const LiveMap: React.FC<LiveMapProps> = ({
         setHasCenteredOnce(true);
       }
     }
-  }, [workers]);
+  }, [workers, language]);
 
   // Center on selected worker when explicitly requested (free zoom preserved)
   useEffect(() => {
@@ -357,7 +362,7 @@ export const LiveMap: React.FC<LiveMapProps> = ({
           <div className="flex flex-col overflow-hidden min-w-0 pr-1">
             <div className="flex items-center gap-1.5">
               <span className="truncate text-xs font-bold text-[#343e48]">
-                {selectedWorker.profile.nombre || selectedWorker.profile.full_name || 'Técnico'}
+                {selectedWorker.profile.nombre || selectedWorker.profile.full_name || t("Técnico")}
               </span>
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
@@ -368,12 +373,12 @@ export const LiveMap: React.FC<LiveMapProps> = ({
                     : 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
                 }`}
               >
-                {selectedWorker.isOffline ? 'Offline' : 'En vivo'}
+                {selectedWorker.isOffline ? t("Offline") : t("En vivo")}
               </span>
               <span className="truncate text-[10.5px] text-slate-400">
                 {selectedWorker.location.actividad === 'conduciendo'
                   ? `En ruta (${Math.round(selectedWorker.location.velocidad || 0)} km/h)`
-                  : (selectedWorker.profile.rol?.replace(/_/g, ' ') || 'Técnico')}
+                  : (selectedWorker.profile.rol?.replace(/_/g, ' ') || t("Técnico"))}
               </span>
             </div>
           </div>
@@ -382,7 +387,7 @@ export const LiveMap: React.FC<LiveMapProps> = ({
           <button
             onClick={() => onSelectWorker('')}
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:text-[#343e48] hover:bg-slate-100 transition-colors"
-            title="Quitar enfoque"
+            title={t("Quitar enfoque")}
           >
             ✕
           </button>
@@ -393,14 +398,14 @@ export const LiveMap: React.FC<LiveMapProps> = ({
       <div className="floating-map-controls">
         <button
           onClick={() => mapInstanceRef.current?.zoomIn()}
-          title="Acercar mapa"
+          title={t("Acercar mapa")}
           className="map-control-btn"
         >
           <ZoomIn size={18} />
         </button>
         <button
           onClick={() => mapInstanceRef.current?.zoomOut()}
-          title="Alejar mapa"
+          title={t("Alejar mapa")}
           className="map-control-btn"
         >
           <ZoomOut size={18} />
@@ -408,7 +413,7 @@ export const LiveMap: React.FC<LiveMapProps> = ({
         <div className="control-divider" />
         <button
           onClick={handleCenterAll}
-          title="Centrar en la flota"
+          title={t("Centrar en la flota")}
           className="map-control-btn center-btn"
         >
           <Navigation size={18} className="text-[#f78c26]" />
@@ -418,7 +423,7 @@ export const LiveMap: React.FC<LiveMapProps> = ({
             <div className="control-divider" />
             <button
               onClick={onRefresh}
-              title="Forzar actualización de radar ahora"
+              title={t("Forzar actualización de radar ahora")}
               className="map-control-btn"
             >
               <RotateCw size={17} className={isRefreshing ? 'animate-spin text-[#f78c26]' : ''} />

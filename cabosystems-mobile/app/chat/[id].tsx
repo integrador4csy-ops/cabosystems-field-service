@@ -1,972 +1,298 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  Pressable,
-  FlatList,
-  Modal,
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, TextInput, Pressable, Modal, ActivityIndicator, KeyboardAvoidingView, Keyboard, Platform, BackHandler, useWindowDimensions } from 'react-native';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import { BlurView } from 'expo-blur';
+import { ArrowLeft, Info, Send, Camera, Paperclip, Keyboard as KeyboardIcon, Smile, X, Reply, Pin, PinOff, Copy, Trash2, MoreVertical, ChevronDown } from 'lucide-react-native';
+import { ChatPalette as P } from '@/constants/Theme';
 import { captureImageSafe, pickImageSafe } from '@/lib/mediaPicker';
-import {
-  ArrowLeft,
-  Info,
-  Send,
-  Camera,
-  Image as ImageIcon,
-  Sparkles,
-  Play,
-  Check,
-  Video,
-  Smile,
-  X,
-} from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { useAuth } from '@/lib/auth';
+import { useTranslation } from '@/lib/i18n';
+import { CHAT_COPY } from '@/lib/chatCopy';
+import { insertEmoji } from '@/lib/chatEmoji';
 import { supabase } from '@/lib/supabase';
-import {
-  getChatGroupDetails,
-  getGroupMessages,
-  sendChatMessage,
-  toggleChatReaction,
-} from '@/lib/chatApi';
-import type { ChatGroup, ChatMessage, ChatMessageType } from '@/types/database';
-import StickerPickerModal from '@/components/chat/StickerPickerModal';
+import { getChatGroupDetails, getGroupMessages, getChatMessage, sendChatMessage, toggleChatReaction, getChatPins, pinChatMessage, unpinChatMessage, deleteChatMessage } from '@/lib/chatApi';
+import type { ChatGroup, ChatMessage, ChatMessageType, ChatPin } from '@/types/database';
+import { ChatMessageBubble } from '@/components/chat/ChatMessageBubble';
+import { ChatToolsModal, type ChatToolTarget } from '@/components/chat/ChatToolsModal';
+import { ReplyPreview } from '@/components/chat/ReplyPreview';
+import { MessageReactions } from '@/components/chat/MessageReactions';
+import { ComposerMediaPanel } from '@/components/chat/ComposerMediaPanel';
+import type { ChatRect } from '@/lib/chatReactionLayout';
+import { prepareChatEmojis } from '@/lib/chatMediaWarmup';
+import { stickerLibrary } from '@/lib/stickerLibrary';
 
-const QUICK_EMOJIS = ['👍', '❤️', '🔥', '🛠️', '✅', '😂'];
+const messageKey = (message: ChatMessage) => message.id;
+const messageType = (message: ChatMessage) => message.tipo;
 
 export default function ChatRoomScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { profile } = useAuth();
-
+  const router = useRouter(); const insets = useSafeAreaInsets(); const { profile } = useAuth();
+  const dimensions = useWindowDimensions();
+  const userId = profile?.id || ''; const { language } = useTranslation(); const c = CHAT_COPY[language];
+  useEffect(() => {
+    if (!userId) return;
+    void stickerLibrary.prepare(userId);
+    const idle = requestIdleCallback(() => { void prepareChatEmojis(); }, { timeout: 750 });
+    return () => cancelIdleCallback(idle);
+  }, [userId]);
   const [group, setGroup] = useState<ChatGroup | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [pins, setPins] = useState<ChatPin[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
-
-  // Modales
-  const [showStickers, setShowStickers] = useState(false);
-  const [activeReactionMsgId, setActiveReactionMsgId] = useState<string | null>(null);
-  const [fullScreenImageUri, setFullScreenImageUri] = useState<string | null>(null);
-
-  const flatListRef = useRef<FlatList>(null);
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tools, setTools] = useState<ChatToolTarget | null>(null);
+  const [showPins, setShowPins] = useState(false);
+  const [mediaPanelOpen, setMediaPanelOpen] = useState(false);
+  const [mediaPanelReady, setMediaPanelReady] = useState(false);
+  useEffect(() => {
+    if (!group?.id) return;
+    const idle = requestIdleCallback(() => setMediaPanelReady(true), { timeout: 750 });
+    return () => cancelIdleCallback(idle);
+  }, [group?.id, userId]);
+  const [reactionAnchor, setReactionAnchor] = useState<(ChatRect & { id: string }) | null>(null);
+  const [rootBounds, setRootBounds] = useState<ChatRect | null>(null);
+  const [feedBounds, setFeedBounds] = useState<ChatRect | null>(null);
+  const [fullImage, setFullImage] = useState<string | null>(null);
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
+  const listRef = useRef<FlashListRef<ChatMessage>>(null);
+  const rootRef = useRef<View>(null);
+  const feedRef = useRef<View>(null);
+  const selectedIdRef = useRef<string | null>(null);
+  const selectedMeasure = useRef<((callback: (rect: ChatRect) => void) => void) | null>(null);
+  const anchorFrame = useRef<number | null>(null);
+  const inputRef = useRef<TextInput>(null);
+  const sendLock = useRef(false); const activeRoom = useRef(id);
+  const sendSequence = useRef(0);
+  const errorCopy = useRef(c.failed);
+  useEffect(() => { errorCopy.current = c.failed; }, [c.failed]);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selected = messages.find((message) => message.id === selectedId) || null;
+  const feedExtra = useMemo(() => ({ selectedId, highlighted, pinnedIds: pins }), [selectedId, highlighted, pins]);
+  const measureSelection = useCallback(() => {
+    if (anchorFrame.current !== null || !selectedIdRef.current) return;
+    anchorFrame.current = requestAnimationFrame(() => {
+      anchorFrame.current = null;
+      const selectedMessageId = selectedIdRef.current;
+      selectedMeasure.current?.((rect) => {
+        if (!selectedMessageId || selectedIdRef.current !== selectedMessageId) return;
+        setReactionAnchor((prev) => rect.width <= 0 || rect.height <= 0 ? null : prev?.id === selectedMessageId && prev.x === rect.x && prev.y === rect.y && prev.width === rect.width && prev.height === rect.height ? prev : { ...rect, id: selectedMessageId });
+      });
+    });
+  }, []);
+  const measureBounds = useCallback(() => {
+    rootRef.current?.measureInWindow((x, y, width, height) => setRootBounds({ x, y, width, height }));
+    feedRef.current?.measureInWindow((x, y, width, height) => setFeedBounds({ x, y, width, height }));
+    measureSelection();
+  }, [measureSelection]);
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+    if (!selectedId) { setReactionAnchor(null); selectedMeasure.current = null; }
+  }, [selectedId]);
+  useEffect(() => { measureBounds(); }, [dimensions.width, dimensions.height, measureBounds]);
+  useEffect(() => {
+    const hidden = Keyboard.addListener('keyboardDidHide', measureBounds);
+    const shown = Keyboard.addListener('keyboardDidShow', measureBounds);
+    return () => { hidden.remove(); shown.remove(); if (anchorFrame.current !== null) cancelAnimationFrame(anchorFrame.current); };
+  }, [measureBounds]);
+  const pinnedIds = useMemo(() => new Set(pins.map((pin) => pin.mensaje_id)), [pins]);
+  const admin = group?.mi_rol === 'admin' || profile?.rol === 'admin' || profile?.rol === 'supervisor_instalacion';
+  const textBlocked = Boolean(group?.solo_multimedia && !admin);
+  const refresh = useCallback(async () => {
+    const [latest, fixed] = await Promise.all([getGroupMessages(id, 100), getChatPins(id)]);
+    if (activeRoom.current !== id) return;
+    setMessages(latest.reverse()); setPins(fixed);
+  }, [id]);
 
   useEffect(() => {
-    if (id && profile?.id) {
-      loadGroupAndMessages();
-      const unsubscribe = setupRealtimeSubscription();
-      return () => {
-        unsubscribe?.();
-      };
-    }
-  }, [id, profile?.id]);
-
-  // Actualizar configuración del grupo al volver de la pantalla de info
-  useFocusEffect(
-    useCallback(() => {
-      if (id && profile?.id) {
-        getChatGroupDetails(id, profile.id).then((grp) => {
-          if (grp) setGroup(grp);
-        });
-      }
-    }, [id, profile?.id])
-  );
-
-  const loadGroupAndMessages = async () => {
-    if (!id || !profile?.id) return;
-    try {
-      setLoading(true);
-      const [grp, msgs] = await Promise.all([
-        getChatGroupDetails(id, profile.id),
-        getGroupMessages(id, 60),
-      ]);
-      setGroup(grp);
-      setMessages(msgs);
-    } catch (err) {
-      console.error('Error loading chat:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const setupRealtimeSubscription = () => {
-    if (!id) return;
-
-    const channel = supabase
-      .channel(`chat_${id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_mensajes',
-          filter: `grupo_id=eq.${id}`,
-        },
-        async (payload) => {
-          // Obtener perfil del remitente
-          const { data: senderProfile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', payload.new.remitente_id)
-            .single();
-
-          const newMsg: ChatMessage = {
-            ...(payload.new as ChatMessage),
-            profiles: senderProfile,
-            reacciones: [],
-          };
-
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === newMsg.id)) return prev;
-            return [newMsg, ...prev];
-          });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'chat_reacciones',
-        },
-        () => {
-          // Recargar mensajes para refrescar reacciones en vivo
-          if (id) {
-            getGroupMessages(id, 60).then((msgs) => setMessages(msgs));
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'chat_grupos',
-          filter: `id=eq.${id}`,
-        },
-        (payload) => {
-          // Actualización instantánea en vivo cuando el admin activa/desactiva Solo Multimedia
-          setGroup((prev) =>
-            prev ? { ...prev, ...(payload.new as ChatGroup) } : (payload.new as ChatGroup)
-          );
-        }
-      )
+    activeRoom.current = id;
+    let active = true;
+    if (!id || !userId) { setLoading(false); return; }
+    sendSequence.current++; sendLock.current = false; setSending(false);
+    setLoading(true); setGroup(null); setMessages([]); setPins([]); setText(''); setReplyTo(null); setSelectedId(null); setTools(null); setNotice(''); setMediaPanelOpen(false); setMediaPanelReady(false);
+    Promise.all([getChatGroupDetails(id, userId), refresh()]).then(([details]) => { if (active) setGroup(details); })
+      .catch(() => { if (active) setNotice(errorCopy.current); }).finally(() => { if (active) setLoading(false); });
+    const reload = () => { void refresh().catch(() => { if (active) setNotice(errorCopy.current); }); };
+    const channel = supabase.channel(`chat_mobile_${id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensajes', filter: `grupo_id=eq.${id}` }, reload)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chat_mensajes' }, (payload) => {
+        setReplyTo((prev) => prev?.id === payload.old.id ? null : prev);
+        setSelectedId((prev) => prev === payload.old.id ? null : prev);
+        setTools((prev) => prev?.kind === 'actions' && prev.message.id === payload.old.id ? null : prev);
+        reload();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_reacciones' }, reload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_pins' }, reload)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_grupos', filter: `id=eq.${id}` }, (payload) => setGroup((prev) => prev ? { ...prev, ...payload.new } : null))
       .subscribe();
+    return () => { active = false; activeRoom.current = ''; sendSequence.current++; void supabase.removeChannel(channel); };
+  }, [id, userId, refresh]);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
+  useEffect(() => () => { if (highlightTimer.current) clearTimeout(highlightTimer.current); if (focusTimer.current) clearTimeout(focusTimer.current); }, []);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    if (id && userId) getChatGroupDetails(id, userId).then((details) => { if (active && details) setGroup(details); }).catch(() => { if (active) setNotice(errorCopy.current); });
+    return () => { active = false; };
+  }, [id, userId]));
+  useFocusEffect(useCallback(() => {
+    const back = Platform.OS === 'android' ? BackHandler.addEventListener('hardwareBackPress', () => {
+      if (mediaPanelOpen) { setMediaPanelOpen(false); return true; }
+      if (selectedId) { setSelectedId(null); return true; }
+      return false;
+    }) : null;
+    return () => { back?.remove(); };
+  }, [selectedId, mediaPanelOpen]));
 
-  const isUserAdmin =
-    group?.mi_rol === 'admin' ||
-    profile?.rol === 'admin' ||
-    profile?.rol === 'supervisor_instalacion';
-
-  // Si el grupo está en 'solo_multimedia', se bloquea el cuadro de texto para modo solo imágenes/videos
-  const isTextBlocked = !!group?.solo_multimedia;
-
-  // Enviar mensaje de texto
-  const handleSendText = async () => {
-    if (isTextBlocked) {
-      Alert.alert(
-        'Modo Solo Imágenes',
-        'Este grupo está configurado en modo multimedia. Solo se permite el envío de fotos y videos de evidencia.'
-      );
-      return;
-    }
-    if (!text.trim() || !id || !profile?.id || sending) return;
-
-    const content = text.trim();
-    setText('');
-    setSending(true);
-
+  const focusComposer = useCallback(() => {
+    if (focusTimer.current) clearTimeout(focusTimer.current);
+    focusTimer.current = setTimeout(() => inputRef.current?.focus(), 180);
+  }, []);
+  const reply = useCallback((message: ChatMessage) => {
+    setReplyTo(message); setSelectedId(null); setTools(null); setMediaPanelOpen(false); focusComposer();
+  }, [focusComposer]);
+  const selectMessage = useCallback((message: ChatMessage, measure: (callback: (rect: ChatRect) => void) => void) => {
+    if (focusTimer.current) clearTimeout(focusTimer.current);
+    selectedIdRef.current = message.id; selectedMeasure.current = measure;
+    setReactionAnchor(null); setSelectedId(message.id); setMediaPanelOpen(false); Keyboard.dismiss();
+    measureSelection();
+  }, [measureSelection]);
+  const fail = useCallback(() => setNotice(c.failed), [c]);
+  const reaction = useCallback(async (messageId: string, emoji: string) => {
+    if (!userId) return;
+    setTools(null); setSelectedId(null); setNotice('');
+    try { await toggleChatReaction(messageId, userId, emoji); await refresh(); } catch { setNotice(c.failed); }
+  }, [userId, refresh, c]);
+  const pin = useCallback(async (message: ChatMessage) => {
+    setNotice('');
     try {
-      await sendChatMessage({
-        grupo_id: id,
-        remitente_id: profile.id,
-        tipo: 'texto',
-        contenido: content,
-      });
-    } catch (err: any) {
-      console.error('Error sending message:', err);
-      Alert.alert('Error', err?.message || 'No se pudo enviar el mensaje.');
-    } finally {
-      setSending(false);
-    }
-  };
-
-  // Enviar foto instantánea desde la cámara
-  const handleCaptureCamera = async () => {
-    if (!id || !profile?.id || sending) return;
-    const uri = await captureImageSafe({ quality: 0.8 });
-    if (uri) {
-      await sendMediaMessage(uri, 'imagen');
-    }
-  };
-
-  // Enviar foto o video desde la galería
-  const handlePickGallery = async () => {
-    if (!id || !profile?.id || sending) return;
-    const uri = await pickImageSafe({ mediaTypes: 'all', quality: 0.85 });
-    if (uri) {
-      const isVideo = uri.toLowerCase().includes('.mp4') || uri.toLowerCase().includes('.mov');
-      await sendMediaMessage(uri, isVideo ? 'video' : 'imagen');
-    }
-  };
-
-  // Enviar Sticker de WhatsApp
-  const handleSelectSticker = async (stickerUrl: string) => {
-    if (!id || !profile?.id) return;
-    await sendMediaMessage(stickerUrl, 'sticker');
-  };
-
-  const sendMediaMessage = async (uri: string, tipo: ChatMessageType) => {
-    if (!id || !profile?.id) return;
-    setSending(true);
+      if (pinnedIds.has(message.id)) await unpinChatMessage(message.id); else await pinChatMessage(message, userId);
+      await refresh(); setSelectedId(null);
+    } catch { setNotice(c.failed); }
+  }, [pinnedIds, userId, refresh, c]);
+  const copy = useCallback(async (message: ChatMessage) => {
+    if (!message.contenido) return;
+    try { const Clipboard = await import('expo-clipboard'); await Clipboard.setStringAsync(message.contenido); setNotice(c.copied); setSelectedId(null); } catch { setNotice(c.failed); }
+  }, [c]);
+  const remove = useCallback(async (message: ChatMessage) => {
+    await deleteChatMessage(message.id);
+    setMessages((prev) => prev.filter((item) => item.id !== message.id).map((item) => item.reply?.id === message.id ? { ...item, reply: null, reply_to_id: null } : item));
+    setPins((prev) => prev.filter((item) => item.mensaje_id !== message.id));
+    setReplyTo((prev) => prev?.id === message.id ? null : prev); setSelectedId(null);
+    void refresh().catch(fail);
+  }, [refresh, fail]);
+  const jump = useCallback(async (messageId: string) => {
     try {
-      await sendChatMessage({
-        grupo_id: id,
-        remitente_id: profile.id,
-        tipo,
-        mediaUri: uri,
-      });
-    } catch (err: any) {
-      console.error('Error sending media:', err);
-      Alert.alert('Error', 'No se pudo enviar el archivo multimedia.');
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const handleToggleReaction = async (messageId: string, emoji: string) => {
-    if (!profile?.id) return;
-    setActiveReactionMsgId(null);
-    try {
-      await toggleChatReaction(messageId, profile.id, emoji);
-    } catch (err) {
-      console.error('Error toggling reaction:', err);
-    }
-  };
-
-  const renderMessageItem = useCallback(
-    ({ item }: { item: ChatMessage }) => {
-      const isMe = item.remitente_id === profile?.id;
-      const senderName = item.profiles?.nombre || 'Técnico';
-      const senderRole = item.profiles?.rol
-        ? item.profiles.rol.toUpperCase().replace(/_/g, ' ')
-        : 'TÉCNICO';
-
-      // Agrupar reacciones
-      const reactionCounts = (item.reacciones || []).reduce<Record<string, number>>(
-        (acc, curr) => {
-          acc[curr.emoji] = (acc[curr.emoji] || 0) + 1;
-          return acc;
-        },
-        {}
-      );
-
-      const hasReactions = Object.keys(reactionCounts).length > 0;
-      const timeStr = new Date(item.created_at).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-
-      // Render específico para stickers
-      if (item.tipo === 'sticker' && item.media_url) {
-        return (
-          <Pressable
-            onLongPress={() => setActiveReactionMsgId(item.id)}
-            style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}
-          >
-            <View style={styles.stickerContainer}>
-              {!isMe && <Text style={styles.senderLabel}>{senderName}</Text>}
-              <Image source={{ uri: item.media_url }} style={styles.stickerImage} contentFit="contain" />
-              <Text style={styles.stickerTime}>{timeStr}</Text>
-
-              {hasReactions && (
-                <View style={styles.reactionsPill}>
-                  {Object.entries(reactionCounts).map(([emoji, count]) => (
-                    <Pressable
-                      key={emoji}
-                      onPress={() => handleToggleReaction(item.id, emoji)}
-                      style={styles.reactionItem}
-                    >
-                      <Text style={styles.reactionEmoji}>{emoji}</Text>
-                      {count > 1 && <Text style={styles.reactionCount}>{count}</Text>}
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-            </View>
-          </Pressable>
-        );
+      let index = messages.findIndex((message) => message.id === messageId);
+      if (index < 0) {
+        const target = await getChatMessage(messageId);
+        if (!target || target.grupo_id !== id) { setNotice(c.missing); return; }
+        const merged = [...messages, target].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+        index = merged.findIndex((message) => message.id === messageId); setMessages(merged);
       }
+      setShowPins(false); setHighlighted(messageId);
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+      highlightTimer.current = setTimeout(() => setHighlighted(null), 1800);
+      requestAnimationFrame(() => { void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 }).catch(fail); });
+    } catch { setNotice(c.missing); }
+  }, [messages, id, c, fail]);
 
-      return (
-        <Pressable
-          onLongPress={() => setActiveReactionMsgId(item.id)}
-          style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}
-        >
-          <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
-            {!isMe && (
-              <View style={styles.senderHeader}>
-                <Text style={styles.senderName}>{senderName}</Text>
-                <Text style={styles.senderRoleTag}>{senderRole}</Text>
-              </View>
-            )}
+  const send = useCallback(async (tipo: ChatMessageType, mediaUri?: string) => {
+    if (!id || !userId || sendLock.current || (tipo === 'texto' && (!text.trim() || textBlocked))) return;
+    sendLock.current = true; setSending(true); setNotice('');
+    const operation = ++sendSequence.current;
+    const content = tipo === 'texto' ? text.trim() : undefined;
+    try {
+      const sent = await sendChatMessage({ grupo_id: id, remitente_id: userId, tipo, contenido: content, mediaUri, reply_to_id: replyTo?.id });
+      if (operation !== sendSequence.current || activeRoom.current !== id) return;
+      // Render the sent message even if the realtime event arrives late or the refresh fails.
+      const message = { ...sent, reply: replyTo, reacciones: [] };
+      setMessages((prev) => prev.some((item) => item.id === sent.id) ? prev : [...prev, message]);
+      if (tipo === 'texto') { setText(''); setSelection({ start: 0, end: 0 }); }
+      setReplyTo(null); setSelectedId(null);
+      requestAnimationFrame(() => { listRef.current?.scrollToEnd({ animated: true }); });
+      void refresh().catch(fail);
+    } catch { if (operation === sendSequence.current) setNotice(tipo === 'texto' ? c.sendFailed : c.failed); }
+    finally { if (operation === sendSequence.current) { sendLock.current = false; setSending(false); } }
+  }, [id, userId, text, textBlocked, replyTo, refresh, fail, c]);
+  const capture = async () => { if (sending) return; try { const uri = await captureImageSafe({ quality: 0.8 }); if (uri) await send('imagen', uri); } catch { fail(); } };
+  const gallery = async () => { if (sending) return; try { const uri = await pickImageSafe({ mediaTypes: 'all', quality: 0.85 }); if (uri) await send(/\.(mp4|mov)(?:\?|$)/i.test(uri) ? 'video' : 'imagen', uri); } catch { fail(); } };
+  const chooseEmoji = (emoji: string) => {
+    if (tools?.kind === 'actions') { void reaction(tools.message.id, emoji); return; }
+    const next = insertEmoji(text, emoji, selection); setText(next.text); setSelection({ start: next.cursor, end: next.cursor });
+  };
+  const renderMessage = useCallback(({ item }: { item: ChatMessage }) => <ChatMessageBubble message={item} userId={userId} pinned={pinnedIds.has(item.id)} highlighted={highlighted === item.id} selected={selectedId === item.id}
+    onActions={selectMessage} onReply={reply} onReaction={reaction} onImage={setFullImage} onJump={jump} onError={fail} />, [userId, pinnedIds, highlighted, selectedId, selectMessage, reply, reaction, jump, fail]);
+  const selectedPin = pins.find((item) => item.mensaje_id === selected?.id);
+  const canUnpinSelected = !selectedPin || selectedPin.pinned_by === userId || admin;
+  const toolMessage = tools?.kind === 'actions' ? tools.message : null;
+  const toolPin = pins.find((item) => item.mensaje_id === toolMessage?.id);
 
-            {/* Imagen */}
-            {item.tipo === 'imagen' && item.media_url && (
-              <Pressable
-                onPress={() => setFullScreenImageUri(item.media_url)}
-                style={styles.mediaPressable}
-              >
-                <Image
-                  source={{ uri: item.media_url }}
-                  style={styles.mediaImage}
-                  contentFit="cover"
-                  transition={200}
-                />
-              </Pressable>
-            )}
-
-            {/* Video */}
-            {item.tipo === 'video' && item.media_url && (
-              <View style={styles.videoBox}>
-                <View style={styles.videoPlaceholder}>
-                  <View style={styles.videoPlayBtn}>
-                    <Play size={24} color="#ffffff" fill="#ffffff" />
-                  </View>
-                  <View style={styles.videoBadge}>
-                    <Video size={12} color="#ffffff" />
-                    <Text style={styles.videoBadgeText}>VIDEO TÉCNICO</Text>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {/* Texto */}
-            {!!item.contenido && (
-              <Text style={[styles.msgText, isMe ? styles.msgTextMe : styles.msgTextOther]}>
-                {item.contenido}
-              </Text>
-            )}
-
-            <Text style={[styles.msgTime, isMe ? styles.msgTimeMe : styles.msgTimeOther]}>
-              {timeStr}
-            </Text>
-
-            {/* Reacciones */}
-            {hasReactions && (
-              <View style={styles.reactionsPill}>
-                {Object.entries(reactionCounts).map(([emoji, count]) => (
-                  <Pressable
-                    key={emoji}
-                    onPress={() => handleToggleReaction(item.id, emoji)}
-                    style={[styles.reactionItem, isMe && styles.reactionItemMe]}
-                  >
-                    <Text style={styles.reactionEmoji}>{emoji}</Text>
-                    {count > 1 && (
-                      <Text style={[styles.reactionCount, isMe && styles.reactionCountMe]}>
-                        {count}
-                      </Text>
-                    )}
-                  </Pressable>
-                ))}
-              </View>
-            )}
-          </View>
+  return <View ref={rootRef} collapsable={false} onLayout={measureBounds} style={styles.container}>
+    <View style={[styles.header, { paddingTop: insets.top }]}>
+      <BlurView tint="dark" intensity={70} style={StyleSheet.absoluteFill} /><View style={[StyleSheet.absoluteFill, styles.headerOverlay]} />
+      {selected ? <View style={styles.headerRow}>
+        <Pressable accessibilityRole="button" accessibilityLabel={c.cancel} onPress={() => setSelectedId(null)} style={styles.headerButton}><ArrowLeft size={22} color={P.white} /></Pressable>
+        <Text style={styles.selectionCount}>1</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={c.reply} onPress={() => reply(selected)} style={styles.headerButton}><Reply size={23} color={P.white} /></Pressable>
+        {canUnpinSelected ? <Pressable accessibilityRole="button" accessibilityLabel={selectedPin ? c.unpin : c.pin} onPress={() => void pin(selected)} style={styles.headerButton}>{selectedPin ? <PinOff size={21} color={P.white} /> : <Pin size={21} color={P.white} />}</Pressable> : null}
+        {selected.contenido ? <Pressable accessibilityRole="button" accessibilityLabel={c.copy} onPress={() => void copy(selected)} style={styles.headerButton}><Copy size={20} color={P.white} /></Pressable> : null}
+        {(selected.remitente_id === userId || admin) ? <Pressable accessibilityRole="button" accessibilityLabel={c.remove} onPress={() => setTools({ kind: 'actions', message: selected, initialPanel: 'delete' })} style={styles.headerButton}><Trash2 size={21} color={P.white} /></Pressable> : null}
+        <Pressable accessibilityRole="button" accessibilityLabel={c.actions} onPress={() => setTools({ kind: 'actions', message: selected })} style={styles.headerButton}><MoreVertical size={22} color={P.white} /></Pressable>
+      </View> : <View style={styles.headerRow}>
+        <Pressable accessibilityRole="button" accessibilityLabel={c.back} onPress={() => router.back()} style={styles.headerButton}><ArrowLeft size={22} color={P.white} /></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={c.info} style={styles.groupInfo} onPress={() => router.push(`/chat/group-info/${id}` as any)}>
+          {group?.foto_url ? <Image source={{ uri: group.foto_url }} style={styles.avatar} contentFit="cover" /> : <View style={styles.avatarPlaceholder}><Text style={styles.avatarLetter}>{group?.nombre?.charAt(0).toUpperCase() || 'G'}</Text></View>}
+          <View style={styles.groupTexts}><Text numberOfLines={1} style={styles.title}>{group?.nombre || c.loading}</Text><Text numberOfLines={1} style={styles.subtitle}>{group?.solo_multimedia ? c.restricted : `${group?.miembros_count || 1} ${c.members}`}</Text></View>
         </Pressable>
-      );
-    },
-    [profile?.id]
-  );
-
-  return (
-    <View style={styles.container}>
-      {/* Header Minimalista en Modo Claro */}
-      <View style={[styles.headerWrapper, { paddingTop: insets.top }]}>
-        <View style={styles.headerContent}>
-          <Pressable
-            onPress={() => router.back()}
-            style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.7 }]}
-            hitSlop={10}
-          >
-            <ArrowLeft size={20} color={Colors.text} />
-          </Pressable>
-
-          <Pressable
-            style={styles.headerInfo}
-            onPress={() => router.push(`/chat/group-info/${id}` as any)}
-          >
-            {group?.foto_url ? (
-              <Image source={{ uri: group.foto_url }} style={styles.headerAvatar} contentFit="cover" />
-            ) : (
-              <View style={styles.headerAvatarPlaceholder}>
-                <Text style={styles.headerAvatarLetter}>
-                  {group?.nombre ? group.nombre.charAt(0).toUpperCase() : 'G'}
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.headerTexts}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
-                {group?.nombre || 'Cargando...'}
-              </Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
-                {group?.solo_multimedia
-                  ? '🔒 Solo fotos y videos'
-                  : `${group?.miembros_count || 1} integrantes`}
-              </Text>
-            </View>
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.push(`/chat/group-info/${id}` as any)}
-            style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.7 }]}
-            hitSlop={10}
-          >
-            <Info size={22} color={Colors.primary} />
-          </Pressable>
-        </View>
-      </View>
-
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        {/* Lista de Mensajes */}
-        {loading ? (
-          <View style={styles.centerLoading}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.loadingText}>Cargando mensajes del equipo...</Text>
-          </View>
-        ) : (
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            keyExtractor={(item) => item.id}
-            renderItem={renderMessageItem}
-            inverted
-            contentContainerStyle={styles.messagesList}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
-
-        {/* Banner de Modo Solo Imágenes */}
-        {isTextBlocked && (
-          <View style={styles.restrictedBanner}>
-            <Video size={14} color={Colors.primary} />
-            <Text style={styles.restrictedText}>
-              Modo Solo Imágenes activo: Solo fotos y videos permitidos.
-            </Text>
-          </View>
-        )}
-
-        {/* Barra de Entrada / Adjuntos */}
-        <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-          <Pressable style={styles.iconBtn} onPress={handleCaptureCamera} disabled={sending}>
-            <Camera size={20} color={Colors.primary} />
-          </Pressable>
-
-          <Pressable style={styles.iconBtn} onPress={handlePickGallery} disabled={sending}>
-            <ImageIcon size={20} color={Colors.textSecondary} />
-          </Pressable>
-
-          <Pressable
-            style={styles.iconBtn}
-            onPress={() => setShowStickers(true)}
-            disabled={sending}
-          >
-            <Sparkles size={20} color={Colors.primary} />
-          </Pressable>
-
-          {!isTextBlocked ? (
-            <TextInput
-              style={styles.textInput}
-              placeholder="Escribe un mensaje..."
-              placeholderTextColor={Colors.textMuted}
-              value={text}
-              onChangeText={setText}
-              multiline
-              maxLength={1000}
-            />
-          ) : (
-            <View style={styles.textInputDisabled}>
-              <Text style={styles.textInputDisabledLabel}>
-                📷 Solo fotos y videos permitidos
-              </Text>
-            </View>
-          )}
-
-          {!isTextBlocked && (
-            <Pressable
-              style={({ pressed }) => [
-                styles.sendBtn,
-                (!text.trim() || sending) && { opacity: 0.4 },
-                pressed && { opacity: 0.8 },
-              ]}
-              onPress={handleSendText}
-              disabled={!text.trim() || sending}
-            >
-              {sending ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <Send size={18} color="#ffffff" />
-              )}
-            </Pressable>
-          )}
-        </View>
-      </KeyboardAvoidingView>
-
-      {/* Popover de Reacciones Rápidas */}
-      <Modal
-        visible={!!activeReactionMsgId}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setActiveReactionMsgId(null)}
-      >
-        <Pressable style={styles.reactionBackdrop} onPress={() => setActiveReactionMsgId(null)}>
-          <View style={styles.reactionBar}>
-            {QUICK_EMOJIS.map((emoji) => (
-              <Pressable
-                key={emoji}
-                style={({ pressed }) => [
-                  styles.reactionChoice,
-                  pressed && { transform: [{ scale: 1.25 }] },
-                ]}
-                onPress={() => activeReactionMsgId && handleToggleReaction(activeReactionMsgId, emoji)}
-              >
-                <Text style={styles.reactionChoiceEmoji}>{emoji}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </Pressable>
-      </Modal>
-
-      {/* Modal de Imagen a Pantalla Completa */}
-      <Modal
-        visible={!!fullScreenImageUri}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setFullScreenImageUri(null)}
-      >
-        <View style={styles.fullScreenBackdrop}>
-          <Pressable
-            style={[styles.fullScreenClose, { top: insets.top + 10 }]}
-            onPress={() => setFullScreenImageUri(null)}
-            hitSlop={12}
-          >
-            <X size={24} color="#ffffff" />
-          </Pressable>
-          {fullScreenImageUri && (
-            <Image
-              source={{ uri: fullScreenImageUri }}
-              style={styles.fullScreenImage}
-              contentFit="contain"
-            />
-          )}
-        </View>
-      </Modal>
-
-      {/* Selector de Stickers de WhatsApp */}
-      {profile?.id && (
-        <StickerPickerModal
-          visible={showStickers}
-          onClose={() => setShowStickers(false)}
-          onSelectSticker={handleSelectSticker}
-          userId={profile.id}
-        />
-      )}
+        <Pressable accessibilityRole="button" accessibilityLabel={c.info} onPress={() => router.push(`/chat/group-info/${id}` as any)} style={styles.headerButton}><Info size={22} color={P.white} /></Pressable>
+      </View>}
     </View>
-  );
+    {pins.length ? <View style={styles.pinArea}><Pressable accessibilityRole="button" accessibilityLabel={c.pinned} accessibilityState={{ expanded: showPins }} onPress={() => setShowPins(!showPins)} style={styles.pinHeading}><Pin size={16} color={P.accent} /><Text style={styles.pinTitle}>{c.pinned} · {pins.length}</Text><Text numberOfLines={1} style={styles.pinSnippet}>{pins[0].message.contenido || c.photo}</Text><ChevronDown size={16} color={P.slate} /></Pressable>
+      {showPins ? <View style={styles.pinList}><FlashList data={pins} keyExtractor={(item) => item.mensaje_id} renderItem={({ item }) => <View style={styles.pinRow}><Pressable accessibilityRole="button" accessibilityLabel={c.original} style={styles.pinMessage} onPress={() => void jump(item.mensaje_id)}><ReplyPreview message={item.message} userId={userId} /></Pressable>{(admin || item.pinned_by === userId) ? <Pressable accessibilityRole="button" accessibilityLabel={c.unpin} style={styles.iconButton} onPress={() => void pin(item.message)}><PinOff size={18} color={P.slate} /></Pressable> : null}</View>} /></View> : null}
+    </View> : null}
+    {notice ? <View accessibilityRole="alert" style={styles.notice}><Text style={styles.noticeText}>{notice}</Text><Pressable accessibilityLabel={c.close} onPress={() => setNotice('')} style={styles.iconButton}><X size={16} color={P.slate} /></Pressable></View> : null}
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <View ref={feedRef} collapsable={false} style={styles.flex} onLayout={measureBounds}>
+      {loading ? <View style={styles.center}><ActivityIndicator color={P.accent} /><Text style={styles.empty}>{c.loading}</Text></View> : !group ? <View style={styles.center}><Text style={styles.empty}>{c.unavailable}</Text><Pressable onPress={() => { setLoading(true); Promise.all([getChatGroupDetails(id, userId), refresh()]).then(([details]) => setGroup(details)).catch(fail).finally(() => setLoading(false)); }} style={styles.retry}><Text style={styles.pinTitle}>{c.retry}</Text></Pressable></View> : <FlashList ref={listRef} data={messages} renderItem={renderMessage} keyExtractor={messageKey} getItemType={messageType} extraData={feedExtra} onScroll={measureSelection} scrollEventThrottle={16}
+        maintainVisibleContentPosition={{ startRenderingFromBottom: true, autoscrollToBottomThreshold: 0.2 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.feed} ListEmptyComponent={<Text style={styles.empty}>{c.emptyChat}</Text>} />}
+      </View>
+      {replyTo ? <View style={styles.replyComposer}><View style={styles.flex}><ReplyPreview message={replyTo} userId={userId} /></View><Pressable accessibilityRole="button" accessibilityLabel={c.cancelReply} style={styles.iconButton} onPress={() => setReplyTo(null)}><X size={20} color={P.slate} /></Pressable></View> : null}
+      {textBlocked ? <Text style={styles.restricted}>{c.restricted}</Text> : null}
+      {group ? <View style={[styles.inputArea, { paddingBottom: mediaPanelOpen ? 8 : Math.max(insets.bottom, 12) }]}>
+        <View style={styles.inputRow}>
+          <Pressable accessibilityRole="button" accessibilityLabel={mediaPanelOpen ? c.keyboard : c.mediaPicker} disabled={sending} style={styles.iconButton} onPress={() => { if (mediaPanelOpen) { setMediaPanelOpen(false); focusComposer(); } else { Keyboard.dismiss(); setSelectedId(null); setMediaPanelOpen(true); } }}>{mediaPanelOpen ? <KeyboardIcon size={23} color={P.slate} /> : <Smile size={23} color={P.slate} />}</Pressable>
+          <TextInput ref={inputRef} accessibilityLabel={c.message} style={styles.input} placeholder={textBlocked ? c.restricted : c.placeholder} placeholderTextColor={P.muted} multiline editable={!textBlocked && !sending} value={text} onChangeText={setText} onFocus={() => setMediaPanelOpen(false)} selection={selection} onSelectionChange={(event) => setSelection(event.nativeEvent.selection)} />
+          <Pressable accessibilityRole="button" accessibilityLabel={c.gallery} disabled={sending} style={styles.attachmentIcon} onPress={() => void gallery()}><Paperclip size={20} color={P.slate} /></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={c.camera} disabled={sending} style={styles.iconButton} onPress={() => void capture()}><Camera size={22} color={P.slate} /></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={c.send} disabled={textBlocked || sending || !text.trim()} onPress={() => void send('texto')} style={[styles.send, (textBlocked || sending || !text.trim()) && styles.disabled]}>{sending ? <ActivityIndicator size="small" color={P.ink} /> : <Send size={19} color={P.ink} />}</Pressable>
+        </View>
+      </View> : null}
+      {(mediaPanelReady || mediaPanelOpen) && group ? <View style={!mediaPanelOpen ? styles.closedMediaPanel : undefined} pointerEvents={mediaPanelOpen ? 'auto' : 'none'} accessibilityElementsHidden={!mediaPanelOpen} importantForAccessibility={mediaPanelOpen ? 'auto' : 'no-hide-descendants'}>
+        <ComposerMediaPanel key={`${id}:${userId}`} userId={userId} textBlocked={textBlocked} sending={sending} onEmoji={chooseEmoji} onSticker={(url) => { void send('sticker', url); }} onClose={() => { Keyboard.dismiss(); setMediaPanelOpen(false); }} />
+      </View> : null}
+    </KeyboardAvoidingView>
+    {selected && reactionAnchor?.id === selected.id && rootBounds && feedBounds && !tools ? <MessageReactions anchor={reactionAnchor} viewport={feedBounds} root={rootBounds} outgoing={selected.remitente_id === userId} onReact={(emoji) => { void reaction(selected.id, emoji); }} onMore={() => setTools({ kind: 'actions', message: selected, initialPanel: 'emoji' })} /> : null}
+    {tools ? <ChatToolsModal key={tools.kind === 'actions' ? tools.message.id : 'composer'} target={tools} userId={userId} canDelete={Boolean(toolMessage && (toolMessage.remitente_id === userId || admin))} pinned={Boolean(toolPin)} canUnpin={!toolPin || toolPin.pinned_by === userId || admin}
+      onClose={() => setTools(null)} onReply={() => { if (toolMessage) reply(toolMessage); }} onCopy={() => { if (toolMessage) void copy(toolMessage); }} onPin={() => { if (toolMessage) void pin(toolMessage); }} onDelete={() => toolMessage ? remove(toolMessage) : Promise.resolve()} onEmoji={chooseEmoji} /> : null}
+    <Modal visible={Boolean(fullImage)} transparent animationType="fade" onRequestClose={() => setFullImage(null)}><View style={[styles.lightbox, { paddingTop: insets.top }]}><Pressable accessibilityRole="button" accessibilityLabel={c.closeImage} onPress={() => setFullImage(null)} style={styles.lightboxClose}><X size={24} color={P.white} /></Pressable>{fullImage ? <Image source={{ uri: fullImage }} style={styles.lightboxImage} contentFit="contain" /> : null}</View></Modal>
+  </View>;
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.backgroundAlt,
-  },
-  headerWrapper: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    zIndex: 10,
-    ...Shadow.xs,
-  },
-  headerContent: {
-    height: 60,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-    gap: 8,
-  },
-  headerBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  headerAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-  },
-  headerAvatarPlaceholder: {
-    width: 38,
-    height: 38,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.primaryLight,
-    borderWidth: 1,
-    borderColor: Colors.borderBrand,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerAvatarLetter: {
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 16,
-    color: Colors.primary,
-  },
-  headerTexts: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 15,
-    color: Colors.text,
-  },
-  headerSubtitle: {
-    fontFamily: 'Outfit_400Regular',
-    fontSize: 11.5,
-    color: Colors.textSecondary,
-    marginTop: 1,
-  },
-  messagesList: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-  },
-  msgRow: {
-    marginVertical: 4,
-    flexDirection: 'row',
-  },
-  msgRowMe: {
-    justifyContent: 'flex-end',
-  },
-  msgRowOther: {
-    justifyContent: 'flex-start',
-  },
-  bubble: {
-    maxWidth: '80%',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-    position: 'relative',
-  },
-  bubbleMe: {
-    backgroundColor: Colors.primary,
-    borderTopRightRadius: 4,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  bubbleOther: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: '#E4E7EC',
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  senderHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  senderName: {
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 12,
-    color: Colors.primary,
-  },
-  senderRoleTag: {
-    fontFamily: 'Outfit_400Regular',
-    fontSize: 9,
-    color: Colors.textMuted,
-  },
-  msgText: {
-    fontFamily: 'Outfit_400Regular',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  msgTextMe: {
-    color: '#ffffff',
-  },
-  msgTextOther: {
-    color: Colors.text,
-  },
-  msgTime: {
-    fontFamily: 'Outfit_400Regular',
-    fontSize: 9.5,
-    alignSelf: 'flex-end',
-    marginTop: 4,
-  },
-  msgTimeMe: {
-    color: 'rgba(255, 255, 255, 0.75)',
-  },
-  msgTimeOther: {
-    color: Colors.textMuted,
-  },
-  mediaPressable: {
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginBottom: 4,
-  },
-  mediaImage: {
-    width: 220,
-    height: 180,
-    borderRadius: 10,
-  },
-  videoBox: {
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginBottom: 4,
-  },
-  videoPlaceholder: {
-    width: 220,
-    height: 140,
-    backgroundColor: '#F2F4F7',
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E4E7EC',
-  },
-  videoPlayBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  videoBadge: {
-    position: 'absolute',
-    bottom: 8,
-    left: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  videoBadgeText: {
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 9,
-    color: '#ffffff',
-  },
-  stickerContainer: {
-    position: 'relative',
-    padding: 4,
-  },
-  senderLabel: {
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 11,
-    color: Colors.primary,
-    marginBottom: 2,
-  },
-  stickerImage: {
-    width: 120,
-    height: 120,
-  },
-  stickerTime: {
-    fontFamily: 'Outfit_400Regular',
-    fontSize: 9,
-    color: Colors.textMuted,
-    textAlign: 'right',
-    marginTop: 2,
-  },
-  reactionsPill: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-    marginTop: 6,
-  },
-  reactionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F2F4F7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E4E7EC',
-  },
-  reactionItemMe: {
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-  },
-  reactionEmoji: {
-    fontSize: 12,
-  },
-  reactionCount: {
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 10,
-    color: Colors.text,
-    marginLeft: 3,
-  },
-  reactionCountMe: {
-    color: '#ffffff',
-  },
-  restrictedBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#FFF7ED',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderTopWidth: 1,
-    borderColor: '#FED7AA',
-  },
-  restrictedText: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 11,
-    color: Colors.primary,
-  },
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderColor: '#E4E7EC',
-    paddingHorizontal: 8,
-    paddingTop: 8,
-    gap: 6,
-  },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  textInput: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    maxHeight: 90,
-    color: Colors.text,
-    fontFamily: 'Outfit_400Regular',
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: '#E4E7EC',
-  },
-  textInputDisabled: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#E4E7EC',
-    justifyContent: 'center',
-  },
-  textInputDisabledLabel: {
-    fontFamily: 'Outfit_400Regular',
-    fontSize: 12,
-    color: Colors.textMuted,
-    fontStyle: 'italic',
-  },
-  sendBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  centerLoading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 10,
-  },
-  loadingText: {
-    fontFamily: 'Outfit_400Regular',
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  reactionBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(16, 24, 40, 0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  reactionBar: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 30,
-    gap: 14,
-    borderWidth: 1,
-    borderColor: '#E4E7EC',
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  reactionChoice: {
-    padding: 2,
-  },
-  reactionChoiceEmoji: {
-    fontSize: 26,
-  },
-  fullScreenBackdrop: {
-    flex: 1,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fullScreenClose: {
-    position: 'absolute',
-    right: 20,
-    zIndex: 20,
-    padding: 8,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: BorderRadius.full,
-  },
-  fullScreenImage: {
-    width: '100%',
-    height: '100%',
-  },
+  closedMediaPanel: { height: 0, opacity: 0, overflow: 'hidden' },
+  attachmentIcon: { width: 36, height: 44, alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: P.white }, flex: { flex: 1 }, header: { overflow: 'hidden' }, headerOverlay: { backgroundColor: P.header }, headerRow: { height: 60, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, gap: 2 }, headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }, groupInfo: { flex: 1, minWidth: 0, flexDirection: 'row', gap: 10, alignItems: 'center' }, groupTexts: { flex: 1 }, avatar: { width: 38, height: 38, borderRadius: 19 }, avatarPlaceholder: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, borderColor: P.accent, alignItems: 'center', justifyContent: 'center' }, avatarLetter: { fontFamily: 'Outfit_600SemiBold', color: P.white, fontSize: 16 }, title: { fontFamily: 'Outfit_600SemiBold', color: P.white, fontSize: 15 }, subtitle: { fontFamily: 'Outfit_400Regular', color: P.white, opacity: 0.75, fontSize: 11, marginTop: 3 }, selectionCount: { flex: 1, fontFamily: 'Outfit_600SemiBold', color: P.white, fontSize: 20 },
+  quickBar: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 12, paddingVertical: 4, borderBottomWidth: 1, borderColor: P.line }, quickButton: { minWidth: 40, height: 44, alignItems: 'center', justifyContent: 'center' }, feed: { paddingHorizontal: 12, paddingVertical: 16 }, center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }, empty: { textAlign: 'center', color: P.muted, fontFamily: 'Outfit_400Regular', padding: 24, lineHeight: 22 }, retry: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 20, borderWidth: 1, borderColor: P.line, borderRadius: 8 },
+  pinArea: { borderBottomWidth: 1, borderColor: P.line, paddingHorizontal: 12 }, pinHeading: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8 }, pinTitle: { fontFamily: 'Outfit_600SemiBold', color: P.slate, fontSize: 12 }, pinSnippet: { flex: 1, fontFamily: 'Outfit_400Regular', fontSize: 12, color: P.muted }, pinList: { height: 160, marginBottom: 8 }, pinRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }, pinMessage: { flex: 1, minWidth: 0 },
+  notice: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: P.line, paddingLeft: 16 }, noticeText: { flex: 1, fontFamily: 'Outfit_400Regular', fontSize: 12, color: P.slate, lineHeight: 18 }, replyComposer: { borderTopWidth: 1, borderColor: P.line, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }, restricted: { fontFamily: 'Outfit_400Regular', color: P.slate, fontSize: 12, paddingHorizontal: 16, paddingVertical: 8 },
+  inputArea: { paddingHorizontal: 8, paddingTop: 8, borderTopWidth: 1, borderColor: P.line }, inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 }, iconButton: { width: 42, height: 44, justifyContent: 'center', alignItems: 'center' }, input: { flex: 1, minWidth: 0, minHeight: 44, maxHeight: 120, fontFamily: 'Outfit_400Regular', fontSize: 15, lineHeight: 21, color: P.ink, paddingHorizontal: 10, paddingTop: 10, paddingBottom: 10, borderRadius: 8, backgroundColor: P.wash }, send: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: P.accent, marginLeft: 4 }, disabled: { opacity: 0.4 }, attachments: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingLeft: 12, paddingTop: 2 }, attachment: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 6 }, attachmentLabel: { fontFamily: 'Outfit_400Regular', color: P.muted, fontSize: 11 },
+  lightbox: { flex: 1, backgroundColor: P.ink }, lightboxClose: { alignSelf: 'flex-end', padding: 16 }, lightboxImage: { flex: 1, width: '100%' },
 });

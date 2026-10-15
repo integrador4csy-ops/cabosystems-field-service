@@ -22,7 +22,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.cabosystems.fieldservice",
-      "versionCode": 8,
+      "versionCode": 9,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -46,6 +46,7 @@
       }
     },
     "plugins": [
+      "./plugins/withChatNotifications",
       "expo-router",
       "expo-font",
       "expo-splash-screen",

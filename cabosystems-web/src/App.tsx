@@ -1,21 +1,14 @@
-import { useEffect, useState, useMemo } from 'react';
-import './App.css';
+import { useEffect, useState, useMemo, lazy, Suspense } from 'react';
 import { supabase } from './lib/supabase';
 import type { LiveWorker, Profile, UserLocation } from './types/fleet';
 import { formatRelativeTime, isWorkerOffline } from './lib/timeAgo';
-import { LiveMap } from './components/LiveMap';
-import { CollaboratorsModal } from './components/modals/CollaboratorsModal';
-import { InvitationsModal } from './components/modals/InvitationsModal';
-import { InviteUserModal } from './components/modals/InviteUserModal';
 import { AdminLoginModal } from './components/modals/AdminLoginModal';
 import { AdminEditProfileModal } from './components/modals/AdminEditProfileModal';
 import { SidebarProvider, useSidebar } from './context/SidebarContext';
 import { AdminAuthProvider, useAdminAuth } from './context/AdminAuthContext';
-import { LanguageProvider } from './context/LanguageContext';
+import { useTranslation, LanguageProvider } from './context/LanguageContext';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { AppHeader } from './components/layout/AppHeader';
-import { ChatView } from './components/chat/ChatView';
-import { ProjectsManagementView } from './components/projects/ProjectsManagementView';
 import { AuthSplitScreen } from './components/auth/AuthSplitScreen';
 import {
   playNotificationSound,
@@ -29,9 +22,19 @@ import {
   type ChatToastItem,
 } from './components/chat/ChatNotificationToast';
 
+const LiveMap = lazy(() => import('./components/LiveMap').then((module) => ({ default: module.LiveMap })));
+
+const ChatView = lazy(() => import('./components/chat/ChatView').then((module) => ({ default: module.ChatView })));
+
+const ProjectsManagementView = lazy(() => import('./components/projects/ProjectsManagementView').then((module) => ({ default: module.ProjectsManagementView })));
+
+const TeamManagementView = lazy(() => import('./components/team/TeamManagementView').then((module) => ({ default: module.TeamManagementView })));
+
 function DashboardContent() {
+  const { t } = useTranslation();
   const {
     activeItem,
+    isExpanded,
     setActiveItem,
     setUnreadChatCount,
     setTargetGroupId,
@@ -42,9 +45,6 @@ function DashboardContent() {
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isCollaboratorsModalOpen, setIsCollaboratorsModalOpen] = useState(false);
-  const [isInvitationsModalOpen, setIsInvitationsModalOpen] = useState(false);
-  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [focusTrigger, setFocusTrigger] = useState(0);
 
   // Solicitar permisos de notificación de escritorio en el navegador
@@ -126,11 +126,11 @@ function DashboardContent() {
             ]);
 
             const groupName = grpRes.data?.nombre || 'Chat';
-            const senderName = senderRes.data?.nombre || 'Colaborador';
+            const senderName = senderRes.data?.nombre || t("Colaborador");
 
-            let preview = newMsg.contenido || 'Nuevo mensaje';
-            if (newMsg.tipo === 'imagen') preview = '📷 Foto';
-            if (newMsg.tipo === 'video') preview = '🎥 Video';
+            let preview = newMsg.contenido || t("Nuevo mensaje");
+            if (newMsg.tipo === 'imagen') preview = t("📷 Foto");
+            if (newMsg.tipo === 'video') preview = t("🎥 Video");
             if (newMsg.tipo === 'sticker') preview = '🎨 Sticker';
 
             const isUserActivelyInChat = activeItem === 'chat' && !document.hidden;
@@ -186,7 +186,7 @@ function DashboardContent() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, activeItem, setActiveItem, setTargetGroupId, setUnreadChatCount]);
+  }, [user?.id, activeItem, setActiveItem, setTargetGroupId, setUnreadChatCount, t]);
 
   // 1. Fetch fleet data
   const fetchFleet = async (showRefreshIndicator = false) => {
@@ -219,8 +219,8 @@ function DashboardContent() {
           const prof = profileMap.get(loc.usuario_id);
           const profile: Profile = prof || {
             id: loc.usuario_id,
-            nombre: 'Técnico CaboSystems',
-            rol: 'Técnico de Campo',
+            nombre: t("Técnico CaboSystems"),
+            rol: t("Técnico de Campo"),
             avatar_url: null,
             activo: true,
           };
@@ -346,17 +346,13 @@ function DashboardContent() {
   }, [searchQuery, filteredWorkers]);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-sans text-slate-800 antialiased">
+    <div className="flex h-dvh w-full overflow-hidden bg-slate-50 font-sans text-slate-800 antialiased">
+      <a href="#main-content" className="skip-link">{t("Saltar al contenido")}</a>
       {/* 1. Permanent Fixed Sidebar with Hover Expansion & Admin Profile Card */}
-      <AppSidebar
-        onOpenCollaboratorsModal={() => setIsCollaboratorsModalOpen(true)}
-        onOpenInvitationsModal={() => setIsInvitationsModalOpen(true)}
-        onOpenInviteModal={() => setIsInviteModalOpen(true)}
-        workersCount={workers.length}
-      />
+      <AppSidebar />
 
       {/* 2. Main Content Wrapper (Offset for collapsed icon sidebar) */}
-      <div className="flex flex-1 flex-col h-screen min-w-0 overflow-hidden pl-[72px]">
+      <div className={`flex flex-1 flex-col h-dvh min-w-0 overflow-hidden transition-[padding] duration-200 ${isExpanded ? 'md:pl-64' : 'md:pl-[72px]'}`}>
         {/* Top Minimalist Header */}
         <AppHeader
           searchQuery={searchQuery}
@@ -367,15 +363,16 @@ function DashboardContent() {
         />
 
         {/* 3. Main View: GPS Radar Map, Team Group Chat or Projects Management */}
-        <main className="flex-1 min-h-0 p-3 lg:p-3.5 overflow-hidden relative flex flex-col">
+        <main id="main-content" tabIndex={-1} className="flex-1 min-h-0 p-3 lg:p-3.5 overflow-hidden relative flex flex-col">
+          <Suspense fallback={<div role="status" className="operational-panel flex flex-1 items-center justify-center text-sm text-slate-500">{t('Cargando vista...')}</div>}>
           {activeItem === 'chat' ? (
             <ChatView />
-          ) : activeItem === 'proyectos' ? (
-            <div className="flex-1 h-full w-full rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden relative">
-              <ProjectsManagementView />
-            </div>
+          ) : ['colaboradores', 'invitaciones'].includes(activeItem) ? (
+            <TeamManagementView onTeamChanged={fetchFleet} />
+          ) : activeItem === 'proyectos' || activeItem === 'agenda' ? (
+            <ProjectsManagementView mode={activeItem === 'agenda' ? 'agenda' : 'tasks'} />
           ) : (
-            <div className="flex-1 h-full w-full rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden relative">
+            <div className="flex-1 h-full w-full rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden relative isolate">
               <LiveMap
                 workers={filteredWorkers}
                 selectedWorkerId={selectedWorkerId}
@@ -386,28 +383,9 @@ function DashboardContent() {
               />
             </div>
           )}
+          </Suspense>
         </main>
       </div>
-
-      {/* 4. Dedicated Modals */}
-      <CollaboratorsModal
-        isOpen={isCollaboratorsModalOpen}
-        onClose={() => setIsCollaboratorsModalOpen(false)}
-        onOpenInviteModal={() => setIsInviteModalOpen(true)}
-        onUserListChanged={fetchFleet}
-      />
-
-      <InvitationsModal
-        isOpen={isInvitationsModalOpen}
-        onClose={() => setIsInvitationsModalOpen(false)}
-        onOpenInviteModal={() => setIsInviteModalOpen(true)}
-      />
-
-      <InviteUserModal
-        isOpen={isInviteModalOpen}
-        onClose={() => setIsInviteModalOpen(false)}
-        onInviteCreated={fetchFleet}
-      />
 
       {/* 5. Admin Authentication & Profile Modals */}
       <AdminLoginModal />
@@ -430,18 +408,19 @@ function DashboardContent() {
 }
 
 function AppContent() {
+  const { t } = useTranslation();
   const { user, loading } = useAdminAuth();
 
   if (loading) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-slate-50">
+      <div className="flex h-dvh w-full items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-3">
           <img
             src="/logo-cabosystems-icon.svg"
             alt="CaboSystems"
             className="h-12 w-12 animate-pulse object-contain"
           />
-          <span className="text-xs font-bold text-slate-400">Cargando CaboSystems...</span>
+          <span className="text-xs font-bold text-slate-400">{t("Cargando CaboSystems...")}</span>
         </div>
       </div>
     );

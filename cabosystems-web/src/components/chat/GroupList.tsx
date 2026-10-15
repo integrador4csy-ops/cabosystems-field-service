@@ -1,3 +1,4 @@
+import { useTranslation } from '../../context/LanguageContext';
 import React from 'react';
 import {
   Search,
@@ -32,6 +33,7 @@ export const GroupList: React.FC<GroupListProps> = ({
   isGlobalAdmin,
   loading,
 }) => {
+  const { t, locale } = useTranslation();
   const filteredGroups = groups.filter((g) => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
@@ -46,36 +48,35 @@ export const GroupList: React.FC<GroupListProps> = ({
     if (!lastMsg) {
       return (
         <span className="text-slate-400 italic">
-          Sin mensajes aún · ¡Inicia el chat!
-        </span>
+          {t("Sin mensajes aún · ¡Inicia el chat!")}</span>
       );
     }
 
-    const sender = lastMsg.profiles?.nombre?.split(' ')[0] || 'Técnico';
+    const sender = lastMsg.profiles?.nombre?.split(' ')[0] || t("Técnico");
 
     if (lastMsg.tipo === 'imagen') {
       return (
-        <span className="flex items-center gap-1 text-[#f78c26] font-semibold">
+        <span className="flex items-center gap-1 text-brand-500 font-semibold">
           <Camera size={11} />
-          <span>{sender}: Foto de evidencia</span>
+          <span>{sender}{t(": Foto de evidencia")}</span>
         </span>
       );
     }
 
     if (lastMsg.tipo === 'video') {
       return (
-        <span className="flex items-center gap-1 text-[#f78c26] font-semibold">
+        <span className="flex items-center gap-1 text-brand-500 font-semibold">
           <Video size={11} />
-          <span>{sender}: Video técnico</span>
+          <span>{sender}{t(": Video técnico")}</span>
         </span>
       );
     }
 
     if (lastMsg.tipo === 'sticker') {
       return (
-        <span className="flex items-center gap-1 text-[#f78c26] font-semibold">
+        <span className="flex items-center gap-1 text-brand-500 font-semibold">
           <Sparkles size={11} />
-          <span>{sender}: Sticker</span>
+          <span>{sender}{t(": Sticker")}</span>
         </span>
       );
     }
@@ -94,10 +95,9 @@ export const GroupList: React.FC<GroupListProps> = ({
       <div className="p-4 border-b border-slate-100 flex items-center justify-between">
         <div>
           <h2 className="text-sm font-bold text-[#343e48]">
-            Grupos de Trabajo
-          </h2>
+            {t("Grupos de Trabajo")}</h2>
           <p className="text-[11px] text-slate-400 font-medium">
-            {groups.length} {groups.length === 1 ? 'grupo activo' : 'grupos activos'}
+            {groups.length} {groups.length === 1 ? t("grupo activo") : t("grupos activos")}
           </p>
         </div>
 
@@ -105,11 +105,11 @@ export const GroupList: React.FC<GroupListProps> = ({
           <button
             type="button"
             onClick={onOpenCreateGroup}
-            className="flex items-center gap-1.5 rounded-xl bg-[#f78c26] hover:bg-[#ea580c] px-3 py-1.5 text-xs font-bold text-white shadow-xs transition-all cursor-pointer"
-            title="Crear nuevo grupo"
+            className="flex items-center gap-1.5 rounded-xl bg-brand-500 hover:bg-brand-700 px-3 py-1.5 text-xs font-bold text-white shadow-xs transition-all cursor-pointer"
+            title={t("Crear nuevo grupo")}
           >
             <Plus size={14} strokeWidth={3} />
-            <span>Nuevo</span>
+            <span>{t("Nuevo")}</span>
           </button>
         )}
       </div>
@@ -123,7 +123,8 @@ export const GroupList: React.FC<GroupListProps> = ({
           />
           <input
             type="text"
-            placeholder="Buscar grupo o proyecto..."
+            aria-label={t("Buscar grupo o proyecto")}
+            placeholder={t("Buscar grupo o proyecto...")}
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="w-full rounded-xl border border-slate-200 bg-white pl-8.5 pr-3 py-1.5 text-xs font-medium text-[#343e48] placeholder-slate-400 focus:border-[#f78c26] focus:ring-2 focus:ring-orange-100 outline-hidden transition-all"
@@ -135,22 +136,21 @@ export const GroupList: React.FC<GroupListProps> = ({
       <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
         {loading ? (
           <div className="p-8 text-center text-xs text-slate-400">
-            Cargando grupos...
-          </div>
+            {t("Cargando grupos...")}</div>
         ) : filteredGroups.length === 0 ? (
           <div className="p-8 text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 mb-2">
               <MessageSquare size={20} />
             </div>
             <p className="text-xs font-bold text-[#343e48]">
-              {searchQuery ? 'Sin resultados' : 'Sin grupos creados'}
+              {searchQuery ? t("Sin resultados") : t("Sin grupos creados")}
             </p>
             <p className="text-[11px] text-slate-400 mt-1 max-w-xs mx-auto">
               {searchQuery
-                ? 'Intenta con otro término de búsqueda.'
+                ? t("Intenta con otro término de búsqueda.")
                 : isGlobalAdmin
-                ? 'Crea tu primer grupo con el botón "+ Nuevo" arriba.'
-                : 'Tu supervisor te asignará a los grupos correspondientes.'}
+                ? t("Crea tu primer grupo con el botón \"+ Nuevo\" arriba.")
+                : t("Tu supervisor te asignará a los grupos correspondientes.")}
             </p>
           </div>
         ) : (
@@ -158,7 +158,7 @@ export const GroupList: React.FC<GroupListProps> = ({
             const isSelected = selectedGroupId === group.id;
             const groupInitial = group.nombre.charAt(0).toUpperCase();
             const lastMsgTime = group.ultimo_mensaje
-              ? new Date(group.ultimo_mensaje.created_at).toLocaleTimeString([], {
+              ? new Date(group.ultimo_mensaje.created_at).toLocaleTimeString(locale, {
                   hour: '2-digit',
                   minute: '2-digit',
                 })
@@ -167,6 +167,8 @@ export const GroupList: React.FC<GroupListProps> = ({
             return (
               <div
                 key={group.id}
+                role="button" tabIndex={0} aria-label={t("Abrir grupo {value0}", { value0: group.nombre })}
+                onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectGroup(group.id); } }}
                 onClick={() => onSelectGroup(group.id)}
                 className={`flex items-start gap-3 p-3.5 cursor-pointer transition-all ${
                   isSelected
@@ -176,7 +178,7 @@ export const GroupList: React.FC<GroupListProps> = ({
               >
                 {/* Group Avatar */}
                 <div className="relative shrink-0 mt-0.5">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-[#f78c26] font-bold text-xs overflow-hidden border border-orange-200/60 shadow-2xs">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-brand-500 font-bold text-xs overflow-hidden border border-orange-200/60 shadow-2xs">
                     {group.foto_url ? (
                       <img
                         src={group.foto_url}
@@ -189,8 +191,8 @@ export const GroupList: React.FC<GroupListProps> = ({
                   </div>
                   {group.mi_rol === 'admin' && (
                     <div
-                      className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#f78c26] text-white border-2 border-white shadow-2xs"
-                      title="Administrador del grupo"
+                      className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-brand-500 text-white border-2 border-white shadow-2xs"
+                      title={t("Administrador del grupo")}
                     >
                       <Shield size={8} />
                     </div>
@@ -202,7 +204,7 @@ export const GroupList: React.FC<GroupListProps> = ({
                   <div className="flex items-center justify-between gap-1 mb-0.5">
                     <h3
                       className={`text-xs font-bold truncate ${
-                        isSelected ? 'text-[#f78c26]' : 'text-[#343e48]'
+                        isSelected ? 'text-brand-500' : 'text-[#343e48]'
                       }`}
                     >
                       {group.nombre}
@@ -219,7 +221,7 @@ export const GroupList: React.FC<GroupListProps> = ({
                     {group.solo_multimedia && (
                       <span className="flex items-center gap-0.5 rounded-sm bg-amber-50 px-1.5 py-0.2 text-[9.5px] font-bold text-amber-700 border border-amber-200/80">
                         <Video size={9} />
-                        <span>Multimedia</span>
+                        <span>{t("Multimedia")}</span>
                       </span>
                     )}
                     <span className="text-[10px] text-slate-400 font-medium flex items-center gap-0.5">

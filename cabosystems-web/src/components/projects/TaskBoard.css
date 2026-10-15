@@ -1,0 +1,53 @@
+.task-board-view { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow: hidden; }
+.task-board-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--color-slate-100); }
+.task-board-search { display: flex; align-items: center; gap: 8px; width: min(100%, 320px); padding: 8px 10px; border: 1px solid var(--color-slate-200); border-radius: 8px; color: var(--color-slate-500); background: #fff; }
+.task-board-search:focus-within { border-color: var(--color-brand-500); outline: 2px solid var(--color-brand-200); outline-offset: 1px; }
+.task-board-search input { width: 100%; min-width: 0; outline: none; font-size: 13px; color: var(--color-slate-800); }
+.task-board-search input::placeholder { color: var(--color-slate-500); }
+.task-board-hint { display: inline-flex; align-items: center; gap: 6px; color: var(--color-slate-500); font-size: 12px; }
+.task-board-error { padding: 10px 16px; font-size: 13px; color: #b91c1c; background: #fef2f2; }
+.task-board { display: flex; align-items: stretch; gap: 14px; flex: 1; min-height: 0; overflow-x: auto; padding: 16px; scrollbar-color: var(--color-slate-300) transparent; }
+.task-board:focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: -3px; }
+.task-board-column { display: flex; flex-direction: column; flex: 1 0 280px; min-width: 280px; min-height: 0; background: var(--color-slate-50); border: 1px solid var(--color-slate-200); border-radius: 12px; transition: border-color 150ms ease, background-color 150ms ease; }
+.task-board-column.is-drop-target { background: var(--color-brand-50); border-color: var(--color-brand-500); }
+.task-board-column-heading { display: flex; align-items: center; gap: 8px; padding: 14px 12px; }
+.task-board-column-heading h4 { font-size: 13px; font-weight: 600; color: var(--color-slate-800); }
+.task-board-column-heading > span { font-size: 12px; color: var(--color-slate-500); font-variant-numeric: tabular-nums; }
+.task-board-column-content { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 10px; scrollbar-width: thin; scrollbar-color: var(--color-slate-300) transparent; }
+.task-board-empty { padding: 28px 12px; text-align: center; font-size: 12px; color: var(--color-slate-500); }
+.task-board-item { position: relative; margin-bottom: 10px; }
+.task-board-item.is-dragging { opacity: .45; }
+.task-board-drag-row { position: absolute; top: 12px; right: 10px; z-index: 1; }
+.task-board-drag-handle { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; color: var(--color-slate-500); cursor: grab; }
+.task-board-drag-handle:active { cursor: grabbing; }
+.task-board-item .task-card-board { border-radius: 8px; box-shadow: none; }
+.task-card-board .task-card-header { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 12px 10px; }
+.task-card-board .task-card-main { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; width: 100%; flex-basis: auto; gap: 10px 6px; }
+.task-card-board .task-card-main > svg { grid-column: 1; grid-row: 1; margin-top: 3px; }
+.task-card-board .task-card-main > h4 { grid-column: 2 / 4; grid-row: 1; padding-right: 18px; white-space: normal; overflow: visible; display: block; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.task-card-board .task-card-main > .task-subtasks-count { grid-column: 3; grid-row: 2; justify-self: end; align-self: start; padding: 0; border-radius: 0; background: transparent; color: var(--color-slate-500); font-variant-numeric: tabular-nums; }
+.task-card-board .task-card-main > .task-card-context { grid-column: 2; grid-row: 2; min-width: 0; font-size: 11px; color: var(--color-slate-500); overflow-wrap: anywhere; }
+.task-card-board .task-card-main:not(:has(.task-subtasks-count)) > .task-card-context { grid-column: 2 / 4; }
+.task-overdue { color: #b91c1c; }
+.task-card-board .task-card-actions { width: 100%; }
+.task-board-assignee { display: flex; align-items: center; gap: 6px; margin-right: auto; min-width: 0; font-size: 11px; color: var(--color-slate-600); }
+.task-board-assignee > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-board-assignee img { height: 24px; width: 24px; border-radius: 50%; object-fit: cover; }
+.task-board-assignee .task-board-initials { display: flex; align-items: center; justify-content: center; flex-shrink: 0; height: 24px; width: 24px; border-radius: 50%; color: var(--color-brand-800); background: var(--color-brand-50); font-size: 10px; font-weight: 600; }
+.task-card-board :is(button, select):focus-visible { outline: 2px solid var(--color-brand-700); outline-offset: 2px; }
+.task-board-icon-button,
+.task-board-status-control { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 6px; color: var(--color-slate-500); transition: color 150ms ease, background-color 150ms ease; }
+.task-board-icon-button:hover,
+.task-board-status-control:hover { color: var(--color-brand-800); background: var(--color-brand-50); }
+.task-board-status-control { position: relative; }
+.task-board-status-control:disabled,
+.task-board-icon-button:disabled { cursor: wait; opacity: .5; }
+.task-actions-menu { position: relative; flex-shrink: 0; }
+.task-actions-popover { position: fixed; z-index: 1000; width: 156px; max-width: calc(100vw - 16px); padding: 4px; border: 1px solid var(--color-slate-200); border-radius: 8px; background: #fff; box-shadow: 0 4px 12px rgb(16 24 40 / 8%); cursor: default; }
+.task-actions-popover button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 9px 10px; border-radius: 4px; font-size: 13px; font-weight: 500; color: var(--color-slate-700); text-align: left; }
+.task-actions-popover button:hover,
+.task-actions-popover button:focus-visible { outline: none; background: var(--color-brand-50); color: var(--color-brand-800); }
+.task-actions-popover .task-menu-danger { color: #b91c1c; }
+.task-actions-popover .task-menu-danger:hover,
+.task-actions-popover .task-menu-danger:focus-visible { color: #b91c1c; background: #fef2f2; }
+@media (max-width: 639px) { .task-board { padding: 12px; gap: 10px; } .task-board-column { flex-basis: 280px; } .task-board-hint { display: none; } }

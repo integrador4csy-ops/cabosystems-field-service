@@ -1,0 +1,33 @@
+export const AGENDA_COPY = {
+  es: {
+    title: 'Agenda', month: 'Calendario', day: 'Día', week: 'Semana', unscheduled: 'Sin fecha', today: 'Hoy', all: 'Todas',
+    pendiente: 'Pendientes', en_proceso: 'En proceso', completada: 'Completadas', overdue: 'Vencida',
+    pendingTask: 'Pendiente', completedTask: 'Completada',
+    search: 'Buscar tarea, villa o desarrollo', openSearch: 'Buscar tareas', closeSearch: 'Cerrar búsqueda',
+    previous: 'Periodo anterior', next: 'Periodo siguiente', views: 'Vista de agenda', statuses: 'Filtrar por estado',
+    allProjects: 'Todas las villas', selectProject: 'Filtrar por villa', searchProject: 'Buscar villa o desarrollo', close: 'Cerrar',
+    workWeek: 'Semana laboral · lunes a viernes', selectedDay: 'Tareas del día', tasks: 'tareas', task: 'tarea',
+    loading: 'Cargando agenda...', failed: 'No se pudo actualizar la agenda.', retry: 'Reintentar',
+    emptyDay: 'Sin tareas programadas para este día', emptyWeek: 'Sin tareas en esta semana', emptyUnscheduled: 'No hay tareas sin fecha',
+    emptyAssigned: 'No tienes tareas asignadas', emptyAssignedHelp: 'Las tareas que te asignen aparecerán aquí.',
+    emptyFilters: 'No hay tareas con estos filtros', emptyHelp: 'Elige otra fecha o ajusta los filtros.', clear: 'Limpiar filtros',
+    seeUnscheduled: 'Ver tareas sin fecha', noTasks: 'Sin tareas', noProjects: 'No hay villas que coincidan.',
+    unscheduledHelp: 'Tareas que todavía no tienen una fecha programada.', noProject: 'Villa no disponible',
+  },
+  en: {
+    title: 'Schedule', month: 'Calendar', day: 'Day', week: 'Week', unscheduled: 'Undated', today: 'Today', all: 'All',
+    pendiente: 'Pending', en_proceso: 'In progress', completada: 'Completed', overdue: 'Overdue',
+    pendingTask: 'Pending', completedTask: 'Completed',
+    search: 'Search task, villa or development', openSearch: 'Search tasks', closeSearch: 'Close search',
+    previous: 'Previous period', next: 'Next period', views: 'Schedule view', statuses: 'Filter by status',
+    allProjects: 'All villas', selectProject: 'Filter by villa', searchProject: 'Search villa or development', close: 'Close',
+    workWeek: 'Workweek · Monday to Friday', selectedDay: 'Daily tasks', tasks: 'tasks', task: 'task',
+    loading: 'Loading schedule...', failed: 'Could not update the schedule.', retry: 'Retry',
+    emptyDay: 'No tasks scheduled for this day', emptyWeek: 'No tasks this week', emptyUnscheduled: 'No undated tasks',
+    emptyAssigned: 'No tasks assigned to you', emptyAssignedHelp: 'Your assigned tasks will appear here.',
+    emptyFilters: 'No tasks match these filters', emptyHelp: 'Choose another date or adjust the filters.', clear: 'Clear filters',
+    seeUnscheduled: 'View undated tasks', noTasks: 'No tasks', noProjects: 'No matching villas.',
+    unscheduledHelp: 'Tasks that do not have a scheduled date yet.', noProject: 'Villa unavailable',
+  },
+} as const;
+export type AgendaCopy = typeof AGENDA_COPY[keyof typeof AGENDA_COPY];

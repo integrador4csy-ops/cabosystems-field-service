@@ -1,3 +1,4 @@
+import { useDialog } from '../ui/useDialog';
 import React, { useState, useEffect, useRef } from 'react';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { useLanguage, type SupportedLanguage } from '../../context/LanguageContext';
@@ -30,6 +31,8 @@ export const AdminEditProfileModal: React.FC = () => {
       setSelectedLang(language);
     }
   }, [adminProfile, isEditProfileModalOpen, language]);
+
+  const dialogRef = useDialog(isEditProfileModalOpen, () => { if (!saving) setIsEditProfileModalOpen(false); });
 
   if (!isEditProfileModalOpen) return null;
 
@@ -117,7 +120,8 @@ export const AdminEditProfileModal: React.FC = () => {
   return (
     <div className="admin-modal-backdrop" onClick={() => setIsEditProfileModalOpen(false)}>
       <div
-        className="admin-modal-card max-w-[650px] shadow-2xl border border-slate-200"
+        ref={dialogRef} role="dialog" aria-modal="true" aria-label={t("Editar perfil")} tabIndex={-1}
+        className="minimal-modal admin-modal-card max-w-[650px] shadow-theme-md border border-slate-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -125,7 +129,7 @@ export const AdminEditProfileModal: React.FC = () => {
           <div className="admin-modal-title-row">
             <div>
               <h2 className="admin-modal-title flex items-center gap-2">
-                <User size={19} className="text-[#f78c26]" />
+                <User size={19} className="text-slate-600" />
                 {t('modal.profileTitle')}
               </h2>
               <p className="admin-modal-subtitle">
@@ -166,17 +170,17 @@ export const AdminEditProfileModal: React.FC = () => {
 
             {/* Drag and drop / Device upload box */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-[#343e48]">
+              <label className="text-xs font-semibold text-[#343e48]">
                 {t('modal.profilePhoto')}
               </label>
 
               {avatarUrl ? (
                 /* Preview State when a photo is selected */
-                <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5">
-                  <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-orange-200 bg-orange-100 shadow-xs">
+                <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-3.5">
+                  <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-slate-200 bg-slate-50 shadow-xs">
                     <img
                       src={avatarUrl}
-                      alt="Avatar Preview"
+                      alt={t("Avatar Preview")}
                       className="h-full w-full object-cover"
                     />
                   </div>
@@ -184,7 +188,7 @@ export const AdminEditProfileModal: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-[#343e48] hover:border-orange-300 hover:text-[#f78c26] shadow-2xs transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-[#343e48] hover:border-slate-200 hover:text-slate-600 shadow-2xs transition-colors cursor-pointer"
                     >
                       <Camera size={13} />
                       <span>{t('modal.changePhoto')}</span>
@@ -192,7 +196,7 @@ export const AdminEditProfileModal: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setAvatarUrl(null)}
-                      className="flex items-center gap-1.5 rounded-xl border border-rose-100 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 rounded-lg border border-rose-100 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                     >
                       <Trash2 size={13} />
                       <span>{t('modal.deletePhoto')}</span>
@@ -208,14 +212,14 @@ export const AdminEditProfileModal: React.FC = () => {
                   onClick={() => fileInputRef.current?.click()}
                   className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center transition-all cursor-pointer ${
                     isDragging
-                      ? 'border-[#f78c26] bg-orange-50/60 scale-[1.01]'
-                      : 'border-slate-200 bg-slate-50/50 hover:border-orange-300 hover:bg-slate-50'
+                      ? 'border-slate-600 bg-slate-50'
+                      : 'border-slate-200 bg-white hover:border-slate-200 hover:bg-slate-50'
                   }`}
                 >
-                  <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-50 border border-orange-200/80 text-[#f78c26] shadow-2xs">
+                  <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 shadow-2xs">
                     <UploadCloud size={22} />
                   </div>
-                  <p className="text-xs font-bold text-[#343e48]">
+                  <p className="text-xs font-semibold text-[#343e48]">
                     {t('modal.uploadDropzone')}
                   </p>
                   <p className="mt-0.5 text-[11px] text-slate-400">
@@ -239,8 +243,8 @@ export const AdminEditProfileModal: React.FC = () => {
 
             {/* Language Preference Field */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-[#343e48] flex items-center gap-1.5">
-                <Globe size={14} className="text-[#f78c26]" />
+              <label className="text-xs font-semibold text-[#343e48] flex items-center gap-1.5">
+                <Globe size={14} className="text-slate-600" />
                 <span>{t('modal.languagePref')}</span>
               </label>
               <p className="text-[11px] text-slate-400">
@@ -251,36 +255,36 @@ export const AdminEditProfileModal: React.FC = () => {
                   type="button"
                   onClick={() => setSelectedLang('es')}
                   className={cn(
-                    'flex items-center gap-2.5 rounded-xl border p-2.5 text-left text-xs font-semibold transition-all cursor-pointer',
+                    'flex items-center gap-2.5 rounded-lg border p-2.5 text-left text-xs font-semibold transition-all cursor-pointer',
                     selectedLang === 'es'
-                      ? 'border-[#f78c26] bg-orange-50 text-[#f78c26] shadow-2xs font-bold'
+                      ? 'border-slate-600 bg-slate-50 text-slate-600 shadow-2xs font-semibold'
                       : 'border-slate-200 bg-slate-50/60 text-slate-600 hover:border-slate-300'
                   )}
                 >
                   <span className="text-lg">🇲🇽</span>
                   <div className="flex flex-col flex-1 min-w-0">
-                    <span className="font-bold truncate">Español</span>
+                    <span className="font-semibold truncate">Español</span>
                     <span className="text-[10px] text-slate-400 font-normal">Latinoamérica</span>
                   </div>
-                  {selectedLang === 'es' && <Check size={14} className="shrink-0 text-[#f78c26]" />}
+                  {selectedLang === 'es' && <Check size={14} className="shrink-0 text-slate-600" />}
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setSelectedLang('en')}
                   className={cn(
-                    'flex items-center gap-2.5 rounded-xl border p-2.5 text-left text-xs font-semibold transition-all cursor-pointer',
+                    'flex items-center gap-2.5 rounded-lg border p-2.5 text-left text-xs font-semibold transition-all cursor-pointer',
                     selectedLang === 'en'
-                      ? 'border-[#f78c26] bg-orange-50 text-[#f78c26] shadow-2xs font-bold'
+                      ? 'border-slate-600 bg-slate-50 text-slate-600 shadow-2xs font-semibold'
                       : 'border-slate-200 bg-slate-50/60 text-slate-600 hover:border-slate-300'
                   )}
                 >
                   <span className="text-lg">🇺🇸</span>
                   <div className="flex flex-col flex-1 min-w-0">
-                    <span className="font-bold truncate">English</span>
+                    <span className="font-semibold truncate">English</span>
                     <span className="text-[10px] text-slate-400 font-normal">United States</span>
                   </div>
-                  {selectedLang === 'en' && <Check size={14} className="shrink-0 text-[#f78c26]" />}
+                  {selectedLang === 'en' && <Check size={14} className="shrink-0 text-slate-600" />}
                 </button>
               </div>
             </div>
@@ -290,14 +294,14 @@ export const AdminEditProfileModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsEditProfileModalOpen(false)}
-                className="flex h-11 flex-1 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-600 transition-colors cursor-pointer"
+                className="flex h-11 flex-1 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-600 transition-colors cursor-pointer"
               >
                 {t('modal.cancel')}
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#f78c26] hover:bg-[#e07412] px-4 text-xs font-bold text-white shadow-md shadow-orange-500/20 transition-all transform active:scale-[0.99] disabled:opacity-60 cursor-pointer"
+                className="flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-brand-500 hover:bg-brand-700 px-4 text-xs font-semibold text-white shadow-md transition-all transform  disabled:opacity-60 cursor-pointer"
               >
                 {saving ? (
                   <span className="flex items-center gap-2">

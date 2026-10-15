@@ -290,14 +290,6 @@ export default function ChatTabScreen() {
 
   const renderListHeader = () => (
     <View style={styles.listHeaderContainer}>
-      {/* Título de la Sección */}
-      <View style={styles.sectionHeading}>
-        <Text style={styles.sectionTitle}>Canales de Comunicación</Text>
-        <Text style={styles.sectionSubtitle}>
-            Coordinación técnica y reportes de cuadrilla 
-        </Text>
-      </View>
-
       {/* Buscador TailAdmin con Botón Limpiar */}
       <View style={styles.searchContainer}>
         <Search size={16} color={Colors.textMuted} />
@@ -571,21 +563,6 @@ const styles = StyleSheet.create({
   listHeaderContainer: {
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.xs,
-  },
-  sectionHeading: {
-    marginBottom: Spacing.sm,
-  },
-  sectionTitle: {
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 21,
-    color: Colors.text,
-    letterSpacing: -0.3,
-  },
-  sectionSubtitle: {
-    fontFamily: 'Outfit_400Regular',
-    fontSize: 12.5,
-    color: Colors.textSecondary,
-    marginTop: 2,
   },
   searchContainer: {
     flexDirection: 'row',

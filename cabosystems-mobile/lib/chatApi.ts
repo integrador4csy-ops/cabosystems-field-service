@@ -6,6 +6,7 @@ import type {
   ChatReaction,
   ChatSticker,
   ChatMessageType,
+  ChatPin,
   Profile,
 } from '@/types/database';
 
@@ -200,7 +201,47 @@ export async function getGroupMessages(
     .limit(limit);
 
   if (error) throw error;
-  return (data ?? []) as ChatMessage[];
+  return hydrateChatReplies((data ?? []) as ChatMessage[]);
+}
+
+async function hydrateChatReplies(messages: ChatMessage[]): Promise<ChatMessage[]> {
+  const ids = [...new Set(messages.flatMap((message) => message.reply_to_id ? [message.reply_to_id] : []))];
+  if (!ids.length) return messages;
+  const { data, error } = await supabase.from('chat_mensajes').select('*, profiles(*)').in('id', ids);
+  if (error) throw error;
+  const parents = new Map(((data ?? []) as ChatMessage[]).map((message) => [message.id, message]));
+  return messages.map((message) => ({ ...message, reply: message.reply_to_id ? parents.get(message.reply_to_id) ?? null : null }));
+}
+
+export async function getChatMessage(id: string): Promise<ChatMessage | null> {
+  const { data, error } = await supabase.from('chat_mensajes').select('*, profiles(*), reacciones:chat_reacciones(*, profiles(nombre))').eq('id', id).maybeSingle();
+  if (error) throw error;
+  return data ? (await hydrateChatReplies([data as ChatMessage]))[0] : null;
+}
+
+export async function getChatPins(groupId: string): Promise<ChatPin[]> {
+  const { data, error } = await supabase.from('chat_pins').select('*').eq('grupo_id', groupId).order('created_at', { ascending: false });
+  if (error) throw error;
+  if (!data?.length) return [];
+  const { data: messages, error: messageError } = await supabase.from('chat_mensajes').select('*, profiles(*)').in('id', data.map((pin) => pin.mensaje_id));
+  if (messageError) throw messageError;
+  const byId = new Map(((messages ?? []) as ChatMessage[]).map((message) => [message.id, message]));
+  return data.flatMap((pin) => { const message = byId.get(pin.mensaje_id); return message ? [{ ...pin, message } as ChatPin] : []; });
+}
+
+export async function pinChatMessage(message: ChatMessage, userId: string): Promise<void> {
+  const { error } = await supabase.from('chat_pins').insert({ mensaje_id: message.id, grupo_id: message.grupo_id, pinned_by: userId });
+  if (error && error.code !== '23505') throw error;
+}
+export async function unpinChatMessage(messageId: string): Promise<void> {
+  const { data, error } = await supabase.from('chat_pins').delete().eq('mensaje_id', messageId).select('mensaje_id');
+  if (error) throw error;
+  if (!data?.length) throw new Error('No permission to unpin this message.');
+}
+export async function deleteChatMessage(messageId: string): Promise<void> {
+  const { data, error } = await supabase.from('chat_mensajes').delete().eq('id', messageId).select('id');
+  if (error) throw error;
+  if (!data?.length) throw new Error('No permission to delete this message.');
 }
 
 /**
@@ -345,6 +386,7 @@ export async function sendChatMessage(params: {
   contenido?: string | null;
   mediaUri?: string | null;
   mediaMeta?: any;
+  reply_to_id?: string | null;
 }): Promise<ChatMessage> {
   let media_url: string | null = null;
 
@@ -364,6 +406,7 @@ export async function sendChatMessage(params: {
       contenido: params.contenido || null,
       media_url,
       media_meta: params.mediaMeta || null,
+      reply_to_id: params.reply_to_id || null,
     })
     .select('*, profiles(*)')
     .single();
@@ -398,7 +441,7 @@ export async function toggleChatReaction(
   profile_id: string,
   emoji: string
 ): Promise<void> {
-  const { data: existing } = await supabase
+  const { data: existing, error: readError } = await supabase
     .from('chat_reacciones')
     .select('id')
     .eq('mensaje_id', mensaje_id)
@@ -406,15 +449,15 @@ export async function toggleChatReaction(
     .eq('emoji', emoji)
     .maybeSingle();
 
-  if (existing) {
-    await supabase.from('chat_reacciones').delete().eq('id', existing.id);
-  } else {
-    await supabase.from('chat_reacciones').insert({
+  if (readError) throw readError;
+  const { error } = existing
+    ? await supabase.from('chat_reacciones').delete().eq('id', existing.id)
+    : await supabase.from('chat_reacciones').insert({
       mensaje_id,
       profile_id,
       emoji,
     });
-  }
+  if (error) throw error;
 }
 
 /**
@@ -427,7 +470,7 @@ export async function getMyStickers(userId: string): Promise<ChatSticker[]> {
     .eq('profile_id', userId)
     .order('created_at', { ascending: false });
 
-  if (error) return [];
+  if (error) throw error;
   return (data ?? []) as ChatSticker[];
 }
 

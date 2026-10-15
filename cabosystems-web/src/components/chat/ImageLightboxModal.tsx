@@ -1,3 +1,4 @@
+import { useTranslation } from '../../context/LanguageContext';
 import React, { useEffect } from 'react';
 import { X, Download, ExternalLink } from 'lucide-react';
 
@@ -12,6 +13,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
   caption,
   onClose,
 }) => {
+  const { t } = useTranslation();
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -24,7 +26,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
@@ -38,8 +40,8 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             download
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-[#f78c26] transition-all shadow-md backdrop-blur-xs"
-            title="Descargar imagen"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-brand-500 transition-all shadow-md backdrop-blur-xs"
+            title={t("Descargar imagen")}
           >
             <Download size={18} />
           </a>
@@ -47,8 +49,8 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
             href={imageUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-[#f78c26] transition-all shadow-md backdrop-blur-xs"
-            title="Abrir en pestaña nueva"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-brand-500 transition-all shadow-md backdrop-blur-xs"
+            title={t("Abrir en pestaña nueva")}
           >
             <ExternalLink size={18} />
           </a>
@@ -56,7 +58,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
             type="button"
             onClick={onClose}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-rose-600 transition-all shadow-md backdrop-blur-xs"
-            title="Cerrar (Esc)"
+            title={t("Cerrar (Esc)")}
           >
             <X size={20} />
           </button>
@@ -66,7 +68,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
         <div className="overflow-hidden rounded-2xl border border-white/10 shadow-2xl bg-black/40 flex items-center justify-center max-h-[82vh]">
           <img
             src={imageUrl}
-            alt={caption || 'Evidencia técnica'}
+            alt={caption || t("Evidencia técnica")}
             className="max-h-[82vh] max-w-full object-contain rounded-2xl select-none"
           />
         </div>

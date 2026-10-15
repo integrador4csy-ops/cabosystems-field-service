@@ -1,0 +1,74 @@
+.team-section .team-section-card {
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: #fff;
+  animation: none;
+}
+.team-section .admin-modal-header { padding: 24px; background: #fff; border-bottom: 0; }
+.team-section .admin-modal-body { overflow: visible; padding: 0 24px 24px; }
+.team-section .admin-modal-title { font-size: 18px; font-weight: 600; }
+.team-section .admin-modal-subtitle { margin-top: 6px; font-size: 13px; }
+.team-section .admin-users-table-wrapper { border-radius: 12px; }
+.team-section .admin-users-table td { padding: 16px; }
+.team-section .admin-edit-submodal { position: fixed; }
+.team-section .admin-edit-card { max-height: calc(100dvh - 32px); display: flex; flex-direction: column; }
+.team-section .edit-card-body { min-height: 0; overflow-y: auto; }
+.team-section .invite-form { max-width: 540px; margin: 0; padding: 0; background: #fff; border: 0; }
+@media (max-width: 639px) {
+  .team-section .admin-modal-header { padding: 20px 16px; }
+  .team-section .admin-modal-body { padding: 0 16px 20px; }
+  .team-section .admin-modal-title { font-size: 16px; }
+}
+
+.team-section .admin-modal-body > form { width: 100%; max-width: 640px; }
+
+/* Brand accents stay on selection, identity, and the primary action. */
+.team-page nav button[aria-current="page"] {
+  color: var(--color-brand-800);
+  border-bottom-color: var(--color-brand-500);
+}
+
+.team-page .team-invite-button {
+  background: var(--color-brand-500);
+  border-color: var(--color-brand-500);
+  color: #fff;
+}
+
+.team-page .team-invite-button:hover {
+  background: var(--color-brand-400);
+  border-color: var(--color-brand-400);
+}
+
+.team-page .user-cell-avatar,
+.team-page .user-cell-avatar .avatar-fallback {
+  background: var(--color-brand-50);
+  border-color: var(--color-brand-200);
+  color: var(--color-brand-800);
+}
+
+.team-page .action-btn.edit,
+.team-page .action-btn.email {
+  color: var(--color-brand-800);
+  border-color: var(--color-brand-200);
+}
+
+.team-page .action-btn.edit:hover,
+.team-page .action-btn.email:hover {
+  background: var(--color-brand-50);
+  border-color: var(--color-brand-300);
+  color: var(--color-brand-800);
+}
+
+.team-page :is(button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-brand-800);
+  outline-offset: 3px;
+}
+
+.team-page .admin-search-bar input:focus {
+  border-color: var(--color-brand-500);
+  box-shadow: none;
+}

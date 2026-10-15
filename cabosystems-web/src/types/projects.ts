@@ -20,10 +20,11 @@ export interface Subtarea {
 export interface Tarea {
   id: string;
   proyecto_id: string;
-  asignado_a: string;
+  asignado_a: string | null;
   titulo: string;
   descripcion: string | null;
   estatus: 'pendiente' | 'en_proceso' | 'completada';
+  fecha_programada?: string | null;
   created_at?: string;
   profiles?: {
     id: string;

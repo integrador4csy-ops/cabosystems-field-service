@@ -1,0 +1,10 @@
+.fluent-emoji {
+  display: inline-block;
+  flex: none;
+  object-fit: contain;
+  vertical-align: -0.2em;
+  user-select: none;
+}
+.fluent-emoji-fallback { line-height: 1; font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; }
+.emoji-only-message { background: transparent; border: 0; box-shadow: none; line-height: 1.2; white-space: pre-wrap; overflow-wrap: anywhere; }
+.emoji-only-message .fluent-emoji { margin: 2px; vertical-align: middle; }

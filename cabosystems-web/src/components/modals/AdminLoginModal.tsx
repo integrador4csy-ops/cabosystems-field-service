@@ -1,9 +1,11 @@
+import { useTranslation } from '../../context/LanguageContext';
 import React, { useState } from 'react';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { Lock, Mail, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import '../AdminUsersModal.css';
 
 export const AdminLoginModal: React.FC = () => {
+  const { t } = useTranslation();
   const { isLoginModalOpen, login, user } = useAdminAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,7 +20,7 @@ export const AdminLoginModal: React.FC = () => {
     setErrorMessage(null);
 
     if (!email.trim() || !password) {
-      setErrorMessage('Por favor ingresa tu correo y contraseña.');
+      setErrorMessage(t("Por favor ingresa tu correo y contraseña."));
       return;
     }
 
@@ -29,8 +31,8 @@ export const AdminLoginModal: React.FC = () => {
     if (!result.success) {
       setErrorMessage(
         result.error === 'Invalid login credentials'
-          ? 'Credenciales inválidas. Revisa tu correo y contraseña.'
-          : result.error || 'Error al iniciar sesión de administrador.'
+          ? t("Credenciales inválidas. Revisa tu correo y contraseña.")
+          : result.error || t("Error al iniciar sesión de administrador.")
       );
     }
   };
@@ -38,7 +40,7 @@ export const AdminLoginModal: React.FC = () => {
   return (
     <div className="admin-modal-backdrop">
       <div
-        className="admin-modal-card max-w-[650px] shadow-2xl border border-slate-200"
+        className="minimal-modal admin-modal-card max-w-[650px] shadow-2xl border border-slate-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header with Official Logo */}
@@ -50,29 +52,26 @@ export const AdminLoginModal: React.FC = () => {
               className="h-16 w-auto max-w-[280px] object-contain"
             />
           </div>
-          <h2 className="text-lg font-bold text-[#343e48] tracking-tight">
-            Acceso de Administrador
-          </h2>
+          <h2 className="text-lg font-semibold text-[#343e48] tracking-tight">
+            {t("Acceso de Administrador")}</h2>
           <p className="mt-1 text-xs text-slate-500 font-medium">
-            GPS Satelital & Operaciones CaboSystems
-          </p>
+            {t("GPS Satelital & Operaciones CaboSystems")}</p>
         </div>
 
         {/* Modal Body */}
         <div className="p-7">
           {errorMessage && (
-            <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800 animate-in fade-in duration-200">
+            <div className="mb-4 flex items-center gap-2.5 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800 animate-in fade-in duration-200">
               <AlertCircle size={17} className="text-rose-600 shrink-0" />
-              <span className="flex-1 text-xs">{errorMessage}</span>
+              <span className="flex-1 text-xs">{t(errorMessage)}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {/* Email Field */}
             <div className="form-field">
-              <label className="text-[13px] font-bold text-slate-700">
-                Correo Electrónico Corporativo
-              </label>
+              <label className="text-[13px] font-semibold text-slate-700">
+                {t("Correo Electrónico Corporativo")}</label>
               <div className="field-icon-wrapper">
                 <span className="field-icon-left">
                   <Mail size={17} />
@@ -91,9 +90,8 @@ export const AdminLoginModal: React.FC = () => {
 
             {/* Password Field */}
             <div className="form-field">
-              <label className="text-[13px] font-bold text-slate-700">
-                Contraseña
-              </label>
+              <label className="text-[13px] font-semibold text-slate-700">
+                {t("Contraseña")}</label>
               <div className="field-icon-wrapper has-right-icon">
                 <span className="field-icon-left">
                   <Lock size={17} />
@@ -110,7 +108,7 @@ export const AdminLoginModal: React.FC = () => {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="field-icon-right"
-                  title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                  title={showPassword ? t("Ocultar contraseña") : t("Ver contraseña")}
                 >
                   {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>
@@ -125,17 +123,16 @@ export const AdminLoginModal: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-[#f78c26] hover:bg-[#e07412] px-5 text-[13.5px] font-bold text-white shadow-md shadow-orange-500/25 transition-all transform active:scale-[0.99] disabled:opacity-60 cursor-pointer"
+                className="flex h-12 w-full items-center justify-center gap-2.5 rounded-lg bg-brand-500 hover:bg-brand-700 px-5 text-[13.5px] font-semibold text-white shadow-md transition-all transform  disabled:opacity-60 cursor-pointer"
               >
                 {loading ? (
                   <span className="flex items-center gap-2">
                     <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                    Validando Credenciales...
-                  </span>
+                    {t("Validando Credenciales...")}</span>
                 ) : (
                   <>
                     <Lock size={16} />
-                    <span>Iniciar Sesión de Administrador</span>
+                    <span>{t("Iniciar Sesión de Administrador")}</span>
                   </>
                 )}
               </button>

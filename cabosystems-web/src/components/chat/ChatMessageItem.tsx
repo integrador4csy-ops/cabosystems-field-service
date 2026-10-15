@@ -1,7 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { FluentEmoji, EmojiText } from './FluentEmoji';
+import { getEmojiOnlyCount, getEmojiMessageSize } from '../../lib/emoji';
+import { getRoleLabel } from '../../lib/uiTranslations';
+import { useTranslation } from '../../context/LanguageContext';
+import React from 'react';
+import { MessageActions } from './MessageActions';
+import { ReplyPreview } from './ReplyPreview';
 import {
-  Smile,
-  Trash2,
+  Pin,
   CheckCheck,
   Maximize2,
 } from 'lucide-react';
@@ -14,9 +19,14 @@ interface ChatMessageItemProps {
   onImageClick: (url: string, caption?: string | null) => void;
   onToggleReaction: (messageId: string, emoji: string) => void;
   onDeleteMessage: (messageId: string) => void;
+  onReply: (message: ChatMessage) => void;
+  onPin: (message: ChatMessage) => void;
+  onJumpToMessage: (id: string) => void;
+  onError: () => void;
+  pinned: boolean;
+  canUnpin: boolean;
 }
 
-const QUICK_EMOJIS = ['👍', '❤️', '🔥', '🛠️', '✅', '😂'];
 
 export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   message,
@@ -24,17 +34,19 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   isGlobalAdmin,
   onImageClick,
   onToggleReaction,
-  onDeleteMessage,
+  onDeleteMessage, onReply, onPin, onJumpToMessage, onError, pinned, canUnpin,
 }) => {
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const toolbarRef = useRef<HTMLDivElement>(null);
+  const { t, locale } = useTranslation();
+
+  const emojiCount = message.tipo === 'texto' ? getEmojiOnlyCount(message.contenido || '') : 0;
+  const isEmojiOnly = emojiCount > 0;
 
   const isMe = message.remitente_id === currentUserId;
   const canDelete = isMe || isGlobalAdmin;
 
   const senderProfile = message.profiles;
-  const senderName = isMe ? 'Tú' : senderProfile?.nombre || 'Técnico CaboSystems';
-  const senderRole = senderProfile?.rol?.replace(/_/g, ' ') || 'Técnico';
+  const senderName = isMe ? t("Tú") : senderProfile?.nombre || t("Técnico CaboSystems");
+  const senderRole = getRoleLabel(senderProfile?.rol, t);
   const initials = (senderProfile?.nombre || 'T')
     .split(' ')
     .filter(Boolean)
@@ -43,22 +55,10 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
     .substring(0, 2)
     .toUpperCase();
 
-  const timeFormatted = new Date(message.created_at).toLocaleTimeString([], {
+  const timeFormatted = new Date(message.created_at).toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
   });
-
-  // Close emoji picker when clicking outside
-  useEffect(() => {
-    if (!showEmojiPicker) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
-        setShowEmojiPicker(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showEmojiPicker]);
 
   // Aggregate reactions by emoji
   const reactionCounts: { [emoji: string]: { count: number; hasMe: boolean; names: string[] } } = {};
@@ -77,13 +77,14 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
 
   return (
     <div
+      id={`chat-message-${message.id}`}
       className={`group/msg relative flex gap-2.5 my-3 items-end transition-all ${
         isMe ? 'flex-row-reverse' : 'flex-row'
       }`}
     >
       {/* Avatar (for incoming messages) */}
       {!isMe ? (
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-orange-100 text-[#f78c26] text-xs font-bold shrink-0 overflow-hidden mb-5 shadow-2xs">
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-orange-100 text-brand-500 text-xs font-bold shrink-0 overflow-hidden mb-5 shadow-2xs">
           {senderProfile?.avatar_url ? (
             <img
               src={senderProfile.avatar_url}
@@ -97,7 +98,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
       ) : null}
 
       {/* Message Bubble Container */}
-      <div className={`flex flex-col max-w-[80%] sm:max-w-[72%] md:max-w-[64%] relative ${isMe ? 'items-end' : 'items-start'}`}>
+      <div className={`flex flex-col max-w-[calc(100%-80px)] sm:max-w-[72%] md:max-w-[64%] relative ${isMe ? 'items-end' : 'items-start'}`}>
         {/* Sender Name & Role (only for other users) */}
         {!isMe && (
           <div className="flex items-center gap-1.5 mb-1 px-1">
@@ -112,59 +113,14 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
 
         {/* Bubble Body with Action Toolbar in corner */}
         <div className="relative">
-          {/* Action Toolbar on Hover (anchored slightly further down and outward on the corner) */}
-          <div
-            ref={toolbarRef}
-            className={`absolute -bottom-5 z-20 items-center gap-1 rounded-full border border-slate-200 bg-white p-0.5 shadow-md transition-all ${
-              isMe ? '-left-6' : '-right-6'
-            } ${showEmojiPicker ? 'flex opacity-100 pointer-events-auto' : 'hidden group-hover/msg:flex'}`}
-          >
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:text-[#f78c26] hover:bg-orange-50 transition-colors cursor-pointer"
-                title="Reaccionar con emoji"
-              >
-                <Smile size={14} />
-              </button>
-
-              {/* Emoji Picker Popup */}
-              {showEmojiPicker && (
-                <div
-                  className={`absolute bottom-full mb-1.5 z-30 flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-150 ${
-                    isMe ? 'left-0' : 'right-0'
-                  }`}
-                >
-                  {QUICK_EMOJIS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => {
-                        onToggleReaction(message.id, emoji);
-                        setShowEmojiPicker(false);
-                      }}
-                      className="flex h-7 w-7 items-center justify-center rounded-full text-sm hover:scale-125 hover:bg-slate-100 transition-all cursor-pointer"
-                      title={emoji}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {canDelete && (
-              <button
-                type="button"
-                onClick={() => onDeleteMessage(message.id)}
-                className="flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                title="Eliminar mensaje"
-              >
-                <Trash2 size={13} />
-              </button>
-            )}
+          <div className={`absolute -top-1 z-10 ${isMe ? '-left-9' : '-right-9'}`}>
+            <MessageActions message={message} canDelete={canDelete} pinned={pinned} canUnpin={canUnpin}
+              onReply={() => onReply(message)} onPin={() => onPin(message)} onDelete={() => onDeleteMessage(message.id)}
+              onReaction={(emoji) => onToggleReaction(message.id, emoji)} onError={onError} />
           </div>
+          {message.reply && <button type="button" onClick={() => onJumpToMessage(message.reply!.id)} className="mb-1 block w-full max-w-full" aria-label={t('Ver mensaje original')}>
+            <ReplyPreview message={message.reply} currentUserId={currentUserId} />
+          </button>}
 
           {/* Type: Image */}
           {message.tipo === 'imagen' && message.media_url && (
@@ -174,7 +130,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
             >
               <img
                 src={message.media_url}
-                alt="Evidencia fotográfica"
+                alt={t("Evidencia fotográfica")}
                 className="max-h-72 w-auto max-w-full rounded-2xl object-cover transition-transform duration-200 group-hover/img:scale-102"
               />
               <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-all flex items-center justify-center">
@@ -201,7 +157,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
             <div className="py-1">
               <img
                 src={message.media_url}
-                alt="Sticker"
+                alt={t("Sticker")}
                 className="h-28 w-28 object-contain"
               />
             </div>
@@ -210,16 +166,16 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
           {/* Type: Text or Caption */}
           {Boolean(message.contenido) && (
             <div
-              className={`rounded-2xl px-4 py-2.5 text-xs shadow-2xs break-words ${
+              className={isEmojiOnly ? 'emoji-only-message py-1' : `rounded-2xl px-4 py-2.5 text-xs shadow-2xs break-words ${
                 message.tipo !== 'texto' ? 'mt-1.5' : ''
               } ${
                 isMe
-                  ? 'bg-[#f78c26] text-white font-medium rounded-tr-xs'
+                  ? 'bg-brand-500 text-white font-medium rounded-tr-xs'
                   : 'bg-white border border-slate-200 text-[#343e48] font-normal rounded-tl-xs'
               }`}
             >
               <p className="whitespace-pre-wrap leading-relaxed">
-                {message.contenido}
+                <EmojiText text={message.contenido || ''} size={isEmojiOnly ? getEmojiMessageSize(emojiCount) : 20} />
               </p>
             </div>
           )}
@@ -230,8 +186,9 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
           <span className="text-[10px] text-slate-400 font-medium">
             {timeFormatted}
           </span>
+          {pinned && <Pin size={11} className="text-slate-400" aria-label={t("Mensaje fijado")} />}
           {isMe && (
-            <CheckCheck size={13} className="text-[#f78c26]" />
+            <CheckCheck size={13} className="text-brand-500" />
           )}
         </div>
 
@@ -246,11 +203,11 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                 title={names.join(', ')}
                 className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold border transition-all cursor-pointer ${
                   hasMe
-                    ? 'bg-orange-50 border-orange-200 text-[#f78c26]'
+                    ? 'bg-orange-50 border-orange-200 text-brand-500'
                     : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                 }`}
               >
-                <span>{emoji}</span>
+                <FluentEmoji emoji={emoji} size={18} />
                 <span>{count}</span>
               </button>
             ))}

@@ -1,3 +1,5 @@
+import { AppSelect } from './ui/AppSelect';
+import { useTranslation } from '../context/LanguageContext';
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Profile } from '../types/fleet';
@@ -55,6 +57,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
   onClose,
   onUserListChanged,
 }) => {
+  const { t, locale } = useTranslation();
   const [activeTab, setActiveTab] = useState<'users' | 'invites' | 'new-invite'>('users');
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [invitaciones, setInvitaciones] = useState<Invitacion[]>([]);
@@ -148,7 +151,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
 
     const cleanEmail = inviteEmail.trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes('@')) {
-      setInviteError('Por favor ingresa un correo electrónico válido.');
+      setInviteError(t("Por favor ingresa un correo electrónico válido."));
       return;
     }
 
@@ -158,7 +161,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
     );
     if (existingActive) {
       setInviteError(
-        `El correo ${cleanEmail} ya pertenece a un colaborador activo en el sistema (${existingActive.nombre || 'Colaborador'}).`
+        `El correo ${cleanEmail} ya pertenece a un colaborador activo en el sistema (${existingActive.nombre || t("Colaborador")}).`
       );
       return;
     }
@@ -241,7 +244,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
       loadData();
     } catch (err: any) {
       console.error('Error al generar invitación:', err);
-      setInviteError(err?.message || 'Error al generar la invitación.');
+      setInviteError(err?.message || t("Error al generar la invitación."));
     } finally {
       setSendingInvite(false);
     }
@@ -252,9 +255,9 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
     const roleLabel = ROLES_LIST.find((r) => r.id === rol)?.label || rol;
     const directLink = `cabosystemsmobile://register?token=${token}&email=${encodeURIComponent(email)}`;
     
-    const subject = encodeURIComponent('Invitación al equipo de campo · CaboSystems Field Service');
+    const subject = encodeURIComponent(t('invite.emailSubject'));
     const body = encodeURIComponent(
-      `Hola,\n\nHas sido registrado e invitado para unirte al equipo de operaciones de CaboSystems como: ${roleLabel}.\n\nPara activar tu cuenta y configurar tu contraseña y foto de perfil en la aplicación móvil, haz clic en el siguiente enlace desde tu teléfono móvil:\n\n${directLink}\n\nSi abres la app manualmente, puedes validar tu registro con tu código de invitación:\n${token}\n\nAtentamente,\nDirección de Operaciones · CaboSystems`
+      t('invite.emailBody', { role: t(roleLabel), link: directLink, token })
     );
 
     window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
@@ -280,7 +283,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
       console.error('Error al reenviar invitación:', err);
       setGlobalBanner({
         type: 'error',
-        text: `Error al reenviar correo: ${err?.message || 'No se pudo conectar con el servidor de correo'}.`,
+        text: t("Error al reenviar correo: {value0}.", { value0: err?.message || 'No se pudo conectar con el servidor de correo' }),
       });
     } finally {
       setResendingInviteId(null);
@@ -333,7 +336,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
 
       setGlobalBanner({
         type: 'success',
-        text: `Datos de ${editNombre.trim() || 'colaborador'} actualizados correctamente.`,
+        text: t("Datos de {value0} actualizados correctamente.", { value0: editNombre.trim() || 'colaborador' }),
       });
       setEditingUser(null);
       loadData();
@@ -342,7 +345,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
       console.error('Error guardando edición:', err);
       setGlobalBanner({
         type: 'error',
-        text: `Error al actualizar usuario: ${err?.message || err}`,
+        text: t("Error al actualizar usuario: {value0}", { value0: err?.message || err }),
       });
     } finally {
       setSavingEdit(false);
@@ -353,9 +356,9 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
   const handleExpelUser = (user: Profile) => {
     setConfirmModal({
       isOpen: true,
-      title: '¿Expulsar Colaborador?',
-      message: `¿Estás seguro de que deseas expulsar y eliminar a ${user.nombre || user.email || 'este usuario'}? Su cuenta será borrada del sistema y desaparecerá por completo de la lista de colaboradores.`,
-      confirmLabel: 'Sí, Expulsar Definitivamente',
+      title: t("¿Expulsar Colaborador?"),
+      message: t("¿Estás seguro de que deseas expulsar y eliminar a {value0}? Su cuenta será borrada del sistema y desaparecerá por completo de la lista de colaboradores.", { value0: user.nombre || user.email || 'este usuario' }),
+      confirmLabel: t("Sí, Expulsar Definitivamente"),
       confirmVariant: 'danger',
       onConfirm: async () => {
         try {
@@ -386,7 +389,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
 
           setGlobalBanner({
             type: 'success',
-            text: `El colaborador ${user.nombre || user.email || 'seleccionado'} ha sido expulsado y eliminado del sistema.`,
+            text: `El colaborador ${user.nombre || user.email || t("seleccionado")} ha sido expulsado y eliminado del sistema.`,
           });
 
           loadData();
@@ -395,7 +398,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
           console.error('Error expulsando usuario:', err);
           setGlobalBanner({
             type: 'error',
-            text: `Error al expulsar colaborador: ${err?.message || err}`,
+            text: t("Error al expulsar colaborador: {value0}", { value0: err?.message || err }),
           });
         }
       },
@@ -426,7 +429,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
 
       setGlobalBanner({
         type: 'success',
-        text: `Acceso reactivado para ${user.nombre || 'el colaborador'}.`,
+        text: t("Acceso reactivado para {value0}.", { value0: user.nombre || 'el colaborador' }),
       });
 
       loadData();
@@ -435,7 +438,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
       console.error('Error reactivando usuario:', err);
       setGlobalBanner({
         type: 'error',
-        text: `Error al reactivar usuario: ${err?.message || err}`,
+        text: t("Error al reactivar usuario: {value0}", { value0: err?.message || err }),
       });
     }
   };
@@ -444,8 +447,8 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
   const handleRevokeInvite = (invite: Invitacion) => {
     setConfirmModal({
       isOpen: true,
-      title: '¿Revocar Invitación y Anular Enlace?',
-      message: `¿Deseas cancelar la invitación pendiente para ${invite.email}? El enlace enviado quedará invalidado de inmediato y ya no podrá ser utilizado para registrarse.`,
+      title: t("¿Revocar Invitación y Anular Enlace?"),
+      message: t("¿Deseas cancelar la invitación pendiente para {value0}? El enlace enviado quedará invalidado de inmediato y ya no podrá ser utilizado para registrarse.", { value0: invite.email }),
       confirmLabel: 'Sí',
       confirmVariant: 'danger',
       onConfirm: async () => {
@@ -487,7 +490,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
           console.error('Error revocando invitación:', err);
           setGlobalBanner({
             type: 'error',
-            text: `Error al revocar invitación: ${err?.message || err}`,
+            text: t("Error al revocar invitación: {value0}", { value0: err?.message || err }),
           });
         }
       },
@@ -534,7 +537,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
               }}
             >
               <Users size={15} />
-              <span>Colaboradores ({profiles.length})</span>
+              <span>{t("Colaboradores (")}{profiles.length})</span>
             </button>
             <button
               className={`admin-tab ${activeTab === 'invites' ? 'active' : ''}`}
@@ -586,7 +589,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                 <Search size={15} className="search-icon" />
                 <input
                   type="text"
-                  placeholder="Buscar colaborador por nombre o rol..."
+                  placeholder={t("Buscar colaborador por nombre o rol...")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -599,7 +602,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                   className="refresh-btn"
                   onClick={loadData}
                   disabled={loading}
-                  title="Recargar datos"
+                  title={t("Recargar datos")}
                 >
                   <RefreshCw size={14} className={loading ? 'spin' : ''} />
                 </button>
@@ -609,17 +612,17 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                 <table className="admin-users-table">
                   <thead>
                     <tr>
-                      <th>Colaborador</th>
+                      <th>{t("Colaborador")}</th>
                       <th>Rol</th>
-                      <th>Estatus</th>
-                      <th style={{ textAlign: 'right' }}>Acciones de Control</th>
+                      <th>{t("Estatus")}</th>
+                      <th style={{ textAlign: 'right' }}>{t("Acciones de Control")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredProfiles.length === 0 ? (
                       <tr>
                         <td colSpan={4} className="empty-table">
-                          {loading ? 'Cargando colaboradores...' : 'No se encontraron colaboradores registrados.'}
+                          {loading ? t("Cargando colaboradores...") : t("No se encontraron colaboradores registrados.")}
                         </td>
                       </tr>
                     ) : (
@@ -657,7 +660,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                             </td>
                             <td>
                               <span className={`status-tag ${isInactive ? 'inactive' : 'active'}`}>
-                                {isInactive ? 'Inactivo / Expulsado' : 'Activo'}
+                                {isInactive ? t("Inactivo / Expulsado") : t("Activo")}
                               </span>
                             </td>
                             <td>
@@ -665,30 +668,30 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                                 <button
                                   className="action-btn edit"
                                   onClick={() => startEdit(user)}
-                                  title="Editar datos del colaborador"
+                                  title={t("Editar datos del colaborador")}
                                 >
                                   <Edit2 size={13} />
-                                  <span>Editar</span>
+                                  <span>{t("Editar")}</span>
                                 </button>
 
                                 {isInactive && (
                                   <button
                                     className="action-btn reactivate"
                                     onClick={() => handleReactivateUser(user)}
-                                    title="Reactivar acceso al sistema"
+                                    title={t("Reactivar acceso al sistema")}
                                   >
                                     <UserCheck size={13} />
-                                    <span>Reactivar</span>
+                                    <span>{t("Reactivar")}</span>
                                   </button>
                                 )}
 
                                 <button
                                   className="action-btn expel"
                                   onClick={() => handleExpelUser(user)}
-                                  title="Expulsar y eliminar definitivamente del sistema"
+                                  title={t("Expulsar y eliminar definitivamente del sistema")}
                                 >
                                   <UserX size={13} />
-                                  <span>Expulsar</span>
+                                  <span>{t("Expulsar")}</span>
                                 </button>
                               </div>
                             </td>
@@ -718,18 +721,18 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                 <table className="admin-users-table">
                   <thead>
                     <tr>
-                      <th>Correo Invitado</th>
-                      <th>Rol Asignado</th>
-                      <th>Fecha</th>
-                      <th>Estatus</th>
-                      <th style={{ textAlign: 'right' }}>Enlace / Acciones</th>
+                      <th>{t("Correo Invitado")}</th>
+                      <th>{t("Rol Asignado")}</th>
+                      <th>{t("Fecha")}</th>
+                      <th>{t("Estatus")}</th>
+                      <th style={{ textAlign: 'right' }}>{t("Enlace / Acciones")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {invitaciones.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="empty-table">
-                          {loading ? 'Cargando invitaciones...' : 'No hay invitaciones registradas.'}
+                          {loading ? t("Cargando invitaciones...") : 'No hay invitaciones registradas.'}
                         </td>
                       </tr>
                     ) : (
@@ -749,14 +752,14 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                             </td>
                             <td>
                               <span className="date-tag">
-                                {new Date(inv.created_at).toLocaleDateString()}
+                                {new Date(inv.created_at).toLocaleDateString(locale)}
                               </span>
                             </td>
                             <td>
                               <span
                                 className={`status-tag ${isPending ? 'pending' : 'accepted'}`}
                               >
-                                {isPending ? 'Pendiente' : 'Aceptada'}
+                                {isPending ? t("Pendiente") : t("Aceptada")}
                               </span>
                             </td>
                             <td>
@@ -767,15 +770,15 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                                       className="action-btn email"
                                       onClick={() => handleResendInvite(inv)}
                                       disabled={resendingInviteId === inv.id}
-                                      title="Reenviar correo automáticamente con el mismo enlace"
+                                      title={t("Reenviar correo automáticamente con el mismo enlace")}
                                     >
                                       <Mail size={13} className={resendingInviteId === inv.id ? 'spin' : ''} />
-                                      <span>{resendingInviteId === inv.id ? 'Reenviando...' : 'Reenviar Mail'}</span>
+                                      <span>{resendingInviteId === inv.id ? t("Reenviando...") : t("Reenviar Mail")}</span>
                                     </button>
                                     <button
                                       className="action-btn delete"
                                       onClick={() => handleRevokeInvite(inv)}
-                                      title="Revocar invitación y anular enlace"
+                                      title={t("Revocar invitación y anular enlace")}
                                     >
                                       <Trash2 size={13} />
                                     </button>
@@ -826,7 +829,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
 
                   <div className="form-field">
                     <label>Rol Asignado en CaboSystems</label>
-                    <select
+                    <AppSelect aria-label={t("Rol Asignado")}
                       value={inviteRole}
                       onChange={(e) => setInviteRole(e.target.value)}
                       className="form-select"
@@ -836,7 +839,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                           {r.label}
                         </option>
                       ))}
-                    </select>
+                    </AppSelect>
                   </div>
                 </div>
 
@@ -862,10 +865,10 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                 <div className="generated-link-card">
                   <div className="success-header">
                     <Check size={18} color="#10b981" />
-                    <strong>¡Invitación generada exitosamente!</strong>
+                    <strong>{t("¡Invitación generada exitosamente!")}</strong>
                   </div>
                   <p>
-                    El colaborador <strong>{generatedInvite.email}</strong> ya está registrado para unirse. Puedes enviarle el correo con las instrucciones o copiar el enlace:
+                    {t("El colaborador")}<strong>{generatedInvite.email}</strong> ya está registrado para unirse. Puedes enviarle el correo con las instrucciones o copiar el enlace:
                   </p>
                   <div className="link-copy-box">
                     <input type="text" readOnly value={generatedLink} />
@@ -875,8 +878,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                     >
                       {copiedLink ? (
                         <>
-                          <Check size={14} /> Copiado
-                        </>
+                          <Check size={14} /> {t("Copiado")}</>
                       ) : (
                         <>
                           <Copy size={14} /> Copiar Link
@@ -892,10 +894,9 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                           generatedInvite.rol
                         )
                       }
-                      title="Abrir tu cliente de correo con el mensaje listo"
+                      title={t("Abrir tu cliente de correo con el mensaje listo")}
                     >
-                      <ExternalLink size={14} /> Enviar Mail
-                    </button>
+                      <ExternalLink size={14} /> {t("Enviar Mail")}</button>
                   </div>
                 </div>
               )}
@@ -908,7 +909,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
           <div className="admin-edit-submodal">
             <div className="admin-edit-card">
               <div className="edit-card-header">
-                <h3>Editar Colaborador</h3>
+                <h3>{t("Editar Colaborador")}</h3>
                 <button onClick={() => setEditingUser(null)}>
                   <X size={16} />
                 </button>
@@ -916,7 +917,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
 
               <div className="edit-card-body">
                 <div className="form-field">
-                  <label>Nombre Completo</label>
+                  <label>{t("Nombre Completo")}</label>
                   <input
                     type="text"
                     value={editNombre}
@@ -925,8 +926,8 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                 </div>
 
                 <div className="form-field">
-                  <label>Rol Asignado</label>
-                  <select
+                  <label>{t("Rol Asignado")}</label>
+                  <AppSelect aria-label={t("Rol Asignado")}
                     value={editRol}
                     onChange={(e) => setEditRol(e.target.value)}
                     className="form-select"
@@ -936,17 +937,17 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                         {r.label}
                       </option>
                     ))}
-                  </select>
+                  </AppSelect>
                 </div>
 
                 <div className="form-field toggle-field">
-                  <label>Estado de Acceso</label>
+                  <label>{t("Estado de Acceso")}</label>
                   <button
                     type="button"
                     className={`toggle-pill ${editActivo ? 'active' : 'inactive'}`}
                     onClick={() => setEditActivo(!editActivo)}
                   >
-                    {editActivo ? 'Permitido (Activo)' : 'Bloqueado (Inactivo)'}
+                    {editActivo ? t("Permitido (Activo)") : t("Bloqueado (Inactivo)")}
                   </button>
                 </div>
               </div>
@@ -957,14 +958,13 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                   onClick={() => setEditingUser(null)}
                   disabled={savingEdit}
                 >
-                  Cancelar
-                </button>
+                  {t("Cancelar")}</button>
                 <button
                   className="save-btn"
                   onClick={handleSaveEdit}
                   disabled={savingEdit}
                 >
-                  {savingEdit ? 'Guardando...' : 'Guardar Cambios'}
+                  {savingEdit ? t("Guardando...") : t("Guardar Cambios")}
                 </button>
               </div>
             </div>
@@ -991,8 +991,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                   disabled={confirmLoading}
                   onClick={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
                 >
-                  Cancelar
-                </button>
+                  {t("Cancelar")}</button>
                 <button
                   type="button"
                   className={`confirm-btn-action ${confirmModal.confirmVariant}`}
@@ -1007,7 +1006,7 @@ export const AdminUsersModal: React.FC<AdminUsersModalProps> = ({
                     }
                   }}
                 >
-                  {confirmLoading ? 'Procesando...' : confirmModal.confirmLabel}
+                  {confirmLoading ? t("Procesando...") : confirmModal.confirmLabel}
                 </button>
               </div>
             </div>

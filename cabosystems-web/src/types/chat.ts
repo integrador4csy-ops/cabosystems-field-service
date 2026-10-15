@@ -30,6 +30,16 @@ export interface ChatMessage {
   created_at: string;
   profiles?: Profile | null;
   reacciones?: ChatReaction[];
+  reply_to_id?: string | null;
+  reply?: ChatMessage | null;
+}
+
+export interface ChatPin {
+  mensaje_id: string;
+  grupo_id: string;
+  pinned_by: string;
+  created_at: string;
+  message: ChatMessage;
 }
 
 export interface ChatGroup {
