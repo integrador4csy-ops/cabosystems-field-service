@@ -55,7 +55,7 @@ test('calendar API fetches all pages of older series and rejects failed writes',
     range: async (from, to) => ({ data: records.slice(from, to + 1), error: null }),
     update: () => query, insert: () => query, delete: () => query, eq: () => query, single: async () => ({ data: null, error: denied }),
   };
-  const api = load('lib/companyAgendaApi.ts', { './supabase': { supabase: { from: table => { assert.equal(table, 'agenda_eventos'); return query; } } }, './companyAgendaRecurrence': recurrence, './companyAgenda': model });
+  const api = load('lib/companyAgendaApi.ts', { './supabase': { supabase: { functions: { invoke: async () => ({ data: { events: [] }, error: null }) }, from: table => { assert.equal(table, 'agenda_eventos'); return query; } } }, './companyAgendaRecurrence': recurrence, './companyAgenda': model });
   assert.equal((await api.getCompanyEvents('2026-10-19', '2026-10-25')).length, 501);
   assert.ok(calls.some(filter => filter.includes('repeticion.neq.ninguna')));
   await assert.rejects(api.saveCompanyEvent('id', event({ hora: '10:00' })), error => error === denied);
@@ -74,4 +74,34 @@ test('Spanish and English mobile calendar dictionaries have every field and acti
   const { COMPANY_AGENDA_COPY } = load('lib/companyAgendaCopy.ts');
   assert.deepEqual(Object.keys(COMPANY_AGENDA_COPY.es).sort(), Object.keys(COMPANY_AGENDA_COPY.en).sort());
   for (const copy of Object.values(COMPANY_AGENDA_COPY)) assert.ok(Object.values(copy).every(value => typeof value === 'string' && value.trim()));
+});
+
+test('web and mobile combine Google events, route Google writes and keep virtual fields out of local rows', async () => {
+  for (const platform of ['mobile', 'web']) {
+    const remote = event({ id: 'gcal:office:event', google: { calendarName: 'Oficina', etag: 'version' } });
+    const local = event({ id: 'local' }); const calls = []; let localInput;
+    const query = { select: () => query, lte: () => query, or: () => query, order: () => query, eq: () => query,
+      range: async () => ({ data: [local], error: null }), update: (input) => { localInput = input; return query; }, insert: (input) => { localInput = input; return query; },
+      single: async () => ({ data: local, error: null }), delete: () => query,
+    };
+    let failed = false;
+    const supabase = { from: () => query, functions: { invoke: async (name, { body }) => {
+      assert.equal(name, 'google-calendar-events'); calls.push(body);
+      return failed ? { data: null, error: new Error('Google unavailable') } : { data: { events: [remote], event: remote, calendars: [{ id: 'office', name: 'Oficina' }], deleted: true }, error: null };
+    } } };
+    const api = platform === 'mobile'
+      ? load('lib/companyAgendaApi.ts', { './supabase': { supabase }, './companyAgendaRecurrence': recurrence, './companyAgenda': model })
+      : load('../cabosystems-web/src/lib/agendaApi.ts', { './supabase': { supabase }, './agendaRecurrence': webRecurrence }, { Response });
+    const records = await api.getCompanyEvents('2026-10-19', '2026-10-25');
+    assert.deepEqual(plain(records.map((e) => e.id).sort()), ['gcal:office:event', 'local']);
+    assert.equal((await api.getGoogleCalendars())[0].id, 'office');
+    const input = { ...event({}), calendar_id: 'office', google_etag: 'version', request_id: 'a'.repeat(32), fecha_fin: '2026-10-19', hora_fin: '' };
+    await api.saveCompanyEvent(remote.id, input);
+    assert.equal(calls.at(-1).action, 'save'); assert.equal(calls.at(-1).etag, 'version');
+    await api.deleteCompanyEvent(remote.id, 'version'); assert.equal(calls.at(-1).action, 'delete');
+    await api.saveCompanyEvent(undefined, { ...input, calendar_id: '' });
+    for (const key of ['calendar_id', 'google_etag', 'request_id', 'fecha_fin']) assert.equal(key in localInput, false);
+    assert.equal(localInput.hora_fin, null);
+    failed = true; await assert.rejects(api.getCompanyEvents('2026-10-19', '2026-10-25'));
+  }
 });

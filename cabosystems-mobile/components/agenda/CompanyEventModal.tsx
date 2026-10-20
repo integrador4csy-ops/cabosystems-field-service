@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { randomUUID } from 'expo-crypto';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,16 +9,27 @@ import { dateKey } from '@/lib/agenda';
 import { isoWeekday, NO_RECURRENCE } from '@/lib/companyAgendaRecurrence';
 import { validCompanyEvent } from '@/lib/companyAgenda';
 import type { CompanyAgendaCopy } from '@/lib/companyAgendaCopy';
-import type { CompanyEvent, EventInput, RecurrenceFrequency } from '@/types/companyAgenda';
+import type { AgendaGoogleCalendar, CompanyEvent, EventInput, RecurrenceFrequency } from '@/types/companyAgenda';
+import { getGoogleCalendars } from '@/lib/companyAgendaApi';
 import { AgendaDatePicker } from './AgendaDatePicker';
 import { CompanyChoice } from './CompanyChoice';
 
-export function CompanyEventModal({ event, day, canManage, copy: c, locale, onClose, onSave, onDelete }: {
+export function CompanyEventModal({ event, day, canManage: allowed, copy: c, locale, onClose, onSave, onDelete }: {
   event: CompanyEvent | null; day: string; canManage: boolean; copy: CompanyAgendaCopy; locale: string;
-  onClose: () => void; onSave: (id: string | undefined, input: EventInput) => Promise<void>; onDelete: (id: string) => Promise<void>;
+  onClose: () => void; onSave: (id: string | undefined, input: EventInput) => Promise<void>; onDelete: (id: string, etag?: string) => Promise<void>;
 }) {
   const insets = useSafeAreaInsets();
-  const [input, setInput] = useState<EventInput>(() => ({ titulo: event?.titulo || '', descripcion: event?.descripcion || '', tipo: event?.tipo || 'evento', fecha: event?.fecha || day, hora: event?.hora?.slice(0, 5) || '', ubicacion: event?.ubicacion || '', repeticion: event?.repeticion || 'ninguna', intervalo: event?.intervalo || 1, dias_semana: event?.dias_semana || [], repetir_hasta: event?.repetir_hasta || null }));
+  const canManage = allowed && event?.google?.editable !== false;
+  const [calendars, setCalendars] = useState<AgendaGoogleCalendar[]>([]);
+  const [calendarError, setCalendarError] = useState(false);
+  const [allDay, setAllDay] = useState(!event?.hora);
+  useEffect(() => {
+    if (event || !canManage) return;
+    let active = true;
+    void getGoogleCalendars().then(items => { if (active) setCalendars(items); }).catch(() => { if (active) setCalendarError(true); });
+    return () => { active = false; };
+  }, [event, canManage]);
+  const [input, setInput] = useState<EventInput>(() => ({ titulo: event?.titulo || '', descripcion: event?.descripcion || '', tipo: event?.tipo || 'evento', fecha: event?.fecha || day, hora: event?.hora?.slice(0, 5) || '', ubicacion: event?.ubicacion || '', repeticion: event?.repeticion || 'ninguna', intervalo: event?.intervalo || 1, dias_semana: event?.dias_semana || [], repetir_hasta: event?.repetir_hasta || null, calendar_id: event?.google?.calendarId || '', google_etag: event?.google?.etag, request_id: randomUUID().replace(/-/g, ''), fecha_fin: event?.google?.endDate || '', hora_fin: (event?.google?.endTime || event?.hora_fin)?.slice(0, 5) || '' }));
   const [mode, setMode] = useState<string>(() => event && (event.intervalo > 1 || event.repeticion === 'diaria') ? 'custom' : event?.repeticion || 'ninguna');
   const [busy, setBusy] = useState(false); const [deleting, setDeleting] = useState(false); const [error, setError] = useState('');
   const disabled = !canManage || busy;
@@ -30,14 +42,15 @@ export function CompanyEventModal({ event, day, canManage, copy: c, locale, onCl
   const submit = async () => {
     if (disabled || deleting) return;
     if (!validCompanyEvent(input)) { setError(c.invalid); return; }
+    if (!allDay && (!input.hora || !input.hora_fin || !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.hora_fin) || !input.calendar_id && input.hora_fin <= input.hora)) { setError(c.invalid); return; }
     setBusy(true); setError('');
-    try { await onSave(event?.id, { ...input, titulo: input.titulo.trim(), descripcion: input.descripcion?.trim() || null, ubicacion: input.ubicacion?.trim() || null, hora: input.hora || null }); onClose(); }
-    catch { setError(c.saveFailed); } finally { setBusy(false); }
+    try { await onSave(event?.id, { ...input, titulo: input.titulo.trim(), descripcion: input.descripcion?.trim() || null, ubicacion: input.ubicacion?.trim() || null, hora: input.hora || null, hora_fin: input.hora ? input.hora_fin || null : null }); onClose(); }
+    catch (reason) { setError(input.calendar_id && reason instanceof Error && reason.message ? reason.message : c.saveFailed); } finally { setBusy(false); }
   };
   const remove = async () => {
     if (!event || disabled) return;
     setBusy(true); setError('');
-    try { await onDelete(event.id); onClose(); } catch { setError(c.deleteFailed); } finally { setBusy(false); }
+    try { await onDelete(event.id, event.google?.etag); onClose(); } catch (reason) { setError(event.google && reason instanceof Error && reason.message ? reason.message : c.deleteFailed); } finally { setBusy(false); }
   };
   const dateField = (label: string, value: string, setValue: (value: string) => void) => <View style={s.field}><Text style={s.label}>{label}</Text>{disabled ? <Text style={s.readonly}>{value.split('-').reverse().join('/')}</Text> : <AgendaDatePicker date={value} today={dateKey(new Date())} locale={locale} onSelect={setValue} />}</View>;
   const textField = (label: string, value: string, setValue: (value: string) => void, maxLength: number, multiline = false) => <View style={s.field}><Text style={s.label}>{label}</Text>{!canManage ? <Text selectable style={s.readonly}>{value || '—'}</Text> : <TextInput accessibilityLabel={label} editable={!busy} value={value} onChangeText={setValue} maxLength={maxLength} multiline={multiline} textAlignVertical={multiline ? 'top' : 'center'} style={[s.input, multiline && s.description]} />}</View>;
@@ -47,11 +60,16 @@ export function CompanyEventModal({ event, day, canManage, copy: c, locale, onCl
       <View style={s.sheet} accessibilityViewIsModal>
         <View style={s.header}><Text accessibilityRole="header" style={s.title}>{!canManage ? c.details : event ? c.edit : c.newEvent}</Text><Pressable accessibilityRole="button" accessibilityLabel={c.close} disabled={busy} style={s.icon} onPress={onClose}><X size={22} color={P.ink} /></Pressable></View>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
+          {event ? <Text style={s.help}>{c.calendar}: {event.google?.calendarName || c.localCalendar}</Text> : <CompanyChoice label={c.calendar} value={input.calendar_id || ''} disabled={disabled} options={[{ value: '', label: c.localCalendar }, ...calendars.map(calendar => ({ value: calendar.id, label: calendar.name }))]} onChange={calendar_id => change({ calendar_id })} />}
+          {calendarError ? <Text style={s.help}>{c.calendarFailed}</Text> : null}
           {textField(c.titleLabel, input.titulo, titulo => change({ titulo }), 160)}
           <CompanyChoice label={c.type} value={input.tipo} disabled={disabled} options={[{ value: 'evento', label: c.event }, { value: 'recordatorio', label: c.reminder }]} onChange={value => { change({ tipo: value as EventInput['tipo'], ...(value === 'evento' ? NO_RECURRENCE : {}) }); if (value === 'evento') setMode('ninguna'); }} />
           {dateField(c.date, input.fecha, fecha => change({ fecha }))}
-          {textField(c.time, input.hora || '', hora => change({ hora }), 5)}
-          {input.tipo === 'recordatorio' ? <View style={s.recurrence}>
+          <Pressable accessibilityRole="checkbox" accessibilityLabel={c.allDay} accessibilityState={{ checked: allDay, disabled }} disabled={disabled} style={s.button} onPress={() => { setAllDay(!allDay); change(allDay ? { hora: '09:00', hora_fin: '10:00' } : { hora: '', hora_fin: '' }); }}><Text style={s.buttonText}>{allDay ? '☑' : '☐'} {c.allDay}</Text></Pressable>
+          {!allDay ? <>{textField(c.startTime, input.hora || '', hora => change({ hora }), 5)}{textField(c.endTime, input.hora_fin || '', hora_fin => change({ hora_fin }), 5)}</> : null}
+          {input.calendar_id ? <>{dateField(c.endDate, input.fecha_fin || input.fecha, fecha_fin => change({ fecha_fin }))}<Text style={s.help}>{c.googleTime}</Text></> : null}
+          {event?.google?.recurring ? <Text style={s.help}>{c.googleOccurrence}</Text> : null}
+          {input.tipo === 'recordatorio' && !event?.google ? <View style={s.recurrence}>
             <CompanyChoice label={c.repeat} value={mode} disabled={disabled} options={[{ value: 'ninguna', label: c.none }, { value: 'semanal', label: c.weekly }, { value: 'mensual', label: c.monthly }, { value: 'custom', label: c.custom }]} onChange={changeRepeat} />
             {mode === 'custom' ? <>
               <View style={s.field}><Text style={s.label}>{c.every}</Text>{!canManage ? <Text style={s.readonly}>{input.intervalo}</Text> : <TextInput accessibilityLabel={c.interval} keyboardType="number-pad" editable={!busy} value={input.intervalo ? String(input.intervalo) : ''} onChangeText={value => change({ intervalo: Number(value) })} maxLength={3} style={s.input} />}</View>

@@ -1,4 +1,5 @@
 const es = {
+  calendar: 'Calendario', localCalendar: 'Solo CaboSystems', startTime: 'Hora de inicio (HH:mm)', endDate: 'Último día', endTime: 'Hora de fin (HH:mm)', calendarFailed: 'No se pudieron consultar los calendarios Google. Puedes guardar solo en CaboSystems.', googleTime: 'Horario de Los Cabos.', googleOccurrence: 'Los cambios y la eliminación afectan solo esta ocurrencia. La serie completa se administra en Google Calendar.', continues: 'Continúa',
   agenda: 'Agenda', views: 'Vista de agenda', clearSearch: 'Borrar búsqueda',
   title: 'Agenda de la empresa', newEvent: 'Nuevo evento', edit: 'Editar evento', details: 'Detalle del evento',
   event: 'Evento', reminder: 'Recordatorio', all: 'Todos', events: 'Eventos', reminders: 'Recordatorios',
@@ -21,6 +22,7 @@ const es = {
 };
 export type CompanyAgendaCopy = typeof es;
 const en: CompanyAgendaCopy = {
+  calendar: 'Calendar', localCalendar: 'CaboSystems only', startTime: 'Start time (HH:mm)', endDate: 'Last day', endTime: 'End time (HH:mm)', calendarFailed: 'Could not load Google calendars. You can still save locally.', googleTime: 'Los Cabos time.', googleOccurrence: 'Changes and deletion apply only to this occurrence. Manage the full series in Google Calendar.', continues: 'Continues',
   agenda: 'Calendar', views: 'Calendar view', clearSearch: 'Clear search',
   title: 'Company calendar', newEvent: 'New event', edit: 'Edit event', details: 'Event details',
   event: 'Event', reminder: 'Reminder', all: 'All', events: 'Events', reminders: 'Reminders',

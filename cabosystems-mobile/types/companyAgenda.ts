@@ -15,9 +15,14 @@ export interface CompanyEvent extends EventRecurrence {
   tipo: AgendaKind;
   fecha: string;
   hora: string | null;
+  hora_fin?: string | null;
   ubicacion: string | null;
   created_at: string;
   occurrence_date?: string;
+  google?: { calendarId: string; calendarName: string; calendarColor?: string; etag: string; recurring: boolean; editable: boolean; endDate: string; endTime: string | null; lastDay: string; timeZone: string };
 }
 
-export type EventInput = Omit<CompanyEvent, 'id' | 'created_at' | 'occurrence_date'>;
+export type EventInput = Omit<CompanyEvent, 'id' | 'created_at' | 'occurrence_date' | 'google'> & {
+  calendar_id?: string; google_etag?: string; request_id?: string; fecha_fin?: string; hora_fin?: string | null;
+};
+export interface AgendaGoogleCalendar { id: string; name: string; timeZone: string; backgroundColor?: string }

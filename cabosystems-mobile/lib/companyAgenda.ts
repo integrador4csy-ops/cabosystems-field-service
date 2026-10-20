@@ -22,7 +22,7 @@ export function companyRows(events: CompanyEvent[], query: string, kind: '' | Co
   const groups = new Map<string, CompanyEvent[]>();
   for (const event of events) {
     if (kind && kind !== event.tipo) continue;
-    const text = normalizeAgendaSearch([event.titulo, event.descripcion, event.ubicacion].filter(Boolean).join(' '));
+    const text = normalizeAgendaSearch([event.titulo, event.descripcion, event.ubicacion, event.google?.calendarName].filter(Boolean).join(' '));
     if (!terms.every(term => text.includes(term))) continue;
     const day = event.occurrence_date || event.fecha;
     const group = groups.get(day) || []; group.push(event); groups.set(day, group);

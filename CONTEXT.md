@@ -2,6 +2,8 @@
 
 Este documento contiene la información completa, arquitectura, modelo de base de datos, decisiones de diseño y estado actual del proyecto para cualquier agente de Inteligencia Artificial o desarrollador que continúe el trabajo en el repositorio.
 
+Actualización al 20 de octubre de 2026: la agenda general de empresa está separada de las tareas en web y móvil, con eventos, recordatorios recurrentes y permisos en Supabase. [Detalle de agenda](docs/company-agenda.md), [reporte semanal del 19 al 23](docs/reporte_semanal_19_23_octubre.md). El commit `c8960fe` corresponde a la reestructuración inicial; los avances posteriores se incluyen en «Implementacion de Google Calendar Api». Google Calendar tiene OAuth, selección y consulta/gestión directa de eventos implementadas en web y móvil, tres funciones desplegadas y migración `20261020185353` aplicada. El usuario autorizó su cuenta y confirmó que un evento Google aparece en la web. Google conserva los eventos de origen, sin duplicarlos en agenda_eventos; las escrituras llevan control ETag e idempotencia de creación. [Estado y límites](docs/google-calendar-integration.md). Pendientes escrituras reales en calendario de pruebas y prueba móvil física; no se ha publicado el frontend ni una actualización móvil.
+
 ---
 
 ## 1. Resumen Ejecutivo del Proyecto

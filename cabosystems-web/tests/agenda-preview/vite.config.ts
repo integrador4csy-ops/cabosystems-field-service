@@ -6,6 +6,7 @@ export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),
   plugins: [react(), tailwindcss()],
   resolve: { alias: [
+    { find: /.*lib\/googleCalendarApi$/, replacement: fileURLToPath(new URL('./googleApi.ts', import.meta.url)) },
     { find: /.*context\/AdminAuthContext$/, replacement: fileURLToPath(new URL('./auth.ts', import.meta.url)) },
     { find: /.*lib\/agendaApi$/, replacement: fileURLToPath(new URL('./api.ts', import.meta.url)) },
     { find: /.*lib\/supabase$/, replacement: fileURLToPath(new URL('./supabase.ts', import.meta.url)) },

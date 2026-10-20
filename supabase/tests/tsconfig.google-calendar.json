@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023", "DOM"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "npm:@supabase/supabase-js@2.116.0": ["../../cabosystems-web/node_modules/@supabase/supabase-js/dist/index.d.mts"]
+    }
+  },
+  "include": ["calendar-runtime.d.ts", "../functions/_shared/google-calendar/*.ts", "../functions/google-calendar/index.ts", "../functions/google-calendar-callback/index.ts", "../functions/google-calendar-events/index.ts"]
+}

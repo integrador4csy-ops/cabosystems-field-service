@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 import ts from 'typescript';
 import { PGlite } from '@electric-sql/pglite';
@@ -75,6 +75,8 @@ test('agenda database enforces role access, active membership and valid entries'
       create policy self_profile on profiles for select to authenticated using(id=auth.uid());`);
     await db.exec(readFileSync(new URL('../../supabase/migrations/20261019232359_company_agenda.sql', import.meta.url), 'utf8'));
     await db.exec(readFileSync(new URL('../../supabase/migrations/20261019233835_agenda_reminder_recurrence.sql', import.meta.url), 'utf8'));
+    const endTimeMigration = readdirSync(new URL('../../supabase/migrations/', import.meta.url)).find((name) => name.endsWith('_agenda_event_end_time.sql'));
+    await db.exec(readFileSync(new URL(`../../supabase/migrations/${endTimeMigration}`, import.meta.url), 'utf8'));
     const asUser = async (id, query) => {
       await db.exec(`begin; set local role authenticated; set local request.jwt.claim.sub = '${id}';`);
       try { const result = await db.query(query); await db.exec('commit'); return result; }
@@ -83,6 +85,11 @@ test('agenda database enforces role access, active membership and valid entries'
     const insert = (kind) => `insert into agenda_eventos(titulo,tipo,fecha) values('Entrega de casa','${kind}','2026-10-24') returning id`;
     const event = (await asUser(ids[0], insert('evento'))).rows[0].id;
     const reminder = (await asUser(ids[1], insert('recordatorio'))).rows[0].id;
+    assert.equal((await asUser(ids[0], `select hora_fin from agenda_eventos where id='${event}'`)).rows[0].hora_fin, null);
+    await asUser(ids[0], `update agenda_eventos set hora='09:00',hora_fin='10:00' where id='${event}'`);
+    await assert.rejects(asUser(ids[0], `update agenda_eventos set hora_fin='08:00' where id='${event}'`));
+    await assert.rejects(asUser(ids[0], `update agenda_eventos set hora=null where id='${event}'`));
+    await asUser(ids[0], `update agenda_eventos set hora=null,hora_fin=null where id='${event}'`);
     assert.equal((await asUser(ids[0], `select repeticion from agenda_eventos where id='${event}'`)).rows[0].repeticion, 'ninguna');
     const rule = (await asUser(ids[1], `update agenda_eventos set repeticion='semanal', intervalo=2, dias_semana=array[1,7], repetir_hasta='2026-12-31' where id='${reminder}' returning *`)).rows[0];
     assert.equal(rule.repeticion, 'semanal'); assert.deepEqual(rule.dias_semana, [1, 7]);

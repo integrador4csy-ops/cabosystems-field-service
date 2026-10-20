@@ -8,6 +8,8 @@ import { useProjects } from '@/lib/projects';
 import type { Project } from '@/types/database';
 
 interface HeaderProps {
+  showProjectSelector?: boolean;
+  rightAccessory?: React.ReactNode;
   projects?: Project[];
   selectedProjectId?: string;
   onSelectProject?: (project: Project) => void;
@@ -27,6 +29,8 @@ export function useHeaderHeight() {
 }
 
 export function HeaderCaboSystems({
+  showProjectSelector = true,
+  rightAccessory,
   projects: propProjects,
   selectedProjectId: propSelectedProjectId,
   onSelectProject: propOnSelectProject,
@@ -71,7 +75,8 @@ export function HeaderCaboSystems({
           </View>
 
           {/* Selector de Villa Minimalista */}
-          {projects.length > 0 && (
+          {rightAccessory}
+          {showProjectSelector && projects.length > 0 && (
             <Pressable
               style={({ pressed }) => [
                 styles.selector,

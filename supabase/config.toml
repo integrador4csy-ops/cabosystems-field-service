@@ -1,0 +1,12 @@
+project_id = "cabosystems-field-service"
+
+[functions.google-calendar]
+verify_jwt = true
+
+[functions.google-calendar-events]
+verify_jwt = true
+
+[functions.google-calendar-callback]
+# Google redirects without a Supabase Authorization header. The handler
+# validates expiring single-use OAuth state, PKCE and a canonical active admin.
+verify_jwt = false
