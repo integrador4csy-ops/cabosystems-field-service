@@ -27,6 +27,8 @@ import {
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { Badge, Card, Button } from '@/components/ui';
 import { getTaskById, updateTaskStatus, toggleSubtarea, type TaskDetail } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { canUpdateTaskProgress } from '@/lib/taskAccess';
 import type { Subtarea } from '@/types/database';
 
 const STATUS_META: Record<
@@ -89,9 +91,11 @@ export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { profile } = useAuth();
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const canProgress = canUpdateTaskProgress(task, profile);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -112,7 +116,7 @@ export default function TaskDetailScreen() {
   }, [load]);
 
   const handleStatusChange = async () => {
-    if (!task) return;
+    if (!task || !canProgress) return;
     const next = NEXT_STATUS[task.estatus];
     if (!next) return;
     setSaving(true);
@@ -128,7 +132,7 @@ export default function TaskDetailScreen() {
   };
 
   const handleToggleSubtarea = async (sub: Subtarea) => {
-    if (!task) return;
+    if (!task || !canProgress) return;
     try {
       await toggleSubtarea(sub.id, !sub.completada);
       setTask({
@@ -300,6 +304,9 @@ export default function TaskDetailScreen() {
                     pressed && { opacity: 0.75 },
                   ]}
                   onPress={() => handleToggleSubtarea(sub)}
+                  disabled={!canProgress}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: sub.completada, disabled: !canProgress }}
                 >
                   {sub.completada ? (
                     <CheckSquare size={18} color={Colors.success} />
@@ -322,7 +329,7 @@ export default function TaskDetailScreen() {
       </ScrollView>
 
       {/* Footer de Acciones Ergonómico TailAdmin */}
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
+      {canProgress ? <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
         <Button
           variant={task.estatus === 'completada' ? 'outline' : 'primary'}
           size="lg"
@@ -337,7 +344,7 @@ export default function TaskDetailScreen() {
         >
           {next.label}
         </Button>
-      </View>
+      </View> : <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}><Text style={styles.emptyText}>Solo consulta. El responsable o un administrador puede actualizar esta tarea.</Text></View>}
     </View>
   );
 }

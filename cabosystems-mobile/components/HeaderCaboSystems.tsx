@@ -11,6 +11,8 @@ interface HeaderProps {
   projects?: Project[];
   selectedProjectId?: string;
   onSelectProject?: (project: Project) => void;
+  allProjectsSelected?: boolean;
+  onSelectAllProjects?: () => void;
 }
 
 const LOGO_DARK = require('@/assets/images/Logo-CaboSystems-Field-Service-Dark.png');
@@ -28,6 +30,8 @@ export function HeaderCaboSystems({
   projects: propProjects,
   selectedProjectId: propSelectedProjectId,
   onSelectProject: propOnSelectProject,
+  allProjectsSelected = false,
+  onSelectAllProjects,
 }: HeaderProps = {}) {
   const context = useProjects();
   const projects = propProjects ?? context.projects;
@@ -48,8 +52,8 @@ export function HeaderCaboSystems({
     return Array.from(map.entries());
   }, [projects]);
 
-  const selected = projects.find((p) => p.id === selectedProjectId) ?? projects[0];
-  const displayCode = selected?.villa || selected?.unidad || 'Sin villa';
+  const selected = allProjectsSelected ? undefined : projects.find((p) => p.id === selectedProjectId) ?? projects[0];
+  const displayCode = allProjectsSelected ? 'Todas las villas' : selected?.villa || selected?.unidad || 'Sin villa';
 
   return (
     <View style={styles.headerWrapper}>
@@ -71,11 +75,15 @@ export function HeaderCaboSystems({
             <Pressable
               style={({ pressed }) => [
                 styles.selector,
+                allProjectsSelected && styles.selectorAll,
                 isTablet && styles.selectorTablet,
                 selected && styles.selectorActive,
                 pressed && (selected ? styles.selectorActivePressed : styles.selectorPressed),
               ]}
               hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={`Filtrar por villa: ${displayCode}`}
+              accessibilityState={{ expanded: visible }}
               onPress={() => setVisible(true)}
             >
               <View style={[styles.selectorPinBox, selected && styles.selectorPinBoxActive]}>
@@ -87,7 +95,7 @@ export function HeaderCaboSystems({
                   isTablet && styles.selectorTextTablet,
                   selected && styles.selectorTextActive,
                 ]}
-                numberOfLines={1}
+                numberOfLines={allProjectsSelected ? 2 : 1}
               >
                 {displayCode}
               </Text>
@@ -121,6 +129,15 @@ export function HeaderCaboSystems({
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
+              {onSelectAllProjects ? <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: allProjectsSelected }}
+                style={[styles.unitRow, allProjectsSelected && styles.unitRowSelected]}
+                onPress={() => { onSelectAllProjects(); setVisible(false); }}
+              >
+                <Text style={[styles.unitCode, allProjectsSelected && styles.unitCodeSelected]}>Todas las villas</Text>
+                {allProjectsSelected ? <Check color="#FFFFFF" size={16} /> : null}
+              </Pressable> : null}
               {grouped.map(([desarrollo, units]) => (
                 <View key={desarrollo} style={styles.devSection}>
                   <Text style={styles.devName}>{desarrollo}</Text>
@@ -188,34 +205,43 @@ const styles = StyleSheet.create({
     minHeight: 78,
   },
   logoContainer: {
+    flex: 1,
+    minWidth: 0,
     justifyContent: 'center',
     alignItems: 'flex-start',
     transform: [{ translateY: -3 }],
   },
   logo: {
-    width: 220,
+    width: '100%',
+    maxWidth: 220,
     height: 54,
   },
   logoTablet: {
-    width: 250,
+    maxWidth: 250,
     height: 60,
   },
   selector: {
+    flexShrink: 1,
+    maxWidth: '48%',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
     paddingVertical: 7,
     paddingHorizontal: 12,
     borderRadius: BorderRadius.full,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E4E7EC',
+    borderColor: Colors.border,
     ...Shadow.xs,
   },
   selectorTablet: {
     paddingVertical: 8,
     paddingHorizontal: 16,
     gap: 8,
+  },
+  selectorAll: {
+    width: '48%',
+    minHeight: 44,
   },
   selectorPressed: {
     backgroundColor: Colors.primaryLight,
@@ -244,6 +270,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.22)',
   },
   selectorText: {
+    flexShrink: 1,
     fontFamily: 'Outfit_700Bold',
     fontSize: 13.5,
     color: Colors.text,

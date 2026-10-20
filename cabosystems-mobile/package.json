@@ -4,7 +4,7 @@
   "version": "1.2.0",
   "scripts": {
     "test:chat": "node --test tests/chat.test.cjs",
-    "test:agenda": "node --test tests/agenda.test.cjs",
+    "test:agenda": "node --test tests/agenda.test.cjs tests/company-agenda.test.cjs",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",

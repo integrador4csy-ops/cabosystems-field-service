@@ -1,0 +1,51 @@
+.company-agenda .agenda-date-controls { flex-wrap: wrap; }
+.company-agenda .agenda-date-controls > .app-select-trigger { width: auto; min-width: 100px; }
+.company-calendar-scroll { flex: 1; min-height: 0; overflow: auto; padding: 0 16px 16px; }
+.company-calendar { width: 100%; min-width: 840px; table-layout: fixed; border-collapse: collapse; }
+.company-calendar th { position: sticky; top: 0; z-index: 1; padding: 10px; background: var(--color-slate-50); color: var(--color-slate-600); text-align: left; font-size: 13px; text-transform: capitalize; }
+.company-calendar td, .company-calendar th { border: 1px solid var(--color-slate-200); }
+.company-calendar td { height: 130px; padding: 6px; vertical-align: top; }
+.company-calendar .is-outside-month { background: var(--color-slate-50); }
+.company-day-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.company-day-heading h3 { font-size: 14px; font-weight: 600; text-transform: capitalize; }
+.company-add { width: 28px; height: 28px; }
+.company-calendar .is-today .agenda-month-date { background: var(--color-brand-500); color: white; }
+.company-event { display: flex; align-items: flex-start; gap: 6px; width: 100%; padding: 8px 6px; border-radius: 6px; text-align: left; color: var(--color-slate-800); }
+.company-event:hover { background: var(--color-slate-100); }
+.company-event > svg { flex-shrink: 0; margin-top: 3px; color: var(--color-slate-600); }
+.company-event > span { min-width: 0; }
+.company-event-title { display: block; font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
+.company-event-meta { display: block; font-size: 12px; color: var(--color-slate-600); overflow-wrap: anywhere; }
+.company-more { padding: 6px; color: var(--color-slate-700); text-decoration: underline; font-size: 12px; }
+.company-columns { display: grid; grid-template-columns: repeat(7, minmax(170px, 1fr)); min-width: 1190px; }
+.company-columns.is-day { grid-template-columns: 1fr; min-width: 0; }
+.company-columns > section { padding: 12px; border: 1px solid var(--color-slate-200); min-height: 240px; }
+.company-columns > .is-today { background: var(--color-brand-25); }
+.company-columns.is-day .company-event { max-width: 760px; padding: 16px 8px; border-bottom: 1px solid var(--color-slate-200); }
+.company-empty { padding: 12px 4px; color: var(--color-slate-600); font-size: 13px; }
+.company-dialog-backdrop { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgb(15 23 42 / 50%); }
+.company-dialog { width: 100%; max-width: 560px; max-height: calc(100dvh - 32px); overflow: auto; border-radius: 16px; background: white; color: var(--color-slate-800); }
+.company-dialog > header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid var(--color-slate-200); }
+.company-dialog h2 { font-size: 18px; font-weight: 600; }
+.company-dialog form { padding: 20px 24px; }
+.company-dialog fieldset { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.company-dialog label { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 13px; font-weight: 500; }
+.company-dialog input, .company-dialog textarea { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--color-slate-200); border-radius: 8px; font-size: 14px; background: white; }
+.company-dialog textarea { resize: vertical; }
+.company-dialog fieldset:disabled input, .company-dialog fieldset:disabled textarea { opacity: 1; color: var(--color-slate-700); -webkit-text-fill-color: var(--color-slate-700); }
+.company-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.company-dialog footer { display: flex; align-items: center; gap: 8px; padding-top: 24px; }
+.company-dialog footer > span { flex: 1; }
+.company-error, .company-danger { color: #b91c1c; }
+.company-error, .company-delete-confirm { margin-top: 16px; font-size: 14px; }
+.company-delete-confirm .workspace-button { margin: 12px 8px 0 0; }
+.company-dialog button:disabled { opacity: .6; cursor: default; }
+.company-recurrence { display: flex; flex-direction: column; gap: 16px; padding: 16px 0; border-block: 1px solid var(--color-slate-200); }
+.company-repeat-interval { display: grid; grid-template-columns: minmax(90px, 1fr) 2fr; gap: 16px; align-items: end; }
+.company-weekday-field > span { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 500; }
+.company-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.company-weekdays button { min-width: 0; min-height: 40px; padding: 4px; border: 1px solid var(--color-slate-200); border-radius: 8px; font-size: 13px; text-transform: capitalize; }
+.company-weekdays button[aria-pressed="true"] { border-color: var(--color-brand-500); background: var(--color-brand-50); color: var(--color-brand-800); font-weight: 600; }
+.company-weekdays button:hover:not(:disabled) { border-color: var(--color-brand-500); }
+.company-field-help { font-size: 13px; line-height: 1.5; color: var(--color-slate-600); }
+@media (max-width: 600px) { .company-form-row { grid-template-columns: 1fr; } .company-agenda .agenda-month-title { font-size: 18px; } .company-dialog form { padding: 16px; } }

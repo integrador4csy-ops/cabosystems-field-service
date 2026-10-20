@@ -62,3 +62,11 @@ El asesor detectó dos RPC heredados (`actualizar_datos_usuario`, `expulsar_usua
 **Aplicada con autorización específica del usuario:** versión remota `20261015220443`. Se verificó por consultas de solo lectura que las cinco funciones exigen administrador activo, no permiten ejecución anónima y tienen search_path fijo. El asesor ya no reporta ejecución anónima ni search_path mutable en estas cinco funciones. Mantiene la advertencia informativa de SECURITY DEFINER para usuarios autenticados: es intencional y está protegida por la comprobación interna de administrador. No cambia usuarios ni les concede permisos; restringe las funciones antiguas que modifican autoridad. Referencia del asesor: https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable .
 
 La pantalla web conectada se verificó con la sesión existente: listado de los tres desarrollos, villas de Chileno Bay y detalle de GE51. No hubo escrituras de equipo durante esta revisión. Evidencia: screenshots/projects-live.jpg.
+
+## Visibilidad en móvil
+
+Tareas y Agenda consultan todas las tareas permitidas por RLS, conservando los filtros de villa, fecha y estado. Se eliminó el filtro exclusivo por asignación personal de estas pantallas. La consulta pagina los resultados y se actualiza al regresar a la pantalla o reactivar la app. El acceso global permite consultar; únicamente el responsable de la tarea o un administrador activo puede actualizar progreso y checklist.
+
+Diagnóstico de solo lectura del 15 de octubre: la cuenta auxiliar con acceso global podía consultar 5 tareas en 4 villas mediante RLS, pero tenía 0 tareas asignadas directamente. El filtro anterior explicaba el listado vacío. No se modificaron permisos ni datos para corregirlo. La instalación móvil debe cargar la versión actualizada para recibir este cambio.
+
+Verificación física: en Expo Go, la cuenta auxiliar con acceso global muestra las 2 tareas de Villa 01. Agenda muestra su tarea programada y su tarea sin fecha; al seleccionar todas las villas, muestra 3 tareas sin fecha, incluyendo Casa 01 y Villa 03. No se modificaron datos. El APK independiente instalado todavía necesita una nueva compilación con estos cambios; la validación física corresponde al código actualizado ejecutado en Expo Go.

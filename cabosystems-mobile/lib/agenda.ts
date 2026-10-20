@@ -1,7 +1,7 @@
 import type { TaskWithProject } from './api';
 import type { TaskStatus } from '@/types/database';
 
-export type AgendaView = 'month' | 'day' | 'week' | 'unscheduled';
+export type AgendaView = 'month' | 'day' | 'week' | 'year' | 'unscheduled';
 export type AgendaStatus = 'all' | TaskStatus;
 export type AgendaRow = { kind: 'heading'; date: string; count: number } | { kind: 'task'; task: TaskWithProject } | { kind: 'empty'; date: string };
 
@@ -48,16 +48,27 @@ export function filterAgendaTasks(tasks: TaskWithProject[], query: string, proje
 }
 export function periodTasks(tasks: TaskWithProject[], view: AgendaView, date: string) {
   if (view === 'unscheduled') return tasks.filter((task) => !task.fecha_programada);
-  if (view !== 'week') return tasks.filter((task) => task.fecha_programada === date);
-  const days = new Set(weekDates(date).slice(0, 5));
+  if (view === 'year' || view === 'month') {
+    const prefix = date.slice(0, view === 'year' ? 4 : 7);
+    return tasks.filter(task => task.fecha_programada?.startsWith(`${prefix}-`));
+  }
+  if (view === 'day') return tasks.filter((task) => task.fecha_programada === date);
+  const days = new Set(weekDates(date));
   return tasks.filter((task) => task.fecha_programada && days.has(task.fecha_programada));
 }
 export function agendaRows(tasks: TaskWithProject[], view: AgendaView, date: string): AgendaRow[] {
-  if (view !== 'week') return periodTasks(tasks, view, date).map((task) => ({ kind: 'task', task }));
-  return weekDates(date).slice(0, 5).flatMap((day): AgendaRow[] => {
-    const items = tasks.filter((task) => task.fecha_programada === day);
-    return [{ kind: 'heading', date: day, count: items.length }, ...(items.length ? items.map((task): AgendaRow => ({ kind: 'task', task })) : [{ kind: 'empty' as const, date: day }])];
-  });
+  const items = periodTasks(tasks, view, date).slice().sort((a, b) => (a.fecha_programada || '').localeCompare(b.fecha_programada || '') || a.id.localeCompare(b.id));
+  if (view === 'day' || view === 'unscheduled') return items.map(task => ({ kind: 'task', task }));
+  const groups = new Map<string, TaskWithProject[]>();
+  for (const task of items) {
+    const day = task.fecha_programada!;
+    const group = groups.get(day) || [];
+    group.push(task); groups.set(day, group);
+  }
+  return Array.from(groups, ([day, group]): AgendaRow[] => [
+    { kind: 'heading', date: day, count: group.length },
+    ...group.map((task): AgendaRow => ({ kind: 'task', task })),
+  ]).flat();
 }
 export function isOverdue(task: Pick<TaskWithProject, 'fecha_programada' | 'estatus'>, today = dateKey(new Date())) {
   return Boolean(task.fecha_programada && task.fecha_programada < today && task.estatus !== 'completada');

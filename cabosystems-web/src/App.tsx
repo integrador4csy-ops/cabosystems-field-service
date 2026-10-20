@@ -27,6 +27,7 @@ const LiveMap = lazy(() => import('./components/LiveMap').then((module) => ({ de
 const ChatView = lazy(() => import('./components/chat/ChatView').then((module) => ({ default: module.ChatView })));
 
 const ProjectsManagementView = lazy(() => import('./components/projects/ProjectsManagementView').then((module) => ({ default: module.ProjectsManagementView })));
+const CompanyAgenda = lazy(() => import('./components/agenda/CompanyAgenda').then((module) => ({ default: module.CompanyAgenda })));
 const ProjectDirectoryView = lazy(() => import('./components/projects/ProjectDirectoryView').then((module) => ({ default: module.ProjectDirectoryView })));
 
 const TeamManagementView = lazy(() => import('./components/team/TeamManagementView').then((module) => ({ default: module.TeamManagementView })));
@@ -372,8 +373,10 @@ function DashboardContent() {
             <TeamManagementView onTeamChanged={fetchFleet} />
           ) : activeItem === 'directorio-proyectos' ? (
             <ProjectDirectoryView key={user?.id} />
-          ) : activeItem === 'proyectos' || activeItem === 'agenda' ? (
-            <ProjectsManagementView mode={activeItem === 'agenda' ? 'agenda' : 'tasks'} />
+          ) : activeItem === 'agenda' ? (
+            <CompanyAgenda key={user?.id} />
+          ) : activeItem === 'proyectos' ? (
+            <ProjectsManagementView mode="tasks" />
           ) : (
             <div className="flex-1 h-full w-full rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden relative isolate">
               <LiveMap

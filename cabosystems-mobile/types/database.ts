@@ -56,7 +56,7 @@ export interface Project {
 export interface Task {
   id: string;
   proyecto_id: string;
-  asignado_a: string;
+  asignado_a: string | null;
   titulo: string;
   descripcion: string | null;
   estatus: TaskStatus;

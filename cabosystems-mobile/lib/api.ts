@@ -48,25 +48,26 @@ function normalizeTaskProject<T extends { proyectos: any }>(task: T): T {
   return task;
 }
 
-export async function getMyTasks(userId: string): Promise<TaskWithProject[]> {
-  const { data, error } = await supabase
-    .from('tareas')
-    .select('*, proyectos(*), profiles(nombre)')
-    .eq('asignado_a', userId)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return (data ?? []).map(normalizeTaskProject) as TaskWithProject[];
+export async function getAllTasks(): Promise<TaskWithProject[]> {
+  const tasks: TaskWithProject[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await supabase
+      .from('tareas')
+      .select('*, proyectos(*), profiles(nombre)')
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(offset, offset + 499);
+    if (error) throw error;
+    tasks.push(...(data ?? []).map(normalizeTaskProject) as TaskWithProject[]);
+    if (!data || data.length < 500) return tasks;
+  }
 }
 
-export async function getAllTasks(): Promise<TaskWithProject[]> {
-  const { data, error } = await supabase
-    .from('tareas')
-    .select('*, proyectos(*), profiles(nombre)')
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return (data ?? []).map(normalizeTaskProject) as TaskWithProject[];
+/** The authenticated session's RLS determines villa/development/global visibility.
+ * Occupational role and direct task assignment must not narrow this query. */
+export async function getAccessibleTasks(userId: string): Promise<TaskWithProject[]> {
+  if (!userId) return [];
+  return getAllTasks();
 }
 
 export async function getTaskById(id: string): Promise<TaskDetail> {
@@ -84,7 +85,9 @@ export async function updateTaskStatus(id: string, estatus: TaskStatus): Promise
   const { error } = await supabase
     .from('tareas')
     .update({ estatus })
-    .eq('id', id);
+    .eq('id', id)
+    .select('id')
+    .single();
 
   if (error) throw error;
 }
@@ -104,7 +107,9 @@ export async function toggleSubtarea(id: string, completada: boolean): Promise<v
   const { error } = await supabase
     .from('subtareas')
     .update({ completada })
-    .eq('id', id);
+    .eq('id', id)
+    .select('id')
+    .single();
 
   if (error) throw error;
 }

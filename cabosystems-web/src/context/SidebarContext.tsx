@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState } from 'react';
+import { useSessionPreference } from '../hooks/useSessionPreference';
+import { isNavigationItem, isStringPreference } from '../lib/sessionPreferences';
 
 interface SidebarContextType {
+  agendaSearchQuery: string;
+  setAgendaSearchQuery: (query: string) => void;
+  agendaCreateVersion: number;
+  requestCreateEvent: () => void;
   isExpanded: boolean;
   isHovered: boolean;
   isMobileOpen: boolean;
@@ -34,15 +40,21 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [activeItem, setActiveItem] = useState<string>('radar');
+  const [activeItem, setActiveItem] = useSessionPreference('csy_active_section', 'radar', isNavigationItem);
   const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
   const [targetGroupId, setTargetGroupId] = useState<string | null>(null);
-  const [taskSearchQuery, setTaskSearchQuery] = useState('');
+  const [taskSearchQuery, setTaskSearchQuery] = useSessionPreference('csy_task_search', '', isStringPreference);
   const [taskCreateVersion, setTaskCreateVersion] = useState(0);
+  const [agendaSearchQuery, setAgendaSearchQuery] = useSessionPreference('csy_company_agenda_search', '', isStringPreference);
+  const [agendaCreateVersion, setAgendaCreateVersion] = useState(0);
 
   return (
     <SidebarContext.Provider
       value={{
+        agendaSearchQuery,
+        setAgendaSearchQuery,
+        agendaCreateVersion,
+        requestCreateEvent: () => setAgendaCreateVersion((version) => version + 1),
         isExpanded,
         isHovered,
         isMobileOpen,

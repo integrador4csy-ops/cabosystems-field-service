@@ -41,15 +41,26 @@ test('mobile workweek and month calendars match the web including leap years', (
 
 test('agenda uses scheduled dates, keeps undated tasks accessible, and supports weekend day view', () => {
   assert.equal(agenda.periodTasks(tasks, 'day', '2026-10-15').map(t => t.id).join(','), 'install,done');
-  assert.equal(agenda.periodTasks(tasks, 'month', '2026-10-15').length, 2);
+  assert.equal(agenda.periodTasks(tasks, 'month', '2026-10-15').length, 4);
   assert.equal(agenda.periodTasks(tasks, 'unscheduled', '2026-10-15')[0].id, 'undated');
-  assert.equal(agenda.periodTasks(tasks, 'week', '2026-10-15').length, 3);
+  assert.equal(agenda.periodTasks(tasks, 'week', '2026-10-15').length, 4);
   assert.equal(agenda.periodTasks(tasks, 'day', '2026-10-17')[0].id, 'saturday');
   assert.equal(agenda.periodTasks(tasks, 'day', '2026-01-01').length, 0);
   const rows = agenda.agendaRows(tasks, 'week', '2026-10-15');
-  assert.equal(rows.filter(row => row.kind === 'heading').length, 5);
-  assert.equal(rows.filter(row => row.kind === 'task').length, 3);
-  assert.equal(rows.filter(row => row.kind === 'empty').length, 3);
+  assert.equal(rows.filter(row => row.kind === 'heading').length, 3);
+  assert.equal(rows.filter(row => row.kind === 'task').length, 4);
+  assert.equal(rows.filter(row => row.kind === 'empty').length, 0);
+});
+
+test('month and year lists include the entire period, ordered by date, across leap years and year boundaries', () => {
+  const items = [task('last', '2026-12-31'), task('first', '2026-01-01'), task('next', '2027-01-01'), task('middle', '2026-10-20'), task('leap', '2024-02-29'), task('none', null)];
+  assert.equal(agenda.periodTasks(items, 'year', '2026-10-15').length, 3);
+  assert.equal(agenda.periodTasks(items, 'month', '2026-12-01')[0].id, 'last');
+  assert.equal(agenda.periodTasks(items, 'month', '2024-02-01')[0].id, 'leap');
+  assert.equal(agenda.agendaRows(items, 'year', '2026-10-15').filter(row => row.kind === 'task').map(row => row.task.id).join(','), 'first,middle,last');
+  assert.equal(agenda.agendaRows(items, 'month', '2026-10-01').filter(row => row.kind === 'task')[0].task.id, 'middle');
+  assert.equal(agenda.shiftMonth('2024-02-29', 12), '2025-02-28');
+  assert.equal(agenda.shiftMonth('2026-12-31', 1), '2027-01-31');
 });
 
 test('search, villa and status filters combine without modifying the source tasks', () => {
@@ -70,13 +81,75 @@ test('overdue status excludes completed tasks and both language dictionaries sta
   assert.deepEqual(Object.keys(AGENDA_COPY.es).sort(), Object.keys(AGENDA_COPY.en).sort());
 });
 
-test('assigned-task API preserves the scheduled date and keeps the account filter', async () => {
-  const calls = [];
-  const result = [task('install', '2026-10-15')];
-  const query = { select: (...args) => { calls.push(['select', ...args]); return query; }, eq: (...args) => { calls.push(['eq', ...args]); return query; }, order: () => query,
-    then: (resolve, reject) => Promise.resolve({ data: result, error: null }).then(resolve, reject) };
-  const api = load('lib/api.ts', { './supabase': { supabase: { from: table => { calls.push(['table', table]); return query; } } } });
-  const items = await api.getMyTasks('technician');
+test('accessible tasks preserve their scheduled date', async () => {
+  const { api } = accessibleApi([task('install', '2026-10-15')]);
+  const items = await api.getAccessibleTasks('technician');
   assert.equal(items[0].fecha_programada, '2026-10-15');
-  assert.deepEqual(calls.find(call => call[0] === 'eq'), ['eq', 'asignado_a', 'technician']);
+});
+
+function accessibleApi(rows, failure = null) {
+  const calls = [];
+  const query = {
+    select: (...args) => { calls.push(['select', ...args]); return query; },
+    eq: (...args) => { calls.push(['eq', ...args]); return query; },
+    order: (...args) => { calls.push(['order', ...args]); return query; },
+    range: (first, last) => { calls.push(['range', first, last]); return Promise.resolve({ data: failure ? null : rows.slice(first, last + 1), error: failure }); },
+  };
+  const api = load('lib/api.ts', { './supabase': { supabase: { from: table => { calls.push(['table', table]); return query; } } } });
+  return { api, calls };
+}
+
+test('accessible tasks include other assignees and unassigned work already authorized by server RLS', async () => {
+  const rows = [
+    { ...task('other-person', '2026-10-15'), asignado_a: 'another-technician' },
+    { ...task('unassigned', null, 'pendiente', 'two'), asignado_a: null },
+  ];
+  const { api, calls } = accessibleApi(rows);
+  const result = await api.getAccessibleTasks('auxiliary-with-global-access');
+  assert.deepEqual(plain(result.map(row => row.id)), ['other-person', 'unassigned']);
+  assert.equal(result[0].fecha_programada, '2026-10-15');
+  assert.equal(result[1].asignado_a, null);
+  assert.equal(calls.some(call => call[0] === 'eq'), false, 'Do not narrow server-authorized rows by assignee or occupational role');
+});
+
+test('accessible tasks fetch every page in a stable order and propagate server failures', async () => {
+  const rows = Array.from({ length: 501 }, (_, i) => task(`task-${i}`, '2026-10-15'));
+  const { api, calls } = accessibleApi(rows);
+  assert.equal((await api.getAccessibleTasks('member')).length, 501);
+  assert.deepEqual(calls.filter(call => call[0] === 'range'), [['range', 0, 499], ['range', 500, 999]]);
+  assert.ok(calls.some(call => call[0] === 'order' && call[1] === 'id'));
+  const failure = new Error('Permission or connection failure');
+  await assert.rejects(accessibleApi([], failure).api.getAccessibleTasks('member'), error => error === failure);
+  const empty = accessibleApi(rows);
+  assert.equal((await empty.api.getAccessibleTasks('')).length, 0);
+  assert.equal(empty.calls.length, 0, 'No task query while the account is unavailable');
+});
+
+test('viewing project tasks does not grant progress updates to a global auxiliary user', () => {
+  const { canUpdateTaskProgress } = load('lib/taskAccess.ts');
+  const auxiliary = { id: 'auxiliary', rol: 'aux_integracion', activo: true };
+  const admin = { id: 'admin', rol: 'admin', activo: true };
+  assert.equal(canUpdateTaskProgress({ asignado_a: 'other' }, auxiliary), false);
+  assert.equal(canUpdateTaskProgress({ asignado_a: null }, auxiliary), false);
+  assert.equal(canUpdateTaskProgress({ asignado_a: 'auxiliary' }, auxiliary), true);
+  assert.equal(canUpdateTaskProgress({ asignado_a: 'other' }, admin), true);
+  assert.equal(canUpdateTaskProgress({ asignado_a: null }, admin), true);
+  assert.equal(canUpdateTaskProgress({ asignado_a: 'auxiliary' }, { ...auxiliary, activo: false }), false);
+  assert.equal(canUpdateTaskProgress({ asignado_a: 'other' }, { ...admin, activo: false }), false);
+  assert.equal(canUpdateTaskProgress(null, admin), false);
+  assert.equal(canUpdateTaskProgress({ asignado_a: 'other' }, null), false);
+});
+
+test('task and checklist writes reject zero-row responses instead of reporting false success', async () => {
+  const denied = new Error('No rows updated');
+  const calls = [];
+  const query = {
+    update: () => query, eq: () => query,
+    select: field => { calls.push(field); return query; },
+    single: async () => ({ data: null, error: denied }),
+  };
+  const api = load('lib/api.ts', { './supabase': { supabase: { from: () => query } } });
+  await assert.rejects(api.updateTaskStatus('foreign-task', 'completada'), error => error === denied);
+  await assert.rejects(api.toggleSubtarea('foreign-checklist', true), error => error === denied);
+  assert.deepEqual(calls, ['id', 'id']);
 });

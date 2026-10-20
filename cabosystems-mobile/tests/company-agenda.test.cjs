@@ -1,0 +1,77 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const ts = require('typescript');
+const root = path.resolve(__dirname, '..');
+function load(file, imports = {}, globals = {}) {
+  const compiled = ts.transpileModule(fs.readFileSync(path.resolve(root, file), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const module = { exports: {} };
+  vm.runInNewContext(compiled, { exports: module.exports, module, Date, Map, Set, Intl, ...globals, require: name => { if (name in imports) return imports[name]; throw Error(`Unexpected import ${name}`); } });
+  return module.exports;
+}
+const plain = value => JSON.parse(JSON.stringify(value));
+const dates = load('lib/agenda.ts');
+const recurrence = load('lib/companyAgendaRecurrence.ts', { './agenda': dates });
+const model = load('lib/companyAgenda.ts', { './agenda': dates, './companyAgendaRecurrence': recurrence });
+const webDates = load('../cabosystems-web/src/lib/taskDates.ts');
+const webRecurrence = load('../cabosystems-web/src/lib/agendaRecurrence.ts', { './taskDates': webDates });
+const webCalendar = load('../cabosystems-web/src/lib/agendaDates.ts', { './taskDates': webDates });
+const event = patch => ({ id: 'series', titulo: 'Revisión de rack', descripcion: 'Confirmar operación', ubicacion: 'Oficina', tipo: 'recordatorio', fecha: '2026-10-19', hora: null, created_at: '', ...recurrence.NO_RECURRENCE, ...patch });
+
+test('mobile and web render the same day, week and month, including weekends and leap years', () => {
+  for (const day of ['2026-10-19', '2026-12-31', '2028-02-29', '2027-01-01']) for (const view of ['day', 'week', 'month']) assert.deepEqual(plain(model.companyDays(day, view)), plain(webCalendar.agendaDays(day, view)));
+});
+test('recurring reminders stay identical on mobile and web across years, short months and end dates', () => {
+  for (const patch of [{}, { repeticion: 'diaria', intervalo: 3 }, { repeticion: 'semanal', dias_semana: [1, 3, 7] }, { repeticion: 'semanal', dias_semana: [1, 7], intervalo: 2, repetir_hasta: '2027-02-10' }, { repeticion: 'mensual', fecha: '2026-10-31' }, { repeticion: 'mensual', intervalo: 2, fecha: '2027-12-31' }]) {
+    const events = [event(patch)];
+    const actual = recurrence.expandCompanyEvents(events, '2026-10-01', '2028-03-31');
+    assert.deepEqual(plain(actual), plain(webRecurrence.expandCompanyEvents(events, '2026-10-01', '2028-03-31')));
+    assert.equal(events[0].occurrence_date, undefined);
+    assert.equal(new Set(actual.map(e => `${e.id}-${e.occurrence_date}`)).size, actual.length);
+  }
+});
+test('only active administrators and installation supervisors may manage the company calendar', () => {
+  for (const rol of ['admin', 'supervisor_instalacion']) assert.equal(model.canManageCompanyAgenda({ id: 'person', activo: true, rol }), true);
+  for (const profile of [null, { id: 'person', activo: false, rol: 'admin' }, { rol: 'admin', activo: true }, { id: 'person', activo: true, rol: 'aux_operaciones' }, { id: 'person', activo: true, rol: 'integrador' }]) assert.equal(model.canManageCompanyAgenda(profile), false);
+});
+test('filters search company content without project membership and group by occurrence, preserving the series date', () => {
+  const entries = recurrence.expandCompanyEvents([event({ repeticion: 'semanal', dias_semana: [1, 7] }), event({ id: 'delivery', titulo: 'Entrega de casa', tipo: 'evento' })], '2026-10-19', '2026-10-25');
+  const rows = model.companyRows(entries, 'revision oficina', 'recordatorio');
+  assert.deepEqual(plain(rows.filter(r => r.kind === 'heading').map(r => r.date)), ['2026-10-19', '2026-10-25']);
+  assert.ok(rows.filter(r => r.kind === 'event').every(r => r.event.fecha === '2026-10-19'));
+  assert.equal(model.companyRows(entries, 'inexistente', '').length, 0);
+});
+test('validation rejects malformed times, empty weekly selections, invalid intervals and early end dates', () => {
+  assert.equal(model.validCompanyEvent(event({ hora: '06:07' })), true);
+  for (const patch of [{ titulo: ' ' }, { hora: '24:00' }, { hora: '6:07' }, { fecha: '2026-02-30' }, { repeticion: 'semanal', dias_semana: [] }, { repeticion: 'diaria', intervalo: 0 }, { repeticion: 'mensual', repetir_hasta: '2026-10-01' }, { tipo: 'evento', repeticion: 'diaria' }]) assert.equal(model.validCompanyEvent(event(patch)), false, JSON.stringify(patch));
+});
+test('calendar API fetches all pages of older series and rejects failed writes', async () => {
+  const records = Array.from({ length: 501 }, (_, i) => event({ id: String(i) })); const calls = [];
+  const denied = new Error('Denied');
+  const query = {
+    select: () => query, lte: () => query, or: filter => { calls.push(filter); return query; }, order: () => query,
+    range: async (from, to) => ({ data: records.slice(from, to + 1), error: null }),
+    update: () => query, insert: () => query, delete: () => query, eq: () => query, single: async () => ({ data: null, error: denied }),
+  };
+  const api = load('lib/companyAgendaApi.ts', { './supabase': { supabase: { from: table => { assert.equal(table, 'agenda_eventos'); return query; } } }, './companyAgendaRecurrence': recurrence, './companyAgenda': model });
+  assert.equal((await api.getCompanyEvents('2026-10-19', '2026-10-25')).length, 501);
+  assert.ok(calls.some(filter => filter.includes('repeticion.neq.ninguna')));
+  await assert.rejects(api.saveCompanyEvent('id', event({ hora: '10:00' })), error => error === denied);
+  await assert.rejects(api.deleteCompanyEvent('id'), error => error === denied);
+});
+test('cached calendars never cross account or date-range boundaries', async () => {
+  const memory = new Map();
+  const cache = load('lib/companyAgendaCache.ts', { 'react-native': { Platform: { OS: 'web' } }, 'expo-file-system/legacy': {} }, { sessionStorage: { setItem: (key, value) => memory.set(key, value), getItem: key => memory.get(key) || null } });
+  await cache.cacheCompanyAgenda('user-a', '2026-10-19', '2026-10-25', [event({})]);
+  assert.equal((await cache.readCompanyAgendaCache('user-a', '2026-10-19', '2026-10-25')).length, 1);
+  assert.equal(await cache.readCompanyAgendaCache('user-b', '2026-10-19', '2026-10-25'), null);
+  assert.equal(await cache.readCompanyAgendaCache('user-a', '2026-11-01', '2026-11-30'), null);
+  assert.equal(await cache.readCompanyAgendaCache('', '2026-10-19', '2026-10-25'), null);
+});
+test('Spanish and English mobile calendar dictionaries have every field and action', () => {
+  const { COMPANY_AGENDA_COPY } = load('lib/companyAgendaCopy.ts');
+  assert.deepEqual(Object.keys(COMPANY_AGENDA_COPY.es).sort(), Object.keys(COMPANY_AGENDA_COPY.en).sort());
+  for (const copy of Object.values(COMPANY_AGENDA_COPY)) assert.ok(Object.values(copy).every(value => typeof value === 'string' && value.trim()));
+});

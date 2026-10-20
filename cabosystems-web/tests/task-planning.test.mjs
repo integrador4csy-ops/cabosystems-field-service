@@ -10,7 +10,7 @@ async function loadModule(file) {
 }
 
 const { dateKey, parseDateKey, shiftDate, shiftMonth, weekDates, monthWorkWeeks, isOverdue } = await loadModule('taskDates');
-const { filterWorkspaceTasks } = await loadModule('taskFilters');
+const { countTaskStatuses, filterWorkspaceTasks } = await loadModule('taskFilters');
 
 test('calendar days stay unchanged across timezones and daylight saving transitions', () => {
   const original = process.env.TZ;
@@ -70,6 +70,16 @@ const tasks = [
   { id: '3', proyecto_id: 'b', asignado_a: 'gerardo', titulo: 'Certificar cableado', estatus: 'completada', fecha_programada: '2026-10-15', profiles: { nombre: 'Gerardo Sandoval' } },
 ];
 const filters = { query: '', development: 'all', project: 'all', assignee: 'all', status: 'all' };
+
+test('agenda status counts exclude undated tasks and count them only in the unscheduled view', () => {
+  const mixed = [...tasks, { ...tasks[1], id: '4' }];
+  assert.deepEqual(countTaskStatuses(mixed, 'scheduled'), { all: 2, pendiente: 1, en_proceso: 0, completada: 1 });
+  assert.deepEqual(countTaskStatuses(mixed, 'unscheduled'), { all: 2, pendiente: 0, en_proceso: 2, completada: 0 });
+  assert.deepEqual(countTaskStatuses(mixed), { all: 4, pendiente: 1, en_proceso: 2, completada: 1 });
+  assert.deepEqual(countTaskStatuses([], 'scheduled'), { all: 0, pendiente: 0, en_proceso: 0, completada: 0 });
+  const filtered = filterWorkspaceTasks(mixed, projects, { ...filters, project: 'b' });
+  assert.deepEqual(countTaskStatuses(filtered, 'scheduled'), { all: 1, pendiente: 0, en_proceso: 0, completada: 1 });
+});
 const ids = (next = {}) => filterWorkspaceTasks(tasks, projects, { ...filters, ...next }).map((task) => task.id);
 
 test('shared task filters compose without changing the underlying task objects', () => {

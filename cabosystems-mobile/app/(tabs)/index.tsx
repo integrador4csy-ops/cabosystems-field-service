@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, ScrollView, AppState } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import {
   MapPin,
@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useProjects } from '@/lib/projects';
 import { supabase } from '@/lib/supabase';
-import { getMyTasks, type TaskWithProject } from '@/lib/api';
+import { getAccessibleTasks, type TaskWithProject } from '@/lib/api';
 import {
   getDailyFormStatus,
   markDailyFormCompleted,
@@ -47,17 +47,17 @@ const STATUS_META: Record<
 > = {
   pendiente: {
     color: Colors.textSecondary,
-    label: 'Por Hacer',
+    label: 'To do',
     badgeColor: 'gray',
   },
   en_proceso: {
     color: Colors.primary,
-    label: 'En Proceso',
+    label: 'Doing',
     badgeColor: 'warning',
   },
   completada: {
     color: Colors.success,
-    label: 'Completada',
+    label: 'Done',
     badgeColor: 'success',
   },
 };
@@ -114,6 +114,7 @@ const TaskCard = React.memo(function TaskCard({
 });
 
 const keyExtractor = (item: TaskWithProject) => item.id;
+const EMPTY_TASKS: TaskWithProject[] = [];
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -127,12 +128,14 @@ export default function DashboardScreen() {
     setSelectedProjectId,
     refreshProjects,
   } = useProjects();
-  const loadingRef = useRef(false);
-  const [tasks, setTasks] = useState<TaskWithProject[]>([]);
+  const requestVersion = useRef(0);
+  const [taskData, setTaskData] = useState<{ owner: string; items: TaskWithProject[] }>({ owner: '', items: [] });
+  const tasks = taskData.owner === profile?.id ? taskData.items : EMPTY_TASKS;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'en_proceso' | 'pendiente' | 'completada'>('all');
+  const [allProjects, setAllProjects] = useState(false);
 
   // Estado del Formulario Diario de Campo
   const [dailyFormCompleted, setDailyFormCompleted] = useState(false);
@@ -177,24 +180,24 @@ export default function DashboardScreen() {
   const load = useCallback(
     async (isRefresh = false) => {
       if (!profile?.id) return;
-      if (loadingRef.current) return;
-      loadingRef.current = true;
+      const version = ++requestVersion.current;
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
       setError(null);
       try {
         const [, tsks] = await Promise.all([
           refreshProjects(),
-          getMyTasks(profile.id),
+          getAccessibleTasks(profile.id),
         ]);
-        setTasks(tsks);
+        if (version === requestVersion.current) setTaskData({ owner: profile.id, items: tsks });
       } catch (e) {
         console.error('Task load error:', e);
-        setError('No se pudieron cargar las tareas');
+        if (version === requestVersion.current) setError('No se pudieron cargar las tareas');
       } finally {
-        loadingRef.current = false;
-        setLoading(false);
-        setRefreshing(false);
+        if (version === requestVersion.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
     [profile?.id, refreshProjects]
@@ -203,12 +206,15 @@ export default function DashboardScreen() {
   const loadRef = useRef(load);
   loadRef.current = load;
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useFocusEffect(useCallback(() => {
+    void load();
+    const listener = AppState.addEventListener('change', state => { if (state === 'active') void load(true); });
+    return () => { requestVersion.current++; listener.remove(); };
+  }, [load]));
 
   useEffect(() => {
     if (!profile?.id) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const channelName = `tareas-dashboard-${profile.id}-${Date.now()}`;
     const channel = supabase
       .channel(channelName)
@@ -218,22 +224,23 @@ export default function DashboardScreen() {
           event: '*',
           schema: 'public',
           table: 'tareas',
-          filter: `asignado_a=eq.${profile.id}`,
         },
         () => {
-          loadRef.current();
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => void loadRef.current(true), 250);
         }
       )
       .subscribe();
 
     return () => {
+      if (timer) clearTimeout(timer);
       supabase.removeChannel(channel);
     };
   }, [profile?.id]);
 
   const filteredTasks = useMemo(
-    () => (selectedProjectId ? tasks.filter((t) => t.proyecto_id === selectedProjectId) : tasks),
-    [tasks, selectedProjectId]
+    () => (!allProjects && selectedProjectId ? tasks.filter((t) => t.proyecto_id === selectedProjectId) : tasks),
+    [tasks, selectedProjectId, allProjects]
   );
 
   const stats = useMemo(() => ({
@@ -266,7 +273,7 @@ export default function DashboardScreen() {
           <View>
             <Text style={styles.greetingTitle}>Hola, {firstName}</Text>
             <Text style={styles.greetingSubtitle}>
-              {getMazatlanDate()} · {filteredTasks.length} {filteredTasks.length === 1 ? 'orden asignada' : 'órdenes asignadas'}
+              {getMazatlanDate()} · {filteredTasks.length} {filteredTasks.length === 1 ? 'orden disponible' : 'órdenes disponibles'}
             </Text>
           </View>
         </View>
@@ -386,7 +393,7 @@ export default function DashboardScreen() {
             ? 'No se pudo conectar con el servidor. Revisa tu conexión.'
             : statusFilter !== 'all'
             ? 'No hay tareas con este estatus en la villa seleccionada.'
-            : 'Las órdenes asignadas a tu villa aparecerán aquí.'}
+            : 'Aquí aparecen las tareas de la villa seleccionada a las que tienes acceso.'}
         </Text>
         {statusFilter !== 'all' ? (
           <Pressable
@@ -413,7 +420,9 @@ export default function DashboardScreen() {
       <HeaderCaboSystems
         projects={projects}
         selectedProjectId={selectedProjectId}
-        onSelectProject={setSelectedProject}
+        onSelectProject={(project) => { setAllProjects(false); setSelectedProject(project); }}
+        allProjectsSelected={allProjects}
+        onSelectAllProjects={() => setAllProjects(true)}
       />
 
       <FlashList
