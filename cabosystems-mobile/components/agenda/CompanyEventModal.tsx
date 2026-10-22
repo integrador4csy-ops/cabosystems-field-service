@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { randomUUID } from 'expo-crypto';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { X } from 'lucide-react-native';
+import { Check, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AgendaPalette as P } from '@/constants/Theme';
 import { dateKey } from '@/lib/agenda';
-import { isoWeekday, NO_RECURRENCE } from '@/lib/companyAgendaRecurrence';
+import { isoWeekday } from '@/lib/companyAgendaRecurrence';
 import { validCompanyEvent } from '@/lib/companyAgenda';
 import type { CompanyAgendaCopy } from '@/lib/companyAgendaCopy';
 import type { AgendaGoogleCalendar, CompanyEvent, EventInput, RecurrenceFrequency } from '@/types/companyAgenda';
@@ -22,14 +22,14 @@ export function CompanyEventModal({ event, day, canManage: allowed, copy: c, loc
   const canManage = allowed && event?.google?.editable !== false;
   const [calendars, setCalendars] = useState<AgendaGoogleCalendar[]>([]);
   const [calendarError, setCalendarError] = useState(false);
-  const [allDay, setAllDay] = useState(!event?.hora);
+  const [allDay, setAllDay] = useState(event ? !event.hora : false);
   useEffect(() => {
     if (event || !canManage) return;
     let active = true;
-    void getGoogleCalendars().then(items => { if (active) setCalendars(items); }).catch(() => { if (active) setCalendarError(true); });
+    void getGoogleCalendars().then(items => { if (active) setCalendars(items.filter(calendar => calendar.editable !== false)); }).catch(() => { if (active) setCalendarError(true); });
     return () => { active = false; };
   }, [event, canManage]);
-  const [input, setInput] = useState<EventInput>(() => ({ titulo: event?.titulo || '', descripcion: event?.descripcion || '', tipo: event?.tipo || 'evento', fecha: event?.fecha || day, hora: event?.hora?.slice(0, 5) || '', ubicacion: event?.ubicacion || '', repeticion: event?.repeticion || 'ninguna', intervalo: event?.intervalo || 1, dias_semana: event?.dias_semana || [], repetir_hasta: event?.repetir_hasta || null, calendar_id: event?.google?.calendarId || '', google_etag: event?.google?.etag, request_id: randomUUID().replace(/-/g, ''), fecha_fin: event?.google?.endDate || '', hora_fin: (event?.google?.endTime || event?.hora_fin)?.slice(0, 5) || '' }));
+  const [input, setInput] = useState<EventInput>(() => ({ titulo: event?.google?.availabilityOnly ? (locale.startsWith('en') ? 'Busy' : 'Ocupado') : event?.titulo || '', descripcion: event?.descripcion || '', tipo: 'evento', fecha: event?.fecha || day, hora: event ? event.hora?.slice(0, 5) || '' : '09:00', ubicacion: event?.ubicacion || '', repeticion: event?.repeticion || 'ninguna', intervalo: event?.intervalo || 1, dias_semana: event?.dias_semana || [], repetir_hasta: event?.repetir_hasta || null, calendar_id: event?.google?.calendarId || '', google_etag: event?.google?.etag, request_id: randomUUID().replace(/-/g, ''), fecha_fin: event?.google?.endDate || '', hora_fin: event ? (event.google?.endTime || event.hora_fin)?.slice(0, 5) || '' : '10:00' }));
   const [mode, setMode] = useState<string>(() => event && (event.intervalo > 1 || event.repeticion === 'diaria') ? 'custom' : event?.repeticion || 'ninguna');
   const [busy, setBusy] = useState(false); const [deleting, setDeleting] = useState(false); const [error, setError] = useState('');
   const disabled = !canManage || busy;
@@ -63,13 +63,12 @@ export function CompanyEventModal({ event, day, canManage: allowed, copy: c, loc
           {event ? <Text style={s.help}>{c.calendar}: {event.google?.calendarName || c.localCalendar}</Text> : <CompanyChoice label={c.calendar} value={input.calendar_id || ''} disabled={disabled} options={[{ value: '', label: c.localCalendar }, ...calendars.map(calendar => ({ value: calendar.id, label: calendar.name }))]} onChange={calendar_id => change({ calendar_id })} />}
           {calendarError ? <Text style={s.help}>{c.calendarFailed}</Text> : null}
           {textField(c.titleLabel, input.titulo, titulo => change({ titulo }), 160)}
-          <CompanyChoice label={c.type} value={input.tipo} disabled={disabled} options={[{ value: 'evento', label: c.event }, { value: 'recordatorio', label: c.reminder }]} onChange={value => { change({ tipo: value as EventInput['tipo'], ...(value === 'evento' ? NO_RECURRENCE : {}) }); if (value === 'evento') setMode('ninguna'); }} />
           {dateField(c.date, input.fecha, fecha => change({ fecha }))}
-          <Pressable accessibilityRole="checkbox" accessibilityLabel={c.allDay} accessibilityState={{ checked: allDay, disabled }} disabled={disabled} style={s.button} onPress={() => { setAllDay(!allDay); change(allDay ? { hora: '09:00', hora_fin: '10:00' } : { hora: '', hora_fin: '' }); }}><Text style={s.buttonText}>{allDay ? '☑' : '☐'} {c.allDay}</Text></Pressable>
+          <Pressable accessibilityRole="checkbox" accessibilityLabel={c.allDay} accessibilityState={{ checked: allDay, disabled }} disabled={disabled} style={s.checkboxRow} onPress={() => { setAllDay(!allDay); change(allDay ? { hora: '09:00', hora_fin: '10:00' } : { hora: '', hora_fin: '' }); }}><View style={[s.checkbox, allDay && s.checkboxChecked]}>{allDay ? <Check size={14} strokeWidth={3} color={P.white} /> : null}</View><Text style={s.buttonText}>{c.allDay}</Text></Pressable>
           {!allDay ? <>{textField(c.startTime, input.hora || '', hora => change({ hora }), 5)}{textField(c.endTime, input.hora_fin || '', hora_fin => change({ hora_fin }), 5)}</> : null}
           {input.calendar_id ? <>{dateField(c.endDate, input.fecha_fin || input.fecha, fecha_fin => change({ fecha_fin }))}<Text style={s.help}>{c.googleTime}</Text></> : null}
           {event?.google?.recurring ? <Text style={s.help}>{c.googleOccurrence}</Text> : null}
-          {input.tipo === 'recordatorio' && !event?.google ? <View style={s.recurrence}>
+          {!event?.google ? <View style={s.recurrence}>
             <CompanyChoice label={c.repeat} value={mode} disabled={disabled} options={[{ value: 'ninguna', label: c.none }, { value: 'semanal', label: c.weekly }, { value: 'mensual', label: c.monthly }, { value: 'custom', label: c.custom }]} onChange={changeRepeat} />
             {mode === 'custom' ? <>
               <View style={s.field}><Text style={s.label}>{c.every}</Text>{!canManage ? <Text style={s.readonly}>{input.intervalo}</Text> : <TextInput accessibilityLabel={c.interval} keyboardType="number-pad" editable={!busy} value={input.intervalo ? String(input.intervalo) : ''} onChangeText={value => change({ intervalo: Number(value) })} maxLength={3} style={s.input} />}</View>
@@ -94,5 +93,8 @@ export function CompanyEventModal({ event, day, canManage: allowed, copy: c, loc
   </Modal>;
 }
 const s = StyleSheet.create({
+  checkboxRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  checkbox: { width: 20, height: 20, borderRadius: 4, borderWidth: 1, borderColor: P.slate, alignItems: 'center', justifyContent: 'center' },
+  checkboxChecked: { backgroundColor: P.accent, borderColor: P.accent },
   page: { flex: 1, backgroundColor: P.white, alignItems: 'center' }, sheet: { width: '100%', maxWidth: 600, flex: 1 }, header: { minHeight: 64, paddingLeft: 20, paddingRight: 12, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: P.line }, title: { flex: 1, fontFamily: 'Outfit_600SemiBold', color: P.ink, fontSize: 20 }, icon: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }, content: { padding: 20, gap: 18 }, field: { gap: 8 }, label: { fontFamily: 'Outfit_500Medium', color: P.slate, fontSize: 13 }, input: { minHeight: 48, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: P.line, fontFamily: 'Outfit_400Regular', color: P.ink, fontSize: 15 }, description: { minHeight: 110 }, readonly: { fontFamily: 'Outfit_400Regular', color: P.ink, fontSize: 15, lineHeight: 23 }, recurrence: { paddingVertical: 16, gap: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: P.line }, weekdays: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 }, weekday: { minWidth: 44, minHeight: 44, borderRadius: 8, borderWidth: 1, borderColor: P.line, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }, selectedDay: { borderColor: P.accent, backgroundColor: P.wash }, dayText: { color: P.slate, fontFamily: 'Outfit_400Regular', fontSize: 13, textTransform: 'capitalize' }, selectedDayText: { color: P.ink, fontFamily: 'Outfit_600SemiBold' }, help: { color: P.slate, fontFamily: 'Outfit_400Regular', fontSize: 13, lineHeight: 20 }, error: { padding: 12, borderWidth: 1, borderColor: P.accent, borderRadius: 8, fontFamily: 'Outfit_400Regular', color: P.ink, fontSize: 14 }, confirmation: { gap: 12, paddingVertical: 12 }, footer: { flexDirection: 'row', gap: 8, alignItems: 'center', borderTopWidth: 1, borderColor: P.line, padding: 12 }, spacer: { flex: 1 }, button: { minHeight: 44, paddingHorizontal: 14, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 1, borderColor: P.line }, buttonText: { fontFamily: 'Outfit_500Medium', fontSize: 14, color: P.ink }, primary: { backgroundColor: P.accent, borderColor: P.accent }, primaryText: { fontFamily: 'Outfit_600SemiBold', color: P.white, fontSize: 14 }, deleteButton: { backgroundColor: P.ink },
 });

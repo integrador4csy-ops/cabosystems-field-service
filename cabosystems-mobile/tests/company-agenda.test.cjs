@@ -45,7 +45,7 @@ test('filters search company content without project membership and group by occ
 });
 test('validation rejects malformed times, empty weekly selections, invalid intervals and early end dates', () => {
   assert.equal(model.validCompanyEvent(event({ hora: '06:07' })), true);
-  for (const patch of [{ titulo: ' ' }, { hora: '24:00' }, { hora: '6:07' }, { fecha: '2026-02-30' }, { repeticion: 'semanal', dias_semana: [] }, { repeticion: 'diaria', intervalo: 0 }, { repeticion: 'mensual', repetir_hasta: '2026-10-01' }, { tipo: 'evento', repeticion: 'diaria' }]) assert.equal(model.validCompanyEvent(event(patch)), false, JSON.stringify(patch));
+  for (const patch of [{ titulo: ' ' }, { hora: '24:00' }, { hora: '6:07' }, { fecha: '2026-02-30' }, { repeticion: 'semanal', dias_semana: [] }, { repeticion: 'diaria', intervalo: 0 }, { repeticion: 'mensual', repetir_hasta: '2026-10-01' }]) assert.equal(model.validCompanyEvent(event(patch)), false, JSON.stringify(patch));
 });
 test('calendar API fetches all pages of older series and rejects failed writes', async () => {
   const records = Array.from({ length: 501 }, (_, i) => event({ id: String(i) })); const calls = [];

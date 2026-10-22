@@ -37,6 +37,7 @@ async function getLocalEvents(from: string, to: string): Promise<CompanyEvent[]>
 }
 
 export async function saveCompanyEvent(id: string | undefined, input: EventInput): Promise<CompanyEvent> {
+  input = { ...input, tipo: 'evento' };
   if (!validCompanyEvent(input)) throw new Error('Invalid event or recurrence');
   if (id?.startsWith('gcal:') || !id && input.calendar_id) return (await googleRequest<{ event: CompanyEvent }>({ action: 'save', id, calendarId: input.calendar_id, etag: input.google_etag, requestId: input.request_id, input })).event;
   const { calendar_id, google_etag: _etag, request_id: _request, fecha_fin: _endDate, ...local } = input;

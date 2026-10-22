@@ -6,20 +6,18 @@ import { HeaderCaboSystems } from '@/components/HeaderCaboSystems';
 import { parseDateKey } from '@/lib/agenda';
 import type { CompanyView } from '@/lib/companyAgenda';
 import type { CompanyAgendaCopy } from '@/lib/companyAgendaCopy';
-import type { AgendaKind } from '@/types/companyAgenda';
 import { AgendaDatePicker } from './AgendaDatePicker';
 
 export function CompanyAgendaTopBar({ copy: c, canManage, onCreate }: { copy: CompanyAgendaCopy; canManage: boolean; onCreate: () => void }) {
   return <HeaderCaboSystems showProjectSelector={false} rightAccessory={canManage ? <Pressable accessibilityRole="button" accessibilityLabel={c.newEvent} onPress={onCreate} style={({ pressed }) => [s.add, pressed && s.pressed]}><Plus size={23} strokeWidth={2} color={P.white} /></Pressable> : undefined} />;
 }
 
-export function CompanyAgendaControls({ copy: c, locale, query, kind, view, anchor, today, days, counts, heading, onSearch, onKind, onView, onDate, onMove, onToday }: {
-  copy: CompanyAgendaCopy; locale: string; query: string; kind: '' | AgendaKind; view: CompanyView; anchor: string; today: string;
+export function CompanyAgendaControls({ copy: c, locale, query, view, anchor, today, days, counts, heading, onSearch, onView, onDate, onMove, onToday }: {
+  copy: CompanyAgendaCopy; locale: string; query: string; view: CompanyView; anchor: string; today: string;
   days: string[]; counts: Map<string, number>; heading: string;
-  onSearch: (value: string) => void; onKind: (value: '' | AgendaKind) => void; onView: (value: CompanyView) => void;
+  onSearch: (value: string) => void; onView: (value: CompanyView) => void;
   onDate: (value: string) => void; onMove: (value: number) => void; onToday: () => void;
 }) {
-  const filters = [{ value: '', label: c.all }, { value: 'evento', label: c.events }, { value: 'recordatorio', label: c.reminders }] as const;
   return <View style={s.controls}>
     <Text accessibilityRole="header" style={s.sectionTitle}>{c.title}</Text>
     <View style={s.search}><Search size={18} color={P.slate} /><TextInput accessibilityLabel={c.search} placeholder={c.search} placeholderTextColor={P.muted} autoCorrect={false} value={query} onChangeText={onSearch} style={s.searchInput} />{query ? <Pressable accessibilityRole="button" accessibilityLabel={c.clearSearch} onPress={() => onSearch('')} style={s.clear}><X size={17} color={P.slate} /></Pressable> : null}</View>
@@ -29,7 +27,6 @@ export function CompanyAgendaControls({ copy: c, locale, query, kind, view, anch
       const selected = day === anchor; const count = counts.get(day) || 0; const outside = view === 'month' && day.slice(0, 7) !== anchor.slice(0, 7);
       return <Pressable key={day} accessibilityRole="button" accessibilityLabel={`${c.selectDay} ${parseDateKey(day).toLocaleDateString(locale, { dateStyle: 'full' })}, ${count} ${c.count}`} accessibilityState={{ selected }} onPress={() => { onDate(day); onView('day'); }} style={({ pressed }) => [s.day, pressed && s.pressed]}><View style={[s.dayCircle, day === today && s.todayCircle, selected && s.selectedCircle]}><Text style={[s.dayNumber, outside && s.outside, selected && s.selectedNumber]}>{parseDateKey(day).getDate()}</Text></View><View style={s.dots}>{Array.from({ length: Math.min(count, 3) }, (_, index) => <View key={index} style={[s.dot, outside && s.outsideDot]} />)}</View></Pressable>;
     })}</View></View> : null}
-    <View style={s.typeTabs} accessibilityRole="tablist" accessibilityLabel={c.type}>{filters.map(option => <Pressable key={option.value} accessibilityRole="tab" accessibilityLabel={option.label} accessibilityState={{ selected: kind === option.value }} onPress={() => onKind(option.value)} style={[s.typeTab, kind === option.value && s.typeTabActive]}><Text style={[s.typeText, kind === option.value && s.typeTextActive]}>{option.label}</Text></Pressable>)}</View>
   </View>;
 }
 const s = StyleSheet.create({

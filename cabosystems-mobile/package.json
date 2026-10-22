@@ -1,7 +1,7 @@
 {
   "name": "cabosystems-mobile",
   "main": "index.js",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "scripts": {
     "test:chat": "node --test tests/chat.test.cjs",
     "test:agenda": "node --test tests/agenda.test.cjs tests/company-agenda.test.cjs",

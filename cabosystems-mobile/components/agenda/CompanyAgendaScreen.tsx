@@ -30,7 +30,7 @@ export default function CompanyAgendaScreen() {
   const { language } = useTranslation(); const c = COMPANY_AGENDA_COPY[language];
   const locale = language === 'es' ? 'es-MX' : 'en-US'; const insets = useSafeAreaInsets();
   const [anchor, setAnchor] = useState(() => dateKey(new Date())); const [view, setView] = useState<CompanyView>('month');
-  const [today, setToday] = useState(() => dateKey(new Date())); const [query, setQuery] = useState(''); const [kind, setKind] = useState<'' | CompanyEvent['tipo']>('');
+  const [today, setToday] = useState(() => dateKey(new Date())); const [query, setQuery] = useState('');
   const [data, setData] = useState<{ owner: string; from: string; to: string; items: CompanyEvent[] }>({ owner: '', from: '', to: '', items: [] });
   const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false); const [error, setError] = useState(false); const [cached, setCached] = useState(false);
   const [dialog, setDialog] = useState<{ owner: string; event: CompanyEvent | null; day: string } | null>(null);
@@ -67,7 +67,7 @@ export default function CompanyAgendaScreen() {
     return () => { active = false; sequence.current++; if (timer) clearTimeout(timer); clearInterval(midnight); listener.remove(); if (channel) void supabase.removeChannel(channel); };
   }, [load, owner]));
 
-  const rows = useMemo(() => companyRows(events.filter(event => !hiddenCalendars.includes(event.google?.calendarId || 'local')), query, kind), [events, query, kind, hiddenCalendars]);
+  const rows = useMemo(() => companyRows(events.filter(event => !hiddenCalendars.includes(event.google?.calendarId || 'local')), query, ''), [events, query, hiddenCalendars]);
   const calendarFilters = [{ id: 'local', name: 'CaboSystems', backgroundColor: P.slate }, ...(calendars.owner === owner ? calendars.items : [])];
   const toggleCalendar = (id: string) => setHiddenCalendars(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id]);
   const counts = useMemo(() => new Map(rows.filter((row): row is Extract<CompanyRow, { kind: 'heading' }> => row.kind === 'heading').map(row => [row.date, row.count])), [rows]);
@@ -82,7 +82,7 @@ export default function CompanyAgendaScreen() {
     if (item.kind === 'heading') return <View style={s.dayHeading}><Text style={s.dayTitle}>{dateFormat.format(parseDateKey(item.date))}</Text><Text style={s.count}>{item.count}</Text></View>;
     const event = item.event;
     const date = event.occurrence_date || event.fecha;
-    return <CompanyAgendaEvent event={event} schedule={eventSchedule(event, locale)} time={event.google && date !== event.fecha ? c.continues : event.hora ? timeFormat.format(new Date(`${event.fecha}T${event.hora}`)) : c.allDay} type={event.tipo === 'recordatorio' ? c.reminder : c.event} repeats={c.repeats} onOpen={openEvent} />;
+    return <CompanyAgendaEvent event={event} schedule={eventSchedule(event, locale)} time={event.google && date !== event.fecha ? c.continues : event.hora ? timeFormat.format(new Date(`${event.fecha}T${event.hora}`)) : c.allDay} type={c.event} repeats={c.repeats} onOpen={openEvent} />;
   }, [c, dateFormat, timeFormat, openEvent, locale]);
   const extra = useMemo(() => ({ c, locale, owner }), [c, locale, owner]);
   const header = <View>
@@ -91,13 +91,13 @@ export default function CompanyAgendaScreen() {
       const color = calendar.backgroundColor && /^#[a-f0-9]{6}$/i.test(calendar.backgroundColor) ? calendar.backgroundColor : P.slate;
       return <Pressable key={calendar.id} accessibilityRole="checkbox" accessibilityState={{ checked }} accessibilityLabel={calendar.name} onPress={() => toggleCalendar(calendar.id)} style={s.calendarOption}><View style={[s.calendarCheck, { borderColor: color, backgroundColor: checked ? color : P.white }]}>{checked ? <Check size={14} color={P.ink} /> : null}</View><Text style={s.calendarName}>{calendar.name}</Text></Pressable>;
     })}</View>
-    <CompanyAgendaControls copy={c} locale={locale} query={query} kind={kind} view={view} anchor={anchor} today={today} days={days} counts={counts} heading={heading} onSearch={setQuery} onKind={setKind} onView={setView} onDate={setAnchor} onMove={move} onToday={() => setAnchor(dateKey(new Date()))} />
+    <CompanyAgendaControls copy={c} locale={locale} query={query} view={view} anchor={anchor} today={today} days={days} counts={counts} heading={heading} onSearch={setQuery} onView={setView} onDate={setAnchor} onMove={move} onToday={() => setAnchor(dateKey(new Date()))} />
     {error ? <View accessibilityRole="alert" style={s.error}><Text style={[s.help, s.errorCopy]}>{cached ? c.cached : c.failed}</Text><Pressable accessibilityRole="button" accessibilityLabel={c.retry} onPress={() => void load(true)} style={s.icon}><RefreshCw size={18} color={P.ink} /></Pressable></View> : null}
   </View>;
   return <View style={s.page}>
     <StatusBar style="dark" />
     <CompanyAgendaTopBar copy={c} canManage={canManage} onCreate={() => setDialog({ owner, event: null, day: anchor })} />
-    <View style={s.listArea}><FlashList data={rows} keyExtractor={rowKey} getItemType={rowType} renderItem={renderRow} extraData={extra} ListHeaderComponent={header} ListEmptyComponent={loading ? <View style={s.empty}><ActivityIndicator color={P.accent} /><Text style={s.help}>{c.loading}</Text></View> : <View style={s.empty}><CalendarDays size={26} color={P.slate} /><Text style={s.emptyText}>{query.trim() || kind ? c.emptyFilter : c.empty}</Text></View>} refreshing={refreshing} onRefresh={() => void load(true)} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 110 }} /></View>
+    <View style={s.listArea}><FlashList data={rows} keyExtractor={rowKey} getItemType={rowType} renderItem={renderRow} extraData={extra} ListHeaderComponent={header} ListEmptyComponent={loading ? <View style={s.empty}><ActivityIndicator color={P.accent} /><Text style={s.help}>{c.loading}</Text></View> : <View style={s.empty}><CalendarDays size={26} color={P.slate} /><Text style={s.emptyText}>{query.trim() ? c.emptyFilter : c.empty}</Text></View>} refreshing={refreshing} onRefresh={() => void load(true)} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 110 }} /></View>
     {dialog && dialog.owner === owner ? <CompanyEventModal key={`${owner}-${dialog.event?.id || dialog.day}`} event={dialog.event} day={dialog.day} canManage={canManage} copy={c} locale={locale} onClose={() => setDialog(null)} onSave={save} onDelete={remove} /> : null}
   </View>;
 }

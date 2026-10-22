@@ -13,13 +13,12 @@ export function isoWeekday(day: string): number {
 }
 
 export function validRecurrence(input: EventInput): boolean {
-  const { repeticion, intervalo, dias_semana, repetir_hasta, fecha, tipo } = input;
+  const { repeticion, intervalo, dias_semana, repetir_hasta, fecha } = input;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || dateKey(parseDateKey(fecha)) !== fecha) return false;
   if (!['ninguna', 'diaria', 'semanal', 'mensual'].includes(repeticion)) return false;
   if (!Number.isInteger(intervalo) || intervalo < 1 || intervalo > 365) return false;
   if (repetir_hasta !== null && (!/^\d{4}-\d{2}-\d{2}$/.test(repetir_hasta) || dateKey(parseDateKey(repetir_hasta)) !== repetir_hasta || repetir_hasta < fecha)) return false;
   if (repeticion === 'ninguna') return intervalo === 1 && dias_semana.length === 0 && repetir_hasta === null;
-  if (tipo !== 'recordatorio') return false;
   if (repeticion !== 'semanal') return dias_semana.length === 0;
   return dias_semana.length > 0 && dias_semana.length <= 7 && dias_semana.every((day) => Number.isInteger(day) && day >= 1 && day <= 7);
 }
@@ -27,7 +26,7 @@ export function validRecurrence(input: EventInput): boolean {
 export function occursOn(event: CompanyEvent, day: string): boolean {
   if (day < event.fecha || (event.repetir_hasta && day > event.repetir_hasta)) return false;
   if (event.repeticion === 'ninguna') return event.fecha === day;
-  if (event.tipo !== 'recordatorio' || !Number.isInteger(event.intervalo) || event.intervalo < 1) return false;
+  if (!Number.isInteger(event.intervalo) || event.intervalo < 1) return false;
   if (event.repeticion === 'diaria') return (ordinal(day) - ordinal(event.fecha)) % event.intervalo === 0;
   if (event.repeticion === 'semanal') {
     const startMonday = ordinal(event.fecha) - (isoWeekday(event.fecha) - 1);
