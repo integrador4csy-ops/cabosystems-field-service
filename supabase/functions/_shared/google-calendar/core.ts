@@ -1,6 +1,6 @@
 import { challenge, digest, randomToken, seal, unseal } from './crypto.ts';
 
-export const SCOPES = ['https://www.googleapis.com/auth/calendar.calendarlist.readonly', 'https://www.googleapis.com/auth/calendar.events'];
+export const SCOPES = ['https://www.googleapis.com/auth/calendar.calendarlist.readonly', 'https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.events.freebusy'];
 export interface Calendar { id: string; name: string; timeZone: string; accessRole: string; primary: boolean; backgroundColor?: string }
 export interface Actor { id: string; rol: string; activo: boolean }
 export interface Connection {
@@ -23,6 +23,7 @@ export class CalendarError extends Error {
 }
 export const isAdmin = (actor: Actor | null) => actor?.activo === true && actor.rol === 'admin';
 export const isWritable = (calendar: Calendar) => ['owner', 'writer'].includes(calendar.accessRole);
+export const isReadable = (calendar: Calendar) => ['owner', 'writer', 'reader', 'writerWithoutPrivateAccess', 'freeBusyReader'].includes(calendar.accessRole);
 const canManageEvents = (actor: Actor | null) => actor?.activo === true && ['admin', 'supervisor_instalacion'].includes(actor.rol);
 export function createCalendarService(options: Options) {
   const { store, clientId, clientSecret, redirectUri } = options;
@@ -129,7 +130,7 @@ export function createCalendarService(options: Options) {
       const verifier = await unseal(state.verifier_ciphertext, clientSecret, clientId, 'pkce-verifier');
       const data = await googleJson('https://oauth2.googleapis.com/token', { method: 'POST', body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: 'authorization_code', code, code_verifier: verifier }) });
       const granted = typeof data.scope === 'string' ? data.scope.split(/\s+/) : [];
-      if (!SCOPES.every((scope) => granted.includes(scope))) throw new CalendarError('Faltan permisos de Calendar. Vuelve a conectar y autoriza los dos permisos solicitados.');
+      if (!SCOPES.every((scope) => granted.includes(scope))) throw new CalendarError('Faltan permisos de Calendar. Vuelve a conectar y autoriza los permisos solicitados.');
       if (typeof data.refresh_token !== 'string' || !data.refresh_token || typeof data.access_token !== 'string' || data.token_type !== 'Bearer') throw new CalendarError('Google no concedió acceso renovable. Vuelve a conectar y autoriza el acceso.');
       const list = await calendars(data.access_token);
       const primary = list.find((calendar) => calendar.primary);
@@ -149,7 +150,7 @@ export function createCalendarService(options: Options) {
       if (connection.revision !== revision) throw new CalendarError('La conexión cambió. Actualiza antes de guardar.', 409);
       const list = await calendars(await accessToken(connection));
       const selected = ids.map((id) => list.find((calendar) => calendar.id === id));
-      if (selected.some((calendar) => !calendar || !isWritable(calendar))) throw new CalendarError('Selecciona únicamente calendarios con permiso para editar eventos.');
+      if (selected.some((calendar) => !calendar || !isReadable(calendar))) throw new CalendarError('Selecciona únicamente calendarios con permiso para consultar eventos.');
       if (!isAdmin(await store.actorById(actorId))) throw new CalendarError('Permiso de administrador revocado.', 403);
       if (!await store.commitConnection(revision, { selected_calendars: selected as Calendar[] })) throw new CalendarError('La conexión cambió. Actualiza antes de guardar.', 409);
       return { saved: true, syncEnabled: true };

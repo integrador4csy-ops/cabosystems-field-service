@@ -1,0 +1,7 @@
+html, body, #root { margin: 0; min-height: 100%; background: #fff; }
+main { max-width: 720px; margin: 0 auto; }
+.preview-note { margin: 0; padding: 10px 20px; background: rgba(0,0,0,.035); color: #343e48; font: 12px sans-serif; }
+input:focus-visible, [role=button]:focus-visible, [role=tab]:focus-visible, [role=checkbox]:focus-visible { outline: 2px solid #343e48; outline-offset: 2px; }
+@font-face { font-family: Outfit_400Regular; src: url('../../../cabosystems-mobile/node_modules/@expo-google-fonts/outfit/400Regular/Outfit_400Regular.ttf'); }
+@font-face { font-family: Outfit_500Medium; src: url('../../../cabosystems-mobile/node_modules/@expo-google-fonts/outfit/500Medium/Outfit_500Medium.ttf'); }
+@font-face { font-family: Outfit_600SemiBold; src: url('../../../cabosystems-mobile/node_modules/@expo-google-fonts/outfit/600SemiBold/Outfit_600SemiBold.ttf'); }

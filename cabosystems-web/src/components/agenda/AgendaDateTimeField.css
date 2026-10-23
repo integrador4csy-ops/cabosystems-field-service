@@ -1,0 +1,33 @@
+.company-picker { display: block; position: relative; min-width: 0; }
+.company-picker .company-picker-native { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; opacity: 0; pointer-events: none; }
+.company-picker-trigger { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--color-slate-200); border-radius: 8px; background: white; color: var(--color-slate-800); font-size: 14px; text-align: left; cursor: pointer; font-variant-numeric: tabular-nums; }
+.company-picker-trigger > svg { flex-shrink: 0; color: var(--color-slate-500); }
+.company-picker-trigger:hover:not(:disabled) { border-color: var(--color-slate-400); }
+.company-picker-trigger:focus-visible, .company-picker-trigger[aria-expanded="true"] { border-color: var(--color-brand-500); outline: 2px solid var(--color-brand-100); outline-offset: 1px; }
+.company-picker-trigger:disabled { opacity: 1; cursor: default; }
+.agenda-picker-panel { position: fixed; z-index: 10020; overflow: auto; padding: 10px; border: 1px solid var(--color-slate-200); border-radius: 10px; background: white; color: var(--color-slate-800); box-shadow: 0 8px 24px rgb(0 0 0 / 12%); font-size: 14px; }
+.agenda-picker-caption { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 13px; font-weight: 500; color: var(--color-slate-600); }
+.agenda-picker-caption strong { color: var(--color-slate-800); font-size: 18px; font-variant-numeric: tabular-nums; }
+.agenda-picker-panel button { min-height: 30px; border-radius: 6px; cursor: pointer; }
+.agenda-picker-panel button:hover:not(:disabled):not(.is-selected):not(.agenda-picker-confirm) { background: var(--color-slate-100); }
+.agenda-picker-panel button:focus-visible, .agenda-picker-panel select:focus-visible, .agenda-picker-panel input:focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 1px; }
+.agenda-picker-panel button:disabled { opacity: .35; cursor: default; }
+.agenda-picker-month { display: grid; grid-template-columns: 26px minmax(0, 1fr) 60px 26px; gap: 4px; align-items: center; margin-bottom: 8px; }
+.agenda-picker-month > button { display: grid; place-items: center; }
+.agenda-picker-panel .agenda-picker-month select, .agenda-picker-panel .agenda-picker-month input { width: 100%; min-width: 0; height: 30px; min-height: 0; padding: 4px; border: 1px solid var(--color-slate-200); border-radius: 6px; background: white; color: var(--color-slate-800); font-size: 13px; }
+.agenda-picker-weekdays, .agenda-picker-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; text-align: center; }
+.agenda-picker-weekdays { margin-bottom: 6px; font-size: 12px; color: var(--color-slate-500); text-transform: capitalize; }
+.agenda-picker-days > button { padding: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+.agenda-picker-days .is-outside { color: var(--color-slate-400); }
+.agenda-picker-days [aria-current="date"]:not(.is-selected) { box-shadow: inset 0 0 0 1px var(--color-brand-500); }
+.agenda-picker-panel button.is-selected { background: var(--color-brand-500); color: white; font-weight: 600; }
+.agenda-picker-panel > footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding: 8px 0 0; border-top: 1px solid var(--color-slate-200); }
+.agenda-picker-panel > footer button { padding-inline: 12px; font-size: 13px; }
+.agenda-picker-panel button.agenda-picker-confirm { background: var(--color-brand-500); color: white; font-weight: 600; }
+.agenda-picker-time { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.agenda-picker-time > div > span { display: block; margin-bottom: 8px; text-align: center; color: var(--color-slate-500); font-size: 12px; }
+.agenda-picker-time-options { max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 3px; border: 1px solid var(--color-slate-200); border-radius: 8px; overscroll-behavior: contain; scrollbar-width: thin; }
+.agenda-picker-time-options > button { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.company-dialog.company-event-dialog .agenda-picker-panel > footer { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; padding: 8px 0 0; border-top: 1px solid var(--color-slate-200); }
+.company-dialog.company-event-dialog .agenda-picker-panel .agenda-picker-month input { min-height: 0; }
+.company-dialog.company-event-dialog .company-picker-native { min-height: 0; }

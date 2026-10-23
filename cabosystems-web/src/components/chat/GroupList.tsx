@@ -21,6 +21,7 @@ interface GroupListProps {
   onSearchChange: (q: string) => void;
   isGlobalAdmin: boolean;
   loading: boolean;
+  onIntentGroup?: (groupId: string) => void;
 }
 
 export const GroupList: React.FC<GroupListProps> = ({
@@ -32,7 +33,10 @@ export const GroupList: React.FC<GroupListProps> = ({
   onSearchChange,
   isGlobalAdmin,
   loading,
+  onIntentGroup,
 }) => {
+  const intentTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  React.useEffect(() => () => clearTimeout(intentTimer.current), []);
   const { t, locale } = useTranslation();
   const filteredGroups = groups.filter((g) => {
     const q = searchQuery.toLowerCase().trim();
@@ -168,6 +172,10 @@ export const GroupList: React.FC<GroupListProps> = ({
               <div
                 key={group.id}
                 role="button" tabIndex={0} aria-label={t("Abrir grupo {value0}", { value0: group.nombre })}
+                  onPointerEnter={event => { if (event.pointerType !== 'touch') { clearTimeout(intentTimer.current); intentTimer.current = setTimeout(() => onIntentGroup?.(group.id), 120); } }}
+                  onPointerLeave={() => clearTimeout(intentTimer.current)}
+                  onFocus={() => onIntentGroup?.(group.id)}
+                  onTouchStart={() => onIntentGroup?.(group.id)}
                 onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectGroup(group.id); } }}
                 onClick={() => onSelectGroup(group.id)}
                 className={`flex items-start gap-3 p-3.5 cursor-pointer transition-all ${

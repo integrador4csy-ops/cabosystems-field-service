@@ -6,6 +6,12 @@ import { CollaboratorsSection } from './CollaboratorsSection';
 import { InvitationsSection } from './InvitationsSection';
 import { InviteUserModal } from './InviteUserModal';
 import './TeamManagementView.css';
+import type { SectionResources } from '../../context/SectionResources';
+import { teamProfiles, teamInvitations } from '../../lib/teamSnapshot';
+
+export const prefetchTeam = (resources: SectionResources, section: string) => section === 'invitaciones'
+  ? resources.queries.load('invitations', teamInvitations)
+  : resources.queries.load('collaborators', teamProfiles);
 
 interface TeamManagementViewProps {
   onTeamChanged: () => void;

@@ -22,8 +22,20 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
+import { useSectionResources, canSpeculate } from '../../context/SectionResources';
+import { preloadView } from '../../lib/viewModules';
 
 export const AppSidebar: React.FC = () => {
+  const resources = useSectionResources();
+  const intentTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const cancelIntent = () => { clearTimeout(intentTimer.current); };
+  const intend = (id: string, immediate = false) => {
+    cancelIntent();
+    if (!user?.id || !adminProfile?.activo || !canSpeculate()) return;
+    const run = () => { void preloadView(id, resources, user.id, adminProfile.rol === 'admin').catch(() => {}); };
+    if (immediate) run(); else intentTimer.current = setTimeout(run, 120);
+  };
+  useEffect(() => () => clearTimeout(intentTimer.current), []);
   const {
     isExpanded,
     isMobileOpen,
@@ -215,7 +227,12 @@ export const AppSidebar: React.FC = () => {
                   key={item.id}
                   aria-label={item.name}
                   aria-current={isActive ? 'page' : undefined}
-                  onClick={isDisabled ? undefined : () => { item.action(); setIsMobileOpen(false); setIsHovered(false); }}
+                  onPointerEnter={isDisabled ? undefined : event => { if (event.pointerType !== 'touch') intend(item.id); }}
+                  onPointerLeave={cancelIntent}
+                  onFocus={isDisabled ? undefined : () => intend(item.id, true)}
+                  onBlur={cancelIntent}
+                  onTouchStart={isDisabled ? undefined : () => intend(item.id, true)}
+                  onClick={isDisabled ? undefined : () => { resources.setIntent(item.id); item.action(); setIsMobileOpen(false); setIsHovered(false); }}
                   disabled={isDisabled}
                   className={cn(
                     'group relative flex h-11 items-center rounded-lg py-2.5 text-sm font-semibold transition-all duration-150 text-left',

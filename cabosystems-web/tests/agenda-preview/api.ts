@@ -10,7 +10,12 @@ events.push(...['Prueba de audio', 'Revisión de red'].map((titulo, index): Comp
   ...NO_RECURRENCE, id: `google-preview-${index}`, titulo, tipo: 'evento', fecha: '2026-10-20', hora: index ? '10:00:00' : '09:30:00', descripcion: 'Evento ficticio para revisar la distribución semanal.', ubicacion: 'Oficina', created_at: '', occurrence_date: '2026-10-20',
   google: { calendarId: `preview-${index}`, calendarName: index ? 'Oficina' : 'Pruebas CaboSystems', calendarColor: index ? '#f6bf26' : '#b39ddb', etag: 'preview', recurring: false, editable: true, endDate: '2026-10-20', endTime: '11:00:00', lastDay: '2026-10-20', timeZone: 'America/Mazatlan' },
 })));
-export async function getCompanyEvents(from: string, to: string) { return expandCompanyEvents(events, from, to); }
+events.push({ ...NO_RECURRENCE, id: 'gcal:preview-busy:busy1', titulo: 'Ocupado', tipo: 'evento', fecha: '2026-10-22', hora: '11:00:00', descripcion: null, ubicacion: null, created_at: '', google: { calendarId: 'preview-busy', calendarName: 'Calendario con disponibilidad', calendarColor: '#8e24aa', etag: 'availability', recurring: false, availabilityOnly: true, editable: false, endDate: '2026-10-22', endTime: '12:30:00', lastDay: '2026-10-22', timeZone: 'America/Mazatlan' } });
+export async function getCompanyEvents(from: string, to: string) {
+  if (new URLSearchParams(location.search).has('availability-permission-error')) throw new Error('Vuelve a autorizar la cuenta Google para permitir consultar la disponibilidad.');
+  if (new URLSearchParams(location.search).has('slow')) await new Promise(resolve => setTimeout(resolve, 2000));
+  return expandCompanyEvents(events, from, to);
+}
 export async function getGoogleCalendars() { return [{ id: 'preview-0', name: 'Pruebas CaboSystems', timeZone: 'America/Mazatlan', backgroundColor: '#b39ddb' }, { id: 'preview-1', name: 'Oficina', timeZone: 'America/Mazatlan', backgroundColor: '#f6bf26' }, { id: 'preview-empty', name: 'Entregas', timeZone: 'America/Mazatlan', backgroundColor: '#0b8043' }]; }
 export async function saveCompanyEvent(id: string | undefined, input: EventInput) {
   const result = { ...input, id: id || crypto.randomUUID(), created_at: '' };

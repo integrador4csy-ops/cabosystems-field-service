@@ -48,8 +48,8 @@ export async function uploadChatMedia(
  */
 export async function getMyChatGroups(userId: string): Promise<ChatGroup[]> {
   try {
-    const { data: authData } = await supabase.auth.getUser();
-    const effectiveUserId = authData?.user?.id || userId;
+    // The caller already has the signed-in user. Every query remains protected by RLS.
+    const effectiveUserId = userId;
 
     if (!effectiveUserId) return [];
 
@@ -65,6 +65,8 @@ export async function getMyChatGroups(userId: string): Promise<ChatGroup[]> {
         .eq('creado_por', effectiveUserId),
     ]);
 
+    if (memRes.error) throw memRes.error;
+    if (createdRes.error) throw createdRes.error;
     const memberships = memRes.data || [];
     const createdGroups = createdRes.data || [];
 
@@ -97,23 +99,17 @@ export async function getMyChatGroups(userId: string): Promise<ChatGroup[]> {
     // 3. Para cada grupo, buscar miembros_count y último mensaje
     const enhancedGroups: ChatGroup[] = await Promise.all(
       groups.map(async (g) => {
-        const { count } = await supabase
-          .from('chat_miembros')
-          .select('*', { count: 'exact', head: true })
-          .eq('grupo_id', g.id);
-
-        const { data: lastMsg } = await supabase
-          .from('chat_mensajes')
-          .select('*, profiles(nombre, avatar_url, rol)')
-          .eq('grupo_id', g.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        const [members, last] = await Promise.all([
+          supabase.from('chat_miembros').select('*', { count: 'exact', head: true }).eq('grupo_id', g.id),
+          supabase.from('chat_mensajes').select('*, profiles(nombre, avatar_url, rol)').eq('grupo_id', g.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+        ]);
+        if (members.error) throw members.error;
+        if (last.error) throw last.error;
 
         return {
           ...g,
-          miembros_count: count ?? 1,
-          ultimo_mensaje: (lastMsg as ChatMessage) || null,
+          miembros_count: members.count ?? 1,
+          ultimo_mensaje: (last.data as ChatMessage) || null,
           mi_rol: (roleMap.get(g.id) || (g.creado_por === effectiveUserId ? 'admin' : 'miembro')) as any,
         };
       })
@@ -129,7 +125,7 @@ export async function getMyChatGroups(userId: string): Promise<ChatGroup[]> {
     return enhancedGroups;
   } catch (error) {
     console.error('Error fetching chat groups:', error);
-    return [];
+    throw error;
   }
 }
 

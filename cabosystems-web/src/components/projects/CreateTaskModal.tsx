@@ -2,12 +2,17 @@ import { AppSelect } from '../ui/AppSelect';
 import { getRoleLabel, getTaskStatusLabel } from '../../lib/uiTranslations';
 import { useTranslation } from '../../context/LanguageContext';
 import { useDialog } from '../ui/useDialog';
+import { AgendaDateTimeField } from '../agenda/AgendaDateTimeField';
+import './CreateTaskModal.css';
 import React, { useState, useEffect } from 'react';
 import {
   X,
   CheckSquare,
   AlertCircle,
   Loader2,
+  Circle,
+  Clock3,
+  CircleCheck,
 } from 'lucide-react';
 import { createTask, updateTask, createSubtask } from '../../lib/projectsApi';
 import type { Proyecto, Tarea } from '../../types/projects';
@@ -34,7 +39,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   taskToEdit,
   staffList,
 }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [asignadoA, setAsignadoA] = useState('');
@@ -141,7 +146,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t("Tarea")} tabIndex={-1}
-        className="minimal-modal w-full max-w-xl operational-panel rounded-2xl bg-white shadow-theme-md border border-slate-200 overflow-hidden flex flex-col max-h-[calc(100dvh-32px)]">
+        className="task-editor minimal-modal w-full max-w-xl operational-panel rounded-2xl bg-white shadow-theme-md border border-slate-200 overflow-hidden flex flex-col max-h-[calc(100dvh-32px)]">
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5 bg-white">
           <div className="flex items-center gap-3">
@@ -158,7 +163,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             </div>
           </div>
           <button
-            aria-label={t("Cerrar ventana")} onClick={onClose}
+            aria-label={t("Cerrar ventana")} onClick={onClose} disabled={loading}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
           >
             <X size={18} />
@@ -190,17 +195,17 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="task-editor-schedule grid grid-cols-1 gap-4">
             {!taskToEdit && projects && <label className="block text-xs font-semibold text-slate-700">
               {t('Villa')}
               <AppSelect aria-label={t('Villa')} value={projectId} onChange={(event) => setProjectId(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm" required>
                 {projects.map((item) => <option key={item.id} value={item.id}>{item.desarrollo} · {item.villa}</option>)}
               </AppSelect>
             </label>}
-            <label className="block text-xs font-semibold text-slate-700">
-              {t('Fecha programada')} <span className="font-normal text-slate-500">{t('(Opcional)')}</span>
-              <input type="date" value={scheduledDate} onChange={(event) => setScheduledDate(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm" />
-            </label>
+            <div>
+              <div className="task-editor-date-label"><span>{t('Fecha programada')} <span className="font-normal text-slate-500">{t('(Opcional)')}</span></span>{scheduledDate && <button type="button" disabled={loading} onClick={() => setScheduledDate('')}>{locale.startsWith('en') ? 'Clear date' : 'Quitar fecha'}</button>}</div>
+              <AgendaDateTimeField type="date" label={t('Fecha programada')} locale={locale} value={scheduledDate} onChange={setScheduledDate} disabled={loading} />
+            </div>
           </div>
 
           {/* Técnico Asignado (Selector con diseño personalizado) */}
@@ -217,11 +222,12 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-slate-700">
               {t("Estatus")}</label>
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="task-editor-status grid grid-cols-3 gap-2.5" role="group" aria-label={t('Estatus')}>
               {(['pendiente', 'en_proceso', 'completada'] as const).map((st) => (
                 <button
                   key={st}
                   type="button"
+                  disabled={loading}
                   aria-pressed={estatus === st}
                   onClick={() => setEstatus(st)}
                   className={`h-10 rounded-lg text-xs font-semibold capitalize transition-all border ${
@@ -230,7 +236,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                       : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
                   }`}
                 >
-                  {getTaskStatusLabel(st, t)}
+                  {st === 'pendiente' ? <Circle size={15} aria-hidden="true" /> : st === 'en_proceso' ? <Clock3 size={15} aria-hidden="true" /> : <CircleCheck size={15} aria-hidden="true" />}{getTaskStatusLabel(st, t)}
                 </button>
               ))}
             </div>

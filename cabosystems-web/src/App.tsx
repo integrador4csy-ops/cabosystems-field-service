@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, lazy, Suspense } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback, lazy } from 'react';
 import { supabase } from './lib/supabase';
 import type { LiveWorker, Profile, UserLocation } from './types/fleet';
 import { formatRelativeTime, isWorkerOffline } from './lib/timeAgo';
@@ -10,6 +10,11 @@ import { useTranslation, LanguageProvider } from './context/LanguageContext';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { AppHeader } from './components/layout/AppHeader';
 import { AuthSplitScreen } from './components/auth/AuthSplitScreen';
+import { RetainedView } from './components/layout/RetainedView';
+import { preloadModules } from './lib/modulePreload';
+import { loadLiveMap, loadChat, loadTasks, loadAgenda, loadDirectory, loadTeam } from './lib/viewModules';
+import { SectionResourcesProvider, useSectionResources, canSpeculate } from './context/SectionResources';
+import { fleetSnapshot } from './lib/fleetSnapshot';
 import {
   playNotificationSound,
   requestDesktopNotificationPermission,
@@ -22,17 +27,18 @@ import {
   type ChatToastItem,
 } from './components/chat/ChatNotificationToast';
 
-const LiveMap = lazy(() => import('./components/LiveMap').then((module) => ({ default: module.LiveMap })));
+const LiveMap = lazy(() => loadLiveMap().then((module) => ({ default: module.LiveMap })));
 
-const ChatView = lazy(() => import('./components/chat/ChatView').then((module) => ({ default: module.ChatView })));
+const ChatView = lazy(() => loadChat().then((module) => ({ default: module.ChatView })));
 
-const ProjectsManagementView = lazy(() => import('./components/projects/ProjectsManagementView').then((module) => ({ default: module.ProjectsManagementView })));
-const CompanyAgenda = lazy(() => import('./components/agenda/CompanyAgenda').then((module) => ({ default: module.CompanyAgenda })));
-const ProjectDirectoryView = lazy(() => import('./components/projects/ProjectDirectoryView').then((module) => ({ default: module.ProjectDirectoryView })));
+const ProjectsManagementView = lazy(() => loadTasks().then((module) => ({ default: module.ProjectsManagementView })));
+const CompanyAgenda = lazy(() => loadAgenda().then((module) => ({ default: module.CompanyAgenda })));
+const ProjectDirectoryView = lazy(() => loadDirectory().then((module) => ({ default: module.ProjectDirectoryView })));
 
-const TeamManagementView = lazy(() => import('./components/team/TeamManagementView').then((module) => ({ default: module.TeamManagementView })));
+const TeamManagementView = lazy(() => loadTeam().then((module) => ({ default: module.TeamManagementView })));
 
 function DashboardContent() {
+  const resources = useSectionResources();
   const { t } = useTranslation();
   const {
     activeItem,
@@ -48,6 +54,10 @@ function DashboardContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [focusTrigger, setFocusTrigger] = useState(0);
+  const fleetRequest = useRef(0);
+  const fleetLoaded = useRef(false);
+
+
 
   // Solicitar permisos de notificación de escritorio en el navegador
   useEffect(() => {
@@ -94,11 +104,11 @@ function DashboardContent() {
       }
     }
 
-    checkInitialUnread();
+    void resources.ready.then(() => { if (isMounted) void checkInitialUnread(); });
     return () => {
       isMounted = false;
     };
-  }, [user?.id, activeItem, setUnreadChatCount]);
+  }, [user?.id, activeItem, setUnreadChatCount, resources]);
 
   // Escuchar mensajes entrantes en tiempo real para notificaciones in-app y de escritorio
   useEffect(() => {
@@ -116,6 +126,8 @@ function DashboardContent() {
         async (payload) => {
           const newMsg = payload.new as any;
           if (!newMsg) return;
+          resources.queries.invalidate('chat-groups');
+          resources.queries.invalidate(`conversation:${newMsg.grupo_id}`);
 
           // Si el mensaje es del propio usuario conectado, ignorar
           if (newMsg.remitente_id === user.id) return;
@@ -188,24 +200,15 @@ function DashboardContent() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, activeItem, setActiveItem, setTargetGroupId, setUnreadChatCount, t]);
+  }, [user?.id, activeItem, setActiveItem, setTargetGroupId, setUnreadChatCount, t, resources]);
 
   // 1. Fetch fleet data
-  const fetchFleet = async (showRefreshIndicator = false) => {
+  const fetchFleet = useCallback(async (showRefreshIndicator = false, force = true) => {
+    const request = ++fleetRequest.current;
     if (showRefreshIndicator) setIsRefreshing(true);
     try {
-      const { data: locations, error: locError } = await supabase
-        .from('ubicaciones_usuarios')
-        .select('*');
-
-      if (locError) {
-        console.error('Error fetching locations:', locError);
-        return;
-      }
-
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, nombre, rol, avatar_url, activo');
+      const { locations, profiles } = await resources.queries.load('fleet', fleetSnapshot, force, 10_000);
+      if (request !== fleetRequest.current) return;
 
       const profileMap = new Map<string, Profile>();
       (profiles || []).forEach((p: Profile) => {
@@ -240,19 +243,35 @@ function DashboardContent() {
           };
         });
 
+      fleetLoaded.current = true;
       setWorkers(mergedWorkers);
     } catch (err) {
       console.error('Error fetching fleet:', err);
     } finally {
+      resources.markReady();
       if (showRefreshIndicator) {
         setTimeout(() => setIsRefreshing(false), 400);
       }
     }
-  };
+  }, [resources, t]);
 
-  // 2. Realtime Subscription & 1.5s Polling Interval
   useEffect(() => {
-    fetchFleet();
+    let cancelled = false;
+    let stop = () => {};
+    void resources.ready.then(() => {
+      if (cancelled) return;
+      // First paint/data have priority. Only the two common next views warm their code.
+      stop = preloadModules([
+        () => canSpeculate() && !resources.queries.busy ? fetchFleet(false, false) : Promise.resolve(),
+        () => canSpeculate() && !resources.queries.busy ? loadTasks() : Promise.resolve(),
+        () => canSpeculate() && !resources.queries.busy ? loadAgenda() : Promise.resolve(),
+      ]);
+    });
+    return () => { cancelled = true; stop(); };
+  }, [resources, fetchFleet]);
+
+  // Realtime stays available; polling is a visible-radar fallback only.
+  useEffect(() => {
 
     const channel = supabase
       .channel('radar-ubicaciones-en-vivo')
@@ -262,6 +281,7 @@ function DashboardContent() {
         (payload) => {
           const newLoc = payload.new as UserLocation;
           if (!newLoc || !newLoc.usuario_id) return;
+          resources.queries.invalidate('fleet');
 
           setWorkers((prevWorkers) => {
             const index = prevWorkers.findIndex(
@@ -284,7 +304,7 @@ function DashboardContent() {
               };
               return updated;
             } else {
-              fetchFleet();
+              if (fleetLoaded.current) void fetchFleet(false, false);
               return prevWorkers;
             }
           });
@@ -292,15 +312,20 @@ function DashboardContent() {
       )
       .subscribe();
 
-    const syncInterval = setInterval(() => {
-      fetchFleet();
-    }, 1500);
-
     return () => {
-      clearInterval(syncInterval);
+      fleetRequest.current++;
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchFleet, resources]);
+
+  useEffect(() => {
+    if (activeItem !== 'radar') return;
+    const refresh = () => { if (document.visibilityState === 'visible') void fetchFleet(); };
+    void fetchFleet(false, false);
+    const interval = setInterval(refresh, 15_000);
+    window.addEventListener('focus', refresh);
+    return () => { clearInterval(interval); window.removeEventListener('focus', refresh); };
+  }, [activeItem, fetchFleet]);
 
   // Filtered workers based on search query
   const filteredWorkers = useMemo(() => {
@@ -366,18 +391,22 @@ function DashboardContent() {
 
         {/* 3. Main View: GPS Radar Map, Team Group Chat or Projects Management */}
         <main id="main-content" tabIndex={-1} className="flex-1 min-h-0 p-3 lg:p-3.5 overflow-hidden relative flex flex-col">
-          <Suspense fallback={<div role="status" className="operational-panel flex flex-1 items-center justify-center text-sm text-slate-500">{t('Cargando vista...')}</div>}>
-          {activeItem === 'chat' ? (
+          <RetainedView active={activeItem === 'chat'} fallback={<ViewLoading />}>
             <ChatView />
-          ) : ['colaboradores', 'invitaciones'].includes(activeItem) ? (
+          </RetainedView>
+          <RetainedView active={['colaboradores', 'invitaciones'].includes(activeItem)} fallback={<ViewLoading />}>
             <TeamManagementView onTeamChanged={fetchFleet} />
-          ) : activeItem === 'directorio-proyectos' ? (
+          </RetainedView>
+          <RetainedView active={activeItem === 'directorio-proyectos'} fallback={<ViewLoading />}>
             <ProjectDirectoryView key={user?.id} />
-          ) : activeItem === 'agenda' ? (
+          </RetainedView>
+          <RetainedView active={activeItem === 'agenda'} fallback={<ViewLoading />}>
             <CompanyAgenda key={user?.id} />
-          ) : activeItem === 'proyectos' ? (
+          </RetainedView>
+          <RetainedView active={activeItem === 'proyectos'} fallback={<ViewLoading />}>
             <ProjectsManagementView mode="tasks" />
-          ) : (
+          </RetainedView>
+          <RetainedView active={!['chat', 'colaboradores', 'invitaciones', 'directorio-proyectos', 'agenda', 'proyectos'].includes(activeItem)} fallback={<ViewLoading />}>
             <div className="flex-1 h-full w-full rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden relative isolate">
               <LiveMap
                 workers={filteredWorkers}
@@ -388,8 +417,7 @@ function DashboardContent() {
                 isRefreshing={isRefreshing}
               />
             </div>
-          )}
-          </Suspense>
+          </RetainedView>
         </main>
       </div>
 
@@ -415,7 +443,7 @@ function DashboardContent() {
 
 function AppContent() {
   const { t } = useTranslation();
-  const { user, loading } = useAdminAuth();
+  const { user, loading, adminProfile } = useAdminAuth();
 
   if (loading) {
     return (
@@ -437,10 +465,17 @@ function AppContent() {
   }
 
   return (
-    <SidebarProvider>
-      <DashboardContent />
-    </SidebarProvider>
+    <SectionResourcesProvider key={`${user.id}/${adminProfile?.rol}/${adminProfile?.activo}`}>
+      <SidebarProvider>
+        <DashboardContent />
+      </SidebarProvider>
+    </SectionResourcesProvider>
   );
+}
+
+function ViewLoading() {
+  const { t } = useTranslation();
+  return <div role="status" className="operational-panel flex flex-1 items-center justify-center text-sm text-slate-500">{t('Cargando vista...')}</div>;
 }
 
 export function App() {

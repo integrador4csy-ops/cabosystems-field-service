@@ -1,4 +1,4 @@
-import { CalendarError, type Actor, type Calendar, type createCalendarService } from './core.ts';
+import { CalendarError, isWritable, type Actor, type Calendar, type createCalendarService } from './core.ts';
 import { digest } from './crypto.ts';
 import { COMPANY_ZONE, eventBody, googleOccurrences, normalizeGoogleEvent, parseIdentity, shiftDay, validDate, validEventInput, zonedInstant, type GoogleEvent } from './events-model.ts';
 
@@ -19,8 +19,9 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
   const calendarPath = (id: string) => `calendars/${encodeURIComponent(id)}/events`;
   async function session(actor: Actor, calendarId: unknown) {
     const current = await service.eventSession(actor, true);
-    const calendar = current.connection.selected_calendars.find((item) => item.id === calendarId);
-    if (!current.token || !calendar) throw new CalendarError('El calendario no está seleccionado para la agenda.', 403);
+    if (!current.token || !current.connection.selected_calendars.some((item) => item.id === calendarId)) throw new CalendarError('El calendario no está seleccionado para la agenda.', 403);
+    const calendar = (await service.eventCalendars(current.token)).find(item => item.id === calendarId);
+    if (!calendar || !isWritable(calendar)) throw new CalendarError('Este calendario es de solo consulta. No puedes crear, editar ni eliminar sus eventos.', 403);
     return { ...current, calendar, token: current.token };
   }
   return {
@@ -30,7 +31,7 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
       const calendars = connection.selected_calendars.map(selected => {
         const calendar = current.get(selected.id);
         if (!calendar) throw new CalendarError('Un calendario seleccionado ya no está disponible. Revisa la selección.', 409);
-        return { id: calendar.id, name: calendar.name, timeZone: calendar.timeZone, backgroundColor: calendar.backgroundColor };
+        return { id: calendar.id, name: calendar.name, timeZone: calendar.timeZone, backgroundColor: calendar.backgroundColor, editable: isWritable(calendar) };
       });
       return { calendars, timeZone: COMPANY_ZONE };
     },
@@ -48,6 +49,25 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
           const selected = connection.selected_calendars[position++];
           const calendar = currentCalendars.get(selected.id);
           if (!calendar) throw new CalendarError('Un calendario seleccionado ya no está disponible. Revisa la selección.', 409);
+          if (calendar.accessRole === 'freeBusyReader') {
+            let data;
+            try {
+              data = await google('freeBusy', token!, { method: 'POST', body: JSON.stringify({ timeMin: zonedInstant(from as string, '00:00'), timeMax: zonedInstant(shiftDay(to as string, 1), '00:00'), timeZone: COMPANY_ZONE, items: [{ id: calendar.id }] }) });
+            } catch (error) {
+              if (error instanceof GoogleError && error.status === 403) throw new CalendarError('Vuelve a autorizar la cuenta Google para permitir consultar la disponibilidad.', 403);
+              throw error;
+            }
+            const calendars = data.calendars as Record<string, { errors?: unknown[]; busy?: { start: string; end: string }[] }> | undefined;
+            const availability = calendars?.[calendar.id];
+            if (!availability || availability.errors?.length || !Array.isArray(availability.busy)) throw new CalendarError('Google no pudo consultar la disponibilidad de un calendario. Intenta actualizar.', 502);
+            for (const interval of availability.busy) {
+              if (typeof interval.start !== 'string' || typeof interval.end !== 'string' || !Number.isFinite(Date.parse(interval.start)) || !Number.isFinite(Date.parse(interval.end)) || Date.parse(interval.end) <= Date.parse(interval.start)) throw new CalendarError('Google devolvió un horario de disponibilidad inválido.', 502);
+              const id = `busy${await digest(`${calendar.id}/${interval.start}/${interval.end}`)}`;
+              result.push(...googleOccurrences({ id, etag: 'availability', summary: 'Ocupado', start: { dateTime: interval.start }, end: { dateTime: interval.end } }, calendar, from as string, to as string));
+              if (result.length > 20000) throw new CalendarError('Hay demasiados eventos. Consulta un periodo más corto.');
+            }
+            continue;
+          }
           const query = new URLSearchParams({ singleEvents: 'true', orderBy: 'startTime', maxResults: '2500', timeZone: COMPANY_ZONE, timeMin: zonedInstant(from as string, '00:00'), timeMax: zonedInstant(shiftDay(to as string, 1), '00:00') });
           const seen = new Set<string>();
           do {

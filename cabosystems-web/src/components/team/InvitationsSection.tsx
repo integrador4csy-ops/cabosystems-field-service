@@ -1,7 +1,9 @@
+import { useSectionResources } from '../../context/SectionResources';
+import { teamInvitations } from '../../lib/teamSnapshot';
 import { getRoleLabel } from '../../lib/uiTranslations';
 import { useTranslation } from '../../context/LanguageContext';
 import { useDialog } from '../ui/useDialog';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { Invitacion } from '../../types/admin';
 import {
@@ -29,8 +31,11 @@ export const InvitationsSection: React.FC<InvitationsSectionProps> = ({
   onOpenInvite,
 }) => {
   const { t, locale } = useTranslation();
-  const [invitaciones, setInvitaciones] = useState<Invitacion[]>([]);
-  const [loading, setLoading] = useState(false);
+  const resources = useSectionResources();
+  const cached = resources.queries.read<Invitacion[]>('invitations');
+  const [invitaciones, setInvitaciones] = useState<Invitacion[]>(cached || []);
+  const [loading, setLoading] = useState(!cached);
+  const hasLoaded = useRef(Boolean(cached));
   const [resendingInviteId, setResendingInviteId] = useState<string | null>(null);
   const [globalBanner, setGlobalBanner] = useState<{
     type: 'success' | 'error';
@@ -55,16 +60,11 @@ export const InvitationsSection: React.FC<InvitationsSectionProps> = ({
   });
   const [confirmLoading, setConfirmLoading] = useState(false);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (force = true) => {
+    if (!hasLoaded.current) setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('invitaciones')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      if (data) setInvitaciones(data as Invitacion[]);
+      const data = await resources.queries.load('invitations', teamInvitations, force);
+      if (data) { setInvitaciones(data as Invitacion[]); hasLoaded.current = true; }
     } catch (e: any) {
       console.error('Error fetching invitations:', e);
       setGlobalBanner({
@@ -73,13 +73,17 @@ export const InvitationsSection: React.FC<InvitationsSectionProps> = ({
       });
     } finally {
       setLoading(false);
+      resources.markReady();
     }
-  }, [t]);
+  }, [t, resources]);
 
   useEffect(() => {
     if (active) {
-      loadData();
+      void loadData(refreshVersion > 0);
       setGlobalBanner(null);
+      const focus = () => { if (document.visibilityState === 'visible') void loadData(false); };
+      window.addEventListener('focus', focus);
+      return () => window.removeEventListener('focus', focus);
     }
   }, [active, refreshVersion, loadData]);
 
@@ -189,7 +193,7 @@ export const InvitationsSection: React.FC<InvitationsSectionProps> = ({
             )}
             <button
               className="refresh-btn"
-              onClick={loadData}
+              onClick={() => void loadData()}
               disabled={loading}
               title={t("Recargar invitaciones")}
             >

@@ -8,6 +8,8 @@ const { calendarAppearance, eventSchedule } = await import(`data:text/javascript
 test('calendar backgrounds follow Google color and maintain contrasting text', () => {
   assert.deepEqual(calendarAppearance({ google: { calendarColor: '#ffff00' } }), { backgroundColor: '#ffff00', color: '#000000' });
   assert.deepEqual(calendarAppearance({ google: { calendarColor: '#000000' } }), { backgroundColor: '#000000', color: '#FFFFFF' });
+  assert.deepEqual(calendarAppearance({ google: { calendarColor: '#a47ae2' } }), { backgroundColor: '#a47ae2', color: '#FFFFFF' });
+  assert.deepEqual(calendarAppearance({ google: { calendarColor: '#9fe1e7' } }), { backgroundColor: '#9fe1e7', color: '#000000' });
   assert.equal(calendarAppearance({ google: { calendarColor: 'url(unsafe)' } }).backgroundColor, '#343e48');
   assert.equal(calendarAppearance({}), undefined);
 });

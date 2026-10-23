@@ -13,6 +13,9 @@ import type { Profile } from '../../types/fleet';
 import { AppSelect } from '../ui/AppSelect';
 import { useDialog } from '../ui/useDialog';
 import './ProjectDirectory.css';
+import { useSectionResources, type SectionResources } from '../../context/SectionResources';
+
+export const prefetchDirectory = (resources: SectionResources, admin: boolean) => resources.queries.load(`directory:${admin}`, () => getProjectDirectory(admin));
 
 const EMPTY: ProjectDirectory = { developments: [], villas: [], members: [], staff: [], globalGrants: [], developmentGrants: [] };
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
@@ -110,23 +113,26 @@ function VillaTeam({ villa, data, admin, c, close, saved, onDirty }: { villa: Pr
 export function ProjectDirectoryView() {
   const { adminProfile } = useAdminAuth(); const admin = adminProfile?.rol === 'admin' && adminProfile.activo === true;
   const { language } = useTranslation(); const c = PROJECT_COPY[language];
-  const [data, setData] = useState(EMPTY); const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false);
+  const resources = useSectionResources();
+  const cached = resources.queries.read<ProjectDirectory>(`directory:${admin}`);
+  const [data, setData] = useState(cached || EMPTY); const [loading, setLoading] = useState(!cached); const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(''); const [developmentId, setDevelopmentId] = useState(''); const [villaId, setVillaId] = useState('');
   const [notice, setNotice] = useState(''); const [editorVersion, setEditorVersion] = useState(0);
   const [developmentSearch, setDevelopmentSearch] = useState(''); const [query, setQuery] = useState('');
   const [creation, setCreation] = useState<'development' | 'villa' | null>(null); const [access, setAccess] = useState<'global' | 'development' | null>(null);
   const request = useRef(0); const dirty = useRef(false); const setDirty = useCallback((value: boolean) => { dirty.current = value; }, []);
+  const hasLoaded = useRef(Boolean(cached));
   const canLeave = () => { if (!dirty.current) { setNotice(''); return true; } if (!window.confirm(c.unsaved)) return false; dirty.current = false; setNotice(''); setEditorVersion(previous => previous + 1); return true; };
   const load = useCallback(async (initial = false) => {
-    const version = ++request.current; if (initial) setLoading(true); else setRefreshing(true);
-    try { const next = await getProjectDirectory(admin); if (version !== request.current) return; setData(next); setError(''); }
+    const version = ++request.current; if (initial && !hasLoaded.current) setLoading(true); else setRefreshing(true);
+    try { const next = await resources.queries.load(`directory:${admin}`, () => getProjectDirectory(admin), !initial); if (version !== request.current) return; setData(next); hasLoaded.current = true; setError(''); }
     catch { if (version === request.current) setError(c.loadFailed); }
-    finally { if (version === request.current) { setLoading(false); setRefreshing(false); } }
-  }, [admin, c.loadFailed]);
+    finally { if (version === request.current) { setLoading(false); setRefreshing(false); resources.markReady(); } }
+  }, [admin, c.loadFailed, resources]);
   const invalidateRequests = useCallback(() => { request.current++; }, []);
   useEffect(() => {
     let cancelled = false;
-    queueMicrotask(() => { if (!cancelled) void load(true); });
+    queueMicrotask(() => { if (!cancelled && !dirty.current) void load(true); });
     return () => { cancelled = true; invalidateRequests(); };
   }, [load, invalidateRequests]);
   useEffect(() => {
@@ -141,8 +147,8 @@ export function ProjectDirectoryView() {
   const developments = data.developments.filter(d => normalize(d.nombre).includes(normalize(developmentSearch)));
   const villas = active.filter(v => v.desarrollo_id === development?.id && normalize(`${v.villa} ${v.descripcion || ''}`).includes(normalize(query))).sort((a, b) => a.villa.localeCompare(b.villa, language, { numeric: true }));
   const counts = useMemo(() => { const map = new Map<string, number>(); for (const villa of active) map.set(villa.desarrollo_id, (map.get(villa.desarrollo_id) || 0) + 1); return map; }, [active]);
-  const changed = async () => { await load(); };
-  const created = async (development: string, villa?: string) => { setDevelopmentId(development); setVillaId(villa || ''); setQuery(''); setDevelopmentSearch(''); await load(); };
+  const changed = async () => { resources.queries.invalidate('tasks'); await load(); };
+  const created = async (development: string, villa?: string) => { resources.queries.invalidate('tasks'); setDevelopmentId(development); setVillaId(villa || ''); setQuery(''); setDevelopmentSearch(''); await load(); };
   if (loading) return <div className="operational-panel pd-loading" role="status"><Loader2 size={24} className="animate-spin" />{c.loading}</div>;
   return <section className={`project-directory operational-panel ${development ? 'pd-has-development' : ''} ${selectedVilla ? 'pd-has-villa' : ''}`} aria-label={c.projects}>
     {error && <div className="pd-error pd-load-error" role="alert">{error}<button className="pd-button" disabled={refreshing} onClick={() => void load()}>{c.retry}</button></div>}

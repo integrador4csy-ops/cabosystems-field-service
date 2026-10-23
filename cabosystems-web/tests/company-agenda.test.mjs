@@ -44,8 +44,10 @@ test('monthly reminders clamp short months without drifting and can repeat every
 test('one-off reminders stay single and invalid rules cannot be saved', () => {
   assert.deepEqual(expandCompanyEvents([reminder()], '2026-10-01', '2026-10-31').map((e) => e.occurrence_date), ['2026-10-19']);
   assert.equal(validRecurrence(reminder()), true);
+  assert.equal(validRecurrence(reminder({ tipo: 'evento', repeticion: 'diaria' })), true);
+  assert.equal(expandCompanyEvents([reminder({ tipo: 'evento', repeticion: 'diaria' })], '2026-10-19', '2026-10-21').length, 3);
   assert.equal(validRecurrence(reminder({ repeticion: 'semanal', dias_semana: [1, 7] })), true);
-  for (const patch of [{ repeticion: 'semanal' }, { intervalo: 0 }, { intervalo: 1.5 }, { intervalo: 366 }, { repeticion: 'diaria', tipo: 'evento' }, { repeticion: 'mensual', dias_semana: [1] }, { repetir_hasta: '2026-10-18' }, { repetir_hasta: '' }, { fecha: '2026-02-30' }, { repeticion: 'semanal', dias_semana: [0, 8] }]) assert.equal(validRecurrence(reminder(patch)), false, JSON.stringify(patch));
+  for (const patch of [{ repeticion: 'semanal' }, { intervalo: 0 }, { intervalo: 1.5 }, { intervalo: 366 }, { repeticion: 'mensual', dias_semana: [1] }, { repetir_hasta: '2026-10-18' }, { repetir_hasta: '' }, { fecha: '2026-02-30' }, { repeticion: 'semanal', dias_semana: [0, 8] }]) assert.equal(validRecurrence(reminder(patch)), false, JSON.stringify(patch));
 });
 
 test('company calendar includes every date and weekend across months and years', () => {
@@ -93,7 +95,11 @@ test('agenda database enforces role access, active membership and valid entries'
     assert.equal((await asUser(ids[0], `select repeticion from agenda_eventos where id='${event}'`)).rows[0].repeticion, 'ninguna');
     const rule = (await asUser(ids[1], `update agenda_eventos set repeticion='semanal', intervalo=2, dias_semana=array[1,7], repetir_hasta='2026-12-31' where id='${reminder}' returning *`)).rows[0];
     assert.equal(rule.repeticion, 'semanal'); assert.deepEqual(rule.dias_semana, [1, 7]);
-    for (const assignment of ["tipo='evento'", "intervalo=0", "intervalo=366", "dias_semana='{}'", "dias_semana=array[0,8]", "dias_semana=array[null]::integer[]", "repetir_hasta='2026-01-01'", "repeticion='mensual'", "repeticion='ninguna'"]) await assert.rejects(asUser(ids[0], `update agenda_eventos set ${assignment} where id='${reminder}'`));
+    const unifiedMigration = readdirSync(new URL('../../supabase/migrations/', import.meta.url)).find(name => name.endsWith('_agenda_unified_events.sql'));
+    await db.exec(readFileSync(new URL(`../../supabase/migrations/${unifiedMigration}`, import.meta.url), 'utf8'));
+    const migrated = (await asUser(ids[0], `select tipo, repeticion, dias_semana from agenda_eventos where id='${reminder}'`)).rows[0];
+    assert.equal(migrated.tipo, 'evento'); assert.equal(migrated.repeticion, 'semanal'); assert.deepEqual(migrated.dias_semana, [1, 7]);
+    for (const assignment of ["intervalo=0", "intervalo=366", "dias_semana='{}'", "dias_semana=array[0,8]", "dias_semana=array[null]::integer[]", "repetir_hasta='2026-01-01'", "repeticion='mensual'", "repeticion='ninguna'"]) await assert.rejects(asUser(ids[0], `update agenda_eventos set ${assignment} where id='${reminder}'`));
     assert.equal((await asUser(ids[2], 'select * from agenda_eventos')).rows.length, 2);
     for (const id of [ids[2], ids[3], ids[4]]) {
       await assert.rejects(asUser(id, insert('evento')));

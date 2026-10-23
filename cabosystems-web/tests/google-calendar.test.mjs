@@ -118,16 +118,16 @@ test('overlapping authorizations cannot silently replace the connection', async 
   assert.ok((await f.service.start(admin, true)).url);
 });
 
-test('calendar pages are read completely, readonly choices and stale writes rejected', async () => {
+test('calendar pages are read completely, reader choices allowed and stale writes rejected', async () => {
   const f = fixture({ pages: [[primary], [office, reader]] }); const { callback } = await f.authorization();
   await f.service.callback(callback);
   const list = await f.service.listCalendars();
   assert.equal(list.calendars.length, 3);
-  await assert.rejects(f.service.selectCalendars(list.revision, ['readonly'], admin.id), /permiso/);
+
   await assert.rejects(f.service.selectCalendars(list.revision, ['missing'], admin.id), /permiso/);
   await assert.rejects(f.service.selectCalendars(list.revision, ['office', 'office'], admin.id), /válida/);
-  await f.service.selectCalendars(list.revision, ['office'], admin.id);
-  assert.deepEqual(f.connection().selected_calendars.map((calendar) => calendar.id), ['office']);
+  await f.service.selectCalendars(list.revision, ['office', 'readonly'], admin.id);
+  assert.deepEqual(f.connection().selected_calendars.map((calendar) => calendar.id), ['office', 'readonly']);
   await assert.rejects(f.service.selectCalendars(list.revision, [], admin.id), (error) => error.status === 409);
   const status = await f.service.status();
   assert.equal(status.syncEnabled, true);
@@ -140,6 +140,41 @@ test('revoking an admin before saving calendar selection prevents the write', as
   f.actor({ ...admin, activo: false });
   await assert.rejects(f.service.selectCalendars(revision, ['office'], admin.id), (error) => error.status === 403);
   assert.deepEqual(f.connection().selected_calendars, []);
+});
+
+test('availability-only calendars are selectable but use only freeBusy and never expose private details', async () => {
+  const f = fixture({ pages: [[primary, { ...reader, accessRole: 'freeBusyReader' }]] });
+  const { callback } = await f.authorization(); await f.service.callback(callback);
+  await f.service.selectCalendars(f.connection().revision, ['readonly'], admin.id);
+  let queries = 0;
+  const events = createEventService(f.service, async (url, options) => {
+    assert.ok(url.endsWith('/freeBusy'));
+    assert.equal(options.method, 'POST');
+    const query = JSON.parse(options.body);
+    assert.deepEqual(query.items, [{ id: 'readonly' }]);
+    assert.equal(query.timeZone, 'America/Mazatlan');
+    queries++;
+    return Response.json({ calendars: { readonly: { busy: [{ start: '2026-10-20T23:00:00-07:00', end: '2026-10-21T01:00:00-07:00' }] } } });
+  });
+  const result = await events.list(admin, '2026-10-20', '2026-10-21');
+  assert.deepEqual(result.events.map(row => row.occurrence_date), ['2026-10-20', '2026-10-21']);
+  assert.ok(result.events.every(row => row.titulo === 'Ocupado' && row.descripcion === null && row.ubicacion === null && row.google.availabilityOnly && !row.google.editable));
+  assert.equal(result.events[0].google.endTime, '01:00:00');
+  await assert.rejects(events.save(admin, { input: eventInput(), calendarId: 'readonly' }), error => error.status === 403);
+  await assert.rejects(events.remove(admin, result.events[0].id, 'availability'), error => error.status === 403);
+  assert.equal(queries, 1);
+});
+
+test('availability errors and missing scopes are explicit, never shown as a confirmed free calendar', async () => {
+  const f = fixture({ pages: [[primary, { ...reader, accessRole: 'freeBusyReader' }]] });
+  const { callback } = await f.authorization(); await f.service.callback(callback);
+  await f.service.selectCalendars(f.connection().revision, ['readonly'], admin.id);
+  for (const response of [{ calendars: { readonly: { errors: [{ reason: 'notFound' }], busy: [] } } }, { calendars: {} }, { calendars: { readonly: { busy: [{ start: 'invalid', end: 'invalid' }] } } }]) {
+    await assert.rejects(createEventService(f.service, async () => Response.json(response)).list(admin, '2026-10-20', '2026-10-20'), error => error.status === 502);
+  }
+  await assert.rejects(createEventService(f.service, async () => new Response('', { status: 403 })).list(admin, '2026-10-20', '2026-10-20'), /Vuelve a autorizar/);
+  const empty = await createEventService(f.service, async () => Response.json({ calendars: { readonly: { busy: [] } } })).list(admin, '2026-10-20', '2026-10-20');
+  assert.deepEqual(empty.events, []);
 });
 
 test('ciphertexts resist tampering, wrong purpose, wrong account client and secret rotation', async () => {
@@ -210,6 +245,37 @@ const officeCalendar = { id: 'office', name: 'Oficina', accessRole: 'writer', pr
 test('Google event metadata carries the actual calendar background color', () => {
   assert.equal(normalizeGoogleEvent(remoteEvent(), { ...officeCalendar, backgroundColor: '#b39ddb' }).google.calendarColor, '#b39ddb');
 });
+
+test('reader calendars display events but reject creation, updates and deletion before Google event requests', async () => {
+  const f = fixture(); const { callback } = await f.authorization(); await f.service.callback(callback);
+  await f.service.selectCalendars(f.connection().revision, ['readonly'], admin.id);
+  let reads = 0;
+  const events = createEventService(f.service, async (_url, options) => {
+    assert.equal(options.method, undefined);
+    reads++;
+    return Response.json({ items: [remoteEvent()] });
+  });
+  assert.equal((await events.selected(admin)).calendars[0].editable, false);
+  const result = await events.list(admin, '2026-10-20', '2026-10-20');
+  assert.equal(result.events[0].google.editable, false);
+  assert.equal(reads, 1);
+  for (const body of [{ calendarId: 'readonly', requestId: 'a'.repeat(32) }, { id: eventIdentity('readonly', 'event1'), etag: '"v1"' }]) {
+    await assert.rejects(events.save(admin, { input: eventInput(), ...body }), error => error.status === 403);
+  }
+  await assert.rejects(events.remove(admin, eventIdentity('readonly', 'event1'), '"v1"'), error => error.status === 403);
+  assert.equal(reads, 1, 'No Google event mutation request for reader calendars');
+});
+
+test('write permission is checked again when a selected calendar becomes read-only', async () => {
+  const calendar = { ...office };
+  const f = fixture({ pages: [[primary, calendar]] });
+  const { callback } = await f.authorization(); await f.service.callback(callback);
+  await f.service.selectCalendars(f.connection().revision, ['office'], admin.id);
+  calendar.accessRole = 'reader';
+  const events = createEventService(f.service, async () => { throw new Error('No event requests expected'); });
+  await assert.rejects(events.save(admin, { input: eventInput(), calendarId: 'office' }), error => error.status === 403);
+  await assert.rejects(events.remove(admin, eventIdentity('office', 'event1'), '"v1"'), error => error.status === 403);
+});
 async function connectedFixture() {
   const f = fixture(); const { callback } = await f.authorization(); await f.service.callback(callback);
   await f.service.selectCalendars(f.connection().revision, ['office'], admin.id);
@@ -224,7 +290,7 @@ test('calendar visibility choices include selected empty calendars with their cu
   calendar.backgroundColor = '#0b8043';
   const events = createEventService(f.service, async () => { throw new Error('Calendar choices must not depend on events'); });
   const result = await events.selected(admin);
-  assert.deepEqual(result.calendars, [{ id: 'office', name: 'Oficina', timeZone: 'America/Mazatlan', backgroundColor: '#0b8043' }]);
+  assert.deepEqual(result.calendars, [{ id: 'office', name: 'Oficina', timeZone: 'America/Mazatlan', backgroundColor: '#0b8043', editable: true }]);
   assert.equal(JSON.stringify(result).includes('refresh-secret'), false);
 });
 
@@ -250,7 +316,10 @@ test('Google edits retain exact duration, seconds, attendees and reminders when 
 });
 
 test('new Google reminders preserve weekday/month-end rules and have no automatic alarms', () => {
-  const weekly = eventBody(eventInput({ tipo: 'recordatorio', repeticion: 'semanal', intervalo: 2, dias_semana: [1, 7], repetir_hasta: '2026-11-01' }));
+  const recurringEvent = eventInput({ tipo: 'evento', repeticion: 'semanal', intervalo: 2, dias_semana: [1, 7], repetir_hasta: '2026-11-01' });
+  assert.equal(validEventInput(recurringEvent), true);
+  const weekly = eventBody(recurringEvent);
+  assert.equal(weekly.extendedProperties.private.csyTipo, 'evento');
   assert.match(weekly.recurrence[0], /FREQ=WEEKLY;INTERVAL=2;WKST=MO;BYDAY=MO,SU;UNTIL=20261102T065959Z/);
   assert.deepEqual(weekly.reminders, { useDefault: false });
   const monthly = eventBody(eventInput({ tipo: 'recordatorio', fecha: '2026-10-31', hora: null, repeticion: 'mensual' }));

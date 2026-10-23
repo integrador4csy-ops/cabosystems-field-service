@@ -10,20 +10,29 @@ import { ChatConversation } from './ChatConversation';
 import { CreateGroupModal } from './CreateGroupModal';
 import { GroupInfoDrawer } from './GroupInfoDrawer';
 import { MessageSquare, Plus } from 'lucide-react';
+import { useSectionResources, canSpeculate, type SectionResources } from '../../context/SectionResources';
+import { prefetchConversation } from '../../lib/chatSnapshot';
+
+export async function prefetchChat(resources: SectionResources, userId: string) {
+  const groups = await resources.queries.load('chat-groups', () => getMyChatGroups(userId), false, 15_000);
+  if (groups[0]) await prefetchConversation(resources, groups[0].id);
+}
 
 export const ChatView: React.FC = () => {
   const { t } = useTranslation();
   const { user, adminProfile } = useAdminAuth();
   const { targetGroupId, setTargetGroupId } = useSidebar();
   const currentUserId = user?.id || '';
+  const resources = useSectionResources();
+  const cached = resources.queries.read<ChatGroup[]>('chat-groups');
   const isGlobalAdmin =
     adminProfile?.rol === 'admin' ||
     adminProfile?.rol === 'supervisor_instalacion';
 
-  const [groups, setGroups] = useState<ChatGroup[]>([]);
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [groups, setGroups] = useState<ChatGroup[]>(cached || []);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(cached?.[0]?.id || null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cached);
   const [mobileConversationOpen, setMobileConversationOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -31,11 +40,11 @@ export const ChatView: React.FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isInfoDrawerOpen, setIsInfoDrawerOpen] = useState(false);
 
-  const loadGroups = useCallback(async () => {
+  const loadGroups = useCallback(async (force = true) => {
     if (!currentUserId) return;
     try {
       setLoadError(null);
-      const data = await getMyChatGroups(currentUserId);
+      const data = await resources.queries.load('chat-groups', () => getMyChatGroups(currentUserId), force, 15_000);
       setGroups(data);
       // Auto-select first group if none is selected or selected group no longer exists
       setSelectedGroupId((prev) => {
@@ -47,8 +56,9 @@ export const ChatView: React.FC = () => {
       setLoadError(t("No se pudieron cargar los grupos. Intenta de nuevo."));
     } finally {
       setLoading(false);
+      resources.markReady();
     }
-  }, [currentUserId, t]);
+  }, [currentUserId, t, resources]);
 
   // Si se hizo clic en una notificación para un grupo específico, seleccionarlo
   useEffect(() => {
@@ -63,7 +73,9 @@ export const ChatView: React.FC = () => {
 
   useEffect(() => {
     if (currentUserId) {
-      loadGroups();
+      void loadGroups(false);
+      const focus = () => { if (document.visibilityState === 'visible') void loadGroups(false); };
+      window.addEventListener('focus', focus);
 
       // Realtime subscription for chat_grupos & chat_miembros to auto-refresh group list
       const channel = supabase
@@ -85,6 +97,7 @@ export const ChatView: React.FC = () => {
         .subscribe();
 
       return () => {
+        window.removeEventListener('focus', focus);
         supabase.removeChannel(channel);
       };
     }
@@ -96,11 +109,12 @@ export const ChatView: React.FC = () => {
     <div className="flex h-full w-full gap-3.5 lg:gap-4.5 overflow-hidden">
       {/* 1. Left Card: Group Conversations List (Standalone Floating Card) */}
       <div className={`operational-panel w-full lg:w-80 xl:w-96 shrink-0 h-full overflow-hidden flex-col ${mobileConversationOpen && selectedGroup ? 'hidden lg:flex' : 'flex'}`}>
-        {loadError && <div role="alert" className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{t(loadError)}<button type="button" onClick={loadGroups} className="ml-2 underline underline-offset-2">{t("Reintentar")}</button></div>}
+        {loadError && <div role="alert" className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{t(loadError)}<button type="button" onClick={() => void loadGroups()} className="ml-2 underline underline-offset-2">{t("Reintentar")}</button></div>}
         <GroupList
           groups={groups}
           selectedGroupId={selectedGroupId}
           onSelectGroup={(id) => { setSelectedGroupId(id); setMobileConversationOpen(true); }}
+          onIntentGroup={id => { if (canSpeculate()) { const intent = `chat:${id}`; resources.setIntent(intent); void resources.prefetch(() => prefetchConversation(resources, id), intent); } }}
           onOpenCreateGroup={() => setIsCreateModalOpen(true)}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}

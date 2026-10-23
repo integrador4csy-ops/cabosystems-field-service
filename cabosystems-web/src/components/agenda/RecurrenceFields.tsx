@@ -4,6 +4,7 @@ import { isoWeekday } from '../../lib/agendaRecurrence';
 import { parseDateKey } from '../../lib/taskDates';
 import type { EventInput, RecurrenceFrequency } from '../../types/agenda';
 import { AppSelect } from '../ui/AppSelect';
+import { AgendaDateTimeField } from './AgendaDateTimeField';
 
 type RepeatMode = 'ninguna' | 'semanal' | 'mensual' | 'custom';
 
@@ -34,6 +35,6 @@ export function RecurrenceFields({ input, disabled, onChange }: {
       return <button key={day} type="button" disabled={disabled} aria-label={date.toLocaleDateString(locale, { weekday: 'long' })} aria-pressed={selected} onClick={() => onChange({ dias_semana: selected ? input.dias_semana.filter((value) => value !== day) : [...input.dias_semana, day].sort((a, b) => a - b) })}>{date.toLocaleDateString(locale, { weekday: 'short' })}</button>;
     })}</div>{input.dias_semana.length === 0 && <p className="company-error">{t('Selecciona al menos un día de la semana.')}</p>}</div>}
     {input.repeticion === 'mensual' && input.fecha && <p className="company-field-help">{t('Se usa el día {day}; si no existe en ese mes, se usa el último día.', { day: parseDateKey(input.fecha).getDate() })}</p>}
-    {input.repeticion !== 'ninguna' && <div className="company-form-row"><label>{t('Termina')}<AppSelect aria-label={t('Termina')} disabled={disabled} value={endsOnDate ? 'date' : 'never'} onChange={(e) => { const ends = e.target.value === 'date'; setEndsOnDate(ends); onChange({ repetir_hasta: ends ? input.fecha : null }); }}><option value="never">{t('Nunca')}</option><option value="date">{t('En una fecha')}</option></AppSelect></label>{endsOnDate && <label>{t('Repetir hasta')}<input type="date" required min={input.fecha} max="9999-12-31" value={input.repetir_hasta || ''} onChange={(e) => onChange({ repetir_hasta: e.target.value })} /></label>}</div>}
+    {input.repeticion !== 'ninguna' && <div className="company-form-row"><label>{t('Termina')}<AppSelect aria-label={t('Termina')} disabled={disabled} value={endsOnDate ? 'date' : 'never'} onChange={(e) => { const ends = e.target.value === 'date'; setEndsOnDate(ends); onChange({ repetir_hasta: ends ? input.fecha : null }); }}><option value="never">{t('Nunca')}</option><option value="date">{t('En una fecha')}</option></AppSelect></label>{endsOnDate && <label>{t('Repetir hasta')}<AgendaDateTimeField type="date" required min={input.fecha} max="9999-12-31" value={input.repetir_hasta || ''} label={t('Repetir hasta')} locale={locale} disabled={disabled} onChange={repetir_hasta => onChange({ repetir_hasta })} /></label>}</div>}
   </div>;
 }

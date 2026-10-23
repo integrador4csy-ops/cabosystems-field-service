@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { CalendarDays, Check, RefreshCw } from 'lucide-react-native';
+import { CalendarDays, RefreshCw } from 'lucide-react-native';
 import { useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import type { AgendaGoogleCalendar, CompanyEvent, EventInput } from '@/types/companyAgenda';
 import { CompanyAgendaControls, CompanyAgendaTopBar } from './CompanyAgendaControls';
 import { CompanyAgendaEvent } from './CompanyAgendaEvent';
+import { CompanyCalendarFilters } from './CompanyCalendarFilters';
 import { CompanyEventModal } from './CompanyEventModal';
 
 const EMPTY: CompanyEvent[] = [];
@@ -86,12 +87,8 @@ export default function CompanyAgendaScreen() {
   }, [c, dateFormat, timeFormat, openEvent, locale]);
   const extra = useMemo(() => ({ c, locale, owner }), [c, locale, owner]);
   const header = <View>
-    <View style={s.calendarFilters}><Text style={s.calendarHeading}>{language === 'es' ? 'Mis calendarios' : 'My calendars'}</Text>{calendarFilters.map(calendar => {
-      const checked = !hiddenCalendars.includes(calendar.id);
-      const color = calendar.backgroundColor && /^#[a-f0-9]{6}$/i.test(calendar.backgroundColor) ? calendar.backgroundColor : P.slate;
-      return <Pressable key={calendar.id} accessibilityRole="checkbox" accessibilityState={{ checked }} accessibilityLabel={calendar.name} onPress={() => toggleCalendar(calendar.id)} style={s.calendarOption}><View style={[s.calendarCheck, { borderColor: color, backgroundColor: checked ? color : P.white }]}>{checked ? <Check size={14} color={P.ink} /> : null}</View><Text style={s.calendarName}>{calendar.name}</Text></Pressable>;
-    })}</View>
     <CompanyAgendaControls copy={c} locale={locale} query={query} view={view} anchor={anchor} today={today} days={days} counts={counts} heading={heading} onSearch={setQuery} onView={setView} onDate={setAnchor} onMove={move} onToday={() => setAnchor(dateKey(new Date()))} />
+    <CompanyCalendarFilters calendars={calendarFilters} hidden={hiddenCalendars} locale={locale} onToggle={toggleCalendar} />
     {error ? <View accessibilityRole="alert" style={s.error}><Text style={[s.help, s.errorCopy]}>{cached ? c.cached : c.failed}</Text><Pressable accessibilityRole="button" accessibilityLabel={c.retry} onPress={() => void load(true)} style={s.icon}><RefreshCw size={18} color={P.ink} /></Pressable></View> : null}
   </View>;
   return <View style={s.page}>
@@ -102,11 +99,6 @@ export default function CompanyAgendaScreen() {
   </View>;
 }
 const s = StyleSheet.create({
-  calendarFilters: { paddingVertical: 12, gap: 2 },
-  calendarHeading: { color: P.ink, fontFamily: 'Outfit_600SemiBold', fontSize: 14, marginBottom: 4 },
-  calendarOption: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },
-  calendarCheck: { width: 20, height: 20, borderWidth: 1, borderRadius: 3, alignItems: 'center', justifyContent: 'center' },
-  calendarName: { flex: 1, color: P.ink, fontFamily: 'Outfit_400Regular', fontSize: 13 },
   page: { flex: 1, backgroundColor: P.white },
   listArea: { flex: 1, width: '100%', maxWidth: 720, alignSelf: 'center' },
   dayHeading: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 24, paddingBottom: 2 },

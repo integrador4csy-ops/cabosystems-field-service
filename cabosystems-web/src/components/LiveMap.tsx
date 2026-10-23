@@ -56,6 +56,7 @@ export const LiveMap: React.FC<LiveMapProps> = ({
   const { t, language } = useTranslation();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
+  const savedView = useRef<{ center: L.LatLng; zoom: number } | null>(null);
   const markersRef = useRef<Map<string, MarkerAnimationState>>(new Map());
   const selectedWorkerIdRef = useRef<string | null>(selectedWorkerId);
   selectedWorkerIdRef.current = selectedWorkerId;
@@ -68,8 +69,8 @@ export const LiveMap: React.FC<LiveMapProps> = ({
 
     // Default center: Los Cabos (Cabo San Lucas / San José del Cabo, BCS)
     const map = L.map(mapContainerRef.current, {
-      center: [23.0626, -109.7036],
-      zoom: 14,
+      center: savedView.current?.center || [23.0626, -109.7036],
+      zoom: savedView.current?.zoom ?? 14,
       zoomControl: false,
     });
 
@@ -104,6 +105,7 @@ export const LiveMap: React.FC<LiveMapProps> = ({
         if (state.animFrameId) cancelAnimationFrame(state.animFrameId);
       });
       markersRef.current.clear();
+      savedView.current = { center: map.getCenter(), zoom: map.getZoom() };
       map.remove();
       mapInstanceRef.current = null;
     };

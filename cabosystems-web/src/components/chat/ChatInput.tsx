@@ -47,7 +47,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => { if (replyTo) textareaRef.current?.focus(); }, [replyTo]);
-  useEffect(() => { return () => { if (mediaPreview) URL.revokeObjectURL(mediaPreview); }; }, [mediaPreview]);
+  useEffect(() => {
+    if (!mediaFile) { setMediaPreview(null); return; }
+    const preview = URL.createObjectURL(mediaFile);
+    setMediaPreview(preview);
+    return () => URL.revokeObjectURL(preview);
+  }, [mediaFile]);
 
   // When solo_multimedia is active and user is not admin, disable regular text
   const isTextBlocked = soloMultimedia && !isAdmin;
@@ -66,7 +71,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
     setMediaFile(file);
     setMediaType(isVideo ? 'video' : 'imagen');
-    setMediaPreview(URL.createObjectURL(file));
   };
 
   const removeMedia = () => {

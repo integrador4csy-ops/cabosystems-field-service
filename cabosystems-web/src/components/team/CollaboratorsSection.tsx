@@ -1,3 +1,5 @@
+import { useSectionResources } from '../../context/SectionResources';
+import { teamProfiles } from '../../lib/teamSnapshot';
 import { getRoleLabel } from '../../lib/uiTranslations';
 import { useTranslation } from '../../context/LanguageContext';
 import { useDialog } from '../ui/useDialog';
@@ -35,8 +37,11 @@ export const CollaboratorsSection: React.FC<CollaboratorsSectionProps> = ({
   onUserListChanged,
 }) => {
   const { t } = useTranslation();
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(false);
+  const resources = useSectionResources();
+  const cached = resources.queries.read<Profile[]>('collaborators');
+  const [profiles, setProfiles] = useState<Profile[]>(cached || []);
+  const [loading, setLoading] = useState(!cached);
+  const hasLoaded = useRef(Boolean(cached));
   const [searchQuery, setSearchQuery] = useState('');
   const [globalBanner, setGlobalBanner] = useState<{
     type: 'success' | 'error';
@@ -71,16 +76,12 @@ export const CollaboratorsSection: React.FC<CollaboratorsSectionProps> = ({
   });
   const [confirmLoading, setConfirmLoading] = useState(false);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (force = true) => {
+    if (force) { resources.queries.invalidate('tasks'); resources.queries.invalidate('directory:true'); resources.queries.invalidate('directory:false'); }
+    if (!hasLoaded.current) setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      if (data) setProfiles(data as Profile[]);
+      const data = await resources.queries.load('collaborators', teamProfiles, force);
+      if (data) { setProfiles(data as Profile[]); hasLoaded.current = true; }
     } catch (e: any) {
       console.error('Error fetching profiles:', e);
       setGlobalBanner({
@@ -89,14 +90,18 @@ export const CollaboratorsSection: React.FC<CollaboratorsSectionProps> = ({
       });
     } finally {
       setLoading(false);
+      resources.markReady();
     }
-  }, [t]);
+  }, [t, resources]);
 
   useEffect(() => {
     if (active) {
-      loadData();
+      void loadData(false);
       setGlobalBanner(null);
       setEditingUser(null);
+      const focus = () => { if (document.visibilityState === 'visible') void loadData(false); };
+      window.addEventListener('focus', focus);
+      return () => window.removeEventListener('focus', focus);
     }
   }, [active, loadData]);
 
@@ -352,7 +357,7 @@ export const CollaboratorsSection: React.FC<CollaboratorsSectionProps> = ({
               )}
               <button
                 className="refresh-btn"
-                onClick={loadData}
+                onClick={() => void loadData()}
                 disabled={loading}
                 title={t("Recargar colaboradores")}
               >

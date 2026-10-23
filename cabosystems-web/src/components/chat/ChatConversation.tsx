@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import {
-  getGroupMessages, getChatMessage, getChatPins, pinChatMessage, unpinChatMessage,
+  getChatMessage, pinChatMessage, unpinChatMessage,
   deleteChatMessage,
   toggleChatReaction,
 } from '../../lib/chatApi';
@@ -22,6 +22,8 @@ import { ReplyPreview } from './ReplyPreview';
 import { useDialog } from '../ui/useDialog';
 import { ChatInput } from './ChatInput';
 import { ImageLightboxModal } from './ImageLightboxModal';
+import { useSectionResources } from '../../context/SectionResources';
+import { chatSnapshot } from '../../lib/chatSnapshot';
 
 interface ChatConversationProps {
   group: ChatGroup;
@@ -41,8 +43,10 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
   onGroupChanged,
 }) => {
   const { t } = useTranslation();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const resources = useSectionResources();
+  const cached = resources.queries.read<Awaited<ReturnType<typeof chatSnapshot>>>(`conversation:${group.id}`);
+  const [messages, setMessages] = useState<ChatMessage[]>(cached?.messages || []);
+  const [loading, setLoading] = useState(!cached);
   const [lightboxImage, setLightboxImage] = useState<{
     url: string;
     caption?: string | null;
@@ -51,7 +55,7 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
   const [isSearching, setIsSearching] = useState(false);
 
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
-  const [pins, setPins] = useState<ChatPin[]>([]);
+  const [pins, setPins] = useState<ChatPin[]>(cached?.pins || []);
   const [showPins, setShowPins] = useState(false);
   const [actionError, setActionError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -61,22 +65,31 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const activeGroupRef = useRef(group.id);
+  const loadedGroup = useRef('');
   useLayoutEffect(() => { activeGroupRef.current = group.id; }, [group.id]);
   const scrollToBottom = (smooth = true) => messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
 
-  const refresh = useCallback(async () => {
-    const [data, pinned] = await Promise.all([getGroupMessages(group.id, 100), getChatPins(group.id)]);
+  const refresh = useCallback(async (force = true) => {
+    const { messages: data, pins: pinned } = await resources.queries.load(`conversation:${group.id}`, () => chatSnapshot(group.id), force, 15_000);
     if (activeGroupRef.current !== group.id) return;
     setMessages(data);
     setPins(pinned);
-  }, [group.id]);
+    loadedGroup.current = group.id;
+  }, [group.id, resources]);
 
   useEffect(() => {
     let active = true;
-    setLoading(true); setMessages([]); setPins([]); setReplyTo(null); setActionError(''); setDeleteTarget(null); setShowPins(false);
+    const initial = loadedGroup.current !== group.id;
+    if (initial) {
+      const saved = resources.queries.read<Awaited<ReturnType<typeof chatSnapshot>>>(`conversation:${group.id}`);
+      setLoading(!saved); setMessages(saved?.messages || []); setPins(saved?.pins || []); setReplyTo(null); setDeleteTarget(null); setShowPins(false);
+    }
+    setActionError('');
     const report = (error: unknown) => { console.error('Chat refresh failed:', JSON.stringify(error)); if (active) setActionError(t('No se pudo actualizar el chat. Intenta de nuevo.')); };
-    refresh().then(() => { if (active) requestAnimationFrame(() => scrollToBottom(false)); }).catch(report).finally(() => { if (active) setLoading(false); });
+    refresh(false).then(() => { if (active && initial) requestAnimationFrame(() => scrollToBottom(false)); }).catch(report).finally(() => { if (active) setLoading(false); });
     const reload = () => refresh().catch(report);
+    const focus = () => { if (document.visibilityState === 'visible') void refresh(false).catch(report); };
+    window.addEventListener('focus', focus);
     const channel = supabase.channel(`chat_web_${group.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensajes', filter: `grupo_id=eq.${group.id}` }, () => {
         const container = chatContainerRef.current;
@@ -93,8 +106,8 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_pins' }, reload)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_grupos', filter: `id=eq.${group.id}` }, onGroupChanged)
       .subscribe();
-    return () => { active = false; supabase.removeChannel(channel); };
-  }, [group.id, refresh, onGroupChanged, t]);
+    return () => { active = false; window.removeEventListener('focus', focus); supabase.removeChannel(channel); };
+  }, [group.id, refresh, onGroupChanged, t, resources]);
 
   const handleToggleReaction = async (messageId: string, emoji: string) => {
     setActionError('');

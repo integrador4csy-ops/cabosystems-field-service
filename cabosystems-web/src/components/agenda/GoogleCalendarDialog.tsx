@@ -11,10 +11,10 @@ const COPY = {
     replaceConfirm: 'Confirmo que esta autorización reemplazará la cuenta actual y vaciará su selección de calendarios.',
     unconfigured: 'Falta configurar Google Calendar en el servidor. Contacta al administrador.',
     disconnected: 'Conecta primero una cuenta de pruebas. Después podrás elegir los calendarios de la empresa.',
-    connected: 'Cuenta conectada:', choose: 'Calendarios disponibles', readOnly: 'Solo consulta', selected: 'Calendarios seleccionados:', noSelection: 'Todavía no seleccionaste calendarios.',
+    connected: 'Cuenta conectada:', choose: 'Calendarios disponibles', readOnly: 'Solo consulta', availabilityOnly: 'Solo disponibilidad · se muestra como Ocupado', needsDetails: 'Para mostrar sus eventos, comparte este calendario con la cuenta conectada y permite ver todos los detalles de los eventos.', unavailable: 'Sin permiso para consultar eventos', selected: 'Calendarios seleccionados:', noSelection: 'Todavía no seleccionaste calendarios.',
     save: 'Guardar selección', saved: 'Selección guardada.',
     failure: 'No se pudo completar la operación. Revisa la conexión e intenta de nuevo.',
-    privacy: 'Selecciona únicamente calendarios destinados a la agenda de empresa. No se seleccionan automáticamente los calendarios personales.',
+    privacy: 'Selecciona únicamente calendarios destinados a la agenda de empresa. Los de solo consulta se pueden mostrar, pero no editar. No se seleccionan automáticamente los calendarios personales.',
     pending: 'Los eventos de los calendarios seleccionados aparecen en la agenda al actualizar. Al crear un evento, elige su calendario. Los cambios se guardan directamente en Google. Horario de Los Cabos.',
     popup: 'Permite abrir la ventana de Google para autorizar la cuenta.',
     authorize: 'Completa la autorización en la pestaña de Google y pulsa Actualizar aquí al terminar.',
@@ -26,10 +26,10 @@ const COPY = {
     replaceConfirm: 'I confirm this authorization will replace the current account and clear its calendar selection.',
     unconfigured: 'Google Calendar is not configured on the server. Contact the administrator.',
     disconnected: 'Connect a test account first. You can then choose the company calendars.',
-    connected: 'Connected account:', choose: 'Available calendars', readOnly: 'Read only', selected: 'Selected calendars:', noSelection: 'No calendars selected yet.',
+    connected: 'Connected account:', choose: 'Available calendars', readOnly: 'Read only', availabilityOnly: 'Availability only · displayed as Busy', needsDetails: 'To display events, share this calendar with the connected account and allow access to all event details.', unavailable: 'No permission to read events', selected: 'Selected calendars:', noSelection: 'No calendars selected yet.',
     save: 'Save selection', saved: 'Selection saved.',
     failure: 'The operation could not be completed. Check your connection and try again.',
-    privacy: 'Only select calendars intended for the company agenda. Personal calendars are not selected automatically.',
+    privacy: 'Only select calendars intended for the company agenda. Read-only calendars can be displayed but not edited. Personal calendars are not selected automatically.',
     pending: 'Events from selected calendars appear when you refresh the agenda. Choose a calendar when creating an event. Changes are saved directly to Google. Times use Los Cabos time.',
     popup: 'Allow the Google window to open to authorize the account.',
     authorize: 'Complete authorization in the Google tab, then press Refresh here.',
@@ -113,7 +113,8 @@ export function GoogleCalendarDialog({ onClose }: { onClose: () => void }) {
               {calendars.length === 0 && <p>{c.none}</p>}
               {calendars.map((calendar) => {
                 const writable = ['owner', 'writer'].includes(calendar.accessRole);
-                return <label className="google-calendar-option" key={calendar.id}><input type="checkbox" disabled={!writable || busy} checked={selected.includes(calendar.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, calendar.id] : current.filter((id) => id !== calendar.id))} /><span>{calendar.name}{!writable && <span className="company-event-meta">{c.readOnly}</span>}</span></label>;
+                const readable = ['owner', 'writer', 'reader', 'writerWithoutPrivateAccess', 'freeBusyReader'].includes(calendar.accessRole);
+                return <label className="google-calendar-option" key={calendar.id}><input type="checkbox" disabled={!readable || busy} checked={selected.includes(calendar.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, calendar.id] : current.filter((id) => id !== calendar.id))} /><span>{calendar.name}{!writable && <span className="company-event-meta">{calendar.accessRole === 'freeBusyReader' ? c.availabilityOnly : readable ? c.readOnly : c.unavailable}</span>}{!readable && <span className="company-event-meta">{c.needsDetails}</span>}</span></label>;
               })}
               <button type="button" className="workspace-primary" disabled={busy} onClick={() => void run(save)}>{c.save}</button>
             </fieldset>}

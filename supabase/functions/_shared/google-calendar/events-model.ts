@@ -55,10 +55,10 @@ export function normalizeGoogleEvent(event: GoogleEvent, calendar: Calendar) {
   const lastDay = !allDay && end.time === '00:00:00' ? shiftDay(end.date, -1) : end.date;
   return {
     id: eventIdentity(calendar.id, event.id), titulo: event.summary || '(Sin título)', descripcion: event.description || null,
-    ubicacion: event.location || null, tipo: event.extendedProperties?.private?.csyTipo === 'recordatorio' ? 'recordatorio' as const : 'evento' as const,
+    ubicacion: event.location || null, tipo: 'evento' as const,
     fecha: start.date, hora: start.time, created_at: event.created || '',
     repeticion: 'ninguna' as const, intervalo: 1, dias_semana: [] as number[], repetir_hasta: null,
-    google: { calendarId: calendar.id, calendarName: calendar.name, calendarColor: calendar.backgroundColor, etag: event.etag, recurring: Boolean(event.recurringEventId), editable: (!event.eventType || event.eventType === 'default') && !event.locked, endDate: end.date, endTime: end.time, lastDay, timeZone: COMPANY_ZONE },
+    google: { calendarId: calendar.id, calendarName: calendar.name, calendarColor: calendar.backgroundColor, etag: event.etag, recurring: Boolean(event.recurringEventId), availabilityOnly: calendar.accessRole === 'freeBusyReader', editable: ['owner', 'writer'].includes(calendar.accessRole) && (!event.eventType || event.eventType === 'default') && !event.locked, endDate: end.date, endTime: end.time, lastDay, timeZone: COMPANY_ZONE },
   };
 }
 export function googleOccurrences(event: GoogleEvent, calendar: Calendar, from: string, to: string) {
@@ -93,7 +93,6 @@ export function validEventInput(input: unknown): input is EventInput {
     && e.dias_semana.every((day) => Number.isInteger(day) && day >= 1 && day <= 7) && new Set(e.dias_semana).size === e.dias_semana.length
     && (e.repeticion !== 'semanal' || e.dias_semana.length > 0) && (e.repeticion === 'semanal' || e.dias_semana.length === 0)
     && (!e.repetir_hasta || validDate(e.repetir_hasta) && e.repetir_hasta >= e.fecha)
-    && (e.tipo === 'recordatorio' || e.repeticion === 'ninguna')
     && (e.repeticion !== 'ninguna' || e.intervalo === 1 && !e.repetir_hasta);
 }
 export function eventBody(input: EventInput, existing?: GoogleEvent): Record<string, unknown> {
@@ -111,7 +110,7 @@ export function eventBody(input: EventInput, existing?: GoogleEvent): Record<str
   }
   const body: Record<string, unknown> = {
     summary: input.titulo.trim(), description: input.descripcion || '', location: input.ubicacion || '', start, end,
-    extendedProperties: { ...existing?.extendedProperties, private: { ...existing?.extendedProperties?.private, csyTipo: input.tipo } },
+    extendedProperties: { ...existing?.extendedProperties, private: { ...existing?.extendedProperties?.private, csyTipo: 'evento' } },
   };
   if (!existing) {
     body.reminders = { useDefault: false };

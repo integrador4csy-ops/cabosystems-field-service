@@ -19,10 +19,10 @@ export interface CompanyEvent extends EventRecurrence {
   ubicacion: string | null;
   created_at: string;
   occurrence_date?: string;
-  google?: { calendarId: string; calendarName: string; calendarColor?: string; etag: string; recurring: boolean; editable: boolean; endDate: string; endTime: string | null; lastDay: string; timeZone: string };
+  google?: { calendarId: string; calendarName: string; calendarColor?: string; etag: string; recurring: boolean; editable: boolean; availabilityOnly?: boolean; endDate: string; endTime: string | null; lastDay: string; timeZone: string };
 }
 
 export type EventInput = Omit<CompanyEvent, 'id' | 'created_at' | 'occurrence_date' | 'google'> & {
   calendar_id?: string; google_etag?: string; request_id?: string; fecha_fin?: string; hora_fin?: string | null;
 };
-export interface AgendaGoogleCalendar { id: string; name: string; timeZone: string; backgroundColor?: string }
+export interface AgendaGoogleCalendar { id: string; name: string; timeZone: string; backgroundColor?: string; editable?: boolean }
