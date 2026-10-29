@@ -146,7 +146,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t("Tarea")} tabIndex={-1}
-        className="task-editor minimal-modal w-full max-w-xl operational-panel rounded-2xl bg-white shadow-theme-md border border-slate-200 overflow-hidden flex flex-col max-h-[calc(100dvh-32px)]">
+        className="task-editor minimal-modal w-full max-w-xl operational-panel rounded-2xl bg-white shadow-theme-md border border-slate-200 overflow-hidden flex flex-col max-h-[calc(var(--app-viewport-height)-32px)]">
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5 bg-white">
           <div className="flex items-center gap-3">

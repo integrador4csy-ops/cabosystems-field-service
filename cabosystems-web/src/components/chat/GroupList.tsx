@@ -8,7 +8,6 @@ import {
   Camera,
   Sparkles,
   MessageSquare,
-  Shield,
 } from 'lucide-react';
 import type { ChatGroup } from '../../types/chat';
 
@@ -197,14 +196,6 @@ export const GroupList: React.FC<GroupListProps> = ({
                       <span>{groupInitial}</span>
                     )}
                   </div>
-                  {group.mi_rol === 'admin' && (
-                    <div
-                      className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-brand-500 text-white border-2 border-white shadow-2xs"
-                      title={t("Administrador del grupo")}
-                    >
-                      <Shield size={8} />
-                    </div>
-                  )}
                 </div>
 
                 {/* Info Container */}

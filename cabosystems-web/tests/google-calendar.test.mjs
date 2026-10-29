@@ -8,18 +8,20 @@ const asModule = (text) => `data:text/javascript;base64,${Buffer.from(text).toSt
 const compile = (file) => ts.transpileModule(readFileSync(new URL(`../../supabase/functions/_shared/google-calendar/${file}.ts`, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ES2022 } }).outputText;
 const cryptoUrl = asModule(compile('crypto'));
 const coreUrl = asModule(compile('core').replace("'./crypto.ts'", JSON.stringify(cryptoUrl)));
-const { SCOPES, createCalendarService } = await import(coreUrl);
+const { SCOPES, createCalendarService, calendarDisplayName } = await import(coreUrl);
 const { seal, unseal, digest } = await import(cryptoUrl);
 const { apiHandler, callbackHandler } = await import(asModule(compile('handlers').replace("'./core.ts'", JSON.stringify(coreUrl))));
 const modelUrl = asModule(compile('events-model'));
+const searchIndexUrl = asModule(compile('search-index').replace("'./core.ts'", JSON.stringify(coreUrl)));
+const { syncSearchCalendar } = await import(searchIndexUrl);
 const { eventBody, googleOccurrences, normalizeGoogleEvent, zonedInstant, validEventInput, eventIdentity } = await import(modelUrl);
-const { createEventService, eventsHandler } = await import(asModule(compile('events').replace("'./core.ts'", JSON.stringify(coreUrl)).replace("'./crypto.ts'", JSON.stringify(cryptoUrl)).replace("'./events-model.ts'", JSON.stringify(modelUrl))));
+const { createEventService, eventsHandler } = await import(asModule(compile('events').replace("'./search-index.ts'", JSON.stringify(searchIndexUrl)).replace("'./core.ts'", JSON.stringify(coreUrl)).replace("'./crypto.ts'", JSON.stringify(cryptoUrl)).replace("'./events-model.ts'", JSON.stringify(modelUrl))));
 const admin = { id: 'admin', activo: true, rol: 'admin' };
 const primary = { id: 'private@example.test', summary: 'Private', primary: true, timeZone: 'America/Mazatlan', accessRole: 'owner' };
 const office = { id: 'office', summary: 'Oficina', timeZone: 'America/Mazatlan', accessRole: 'writer' };
 const reader = { id: 'readonly', summary: 'Consulta', timeZone: 'UTC', accessRole: 'reader' };
 
-function fixture({ pages = [[primary, office, reader]], tokenPatch = {}, configured = true } = {}) {
+function fixture({ pages = [[primary, office, reader]], tokenPatch = {}, configured = true, searchIndex } = {}) {
   let instant = Date.parse('2026-10-20T18:00:00Z');
   let actor = { ...admin };
   let connection = { revision: 'first', refresh_token_ciphertext: null, account_label: null, selected_calendars: [], connected_at: null, connected_by: null };
@@ -46,7 +48,7 @@ function fixture({ pages = [[primary, office, reader]], tokenPatch = {}, configu
     const index = page ? Number(page) : 0;
     return Response.json({ items: pages[index], ...(index < pages.length - 1 ? { nextPageToken: String(index + 1) } : {}) });
   };
-  const service = createCalendarService({ store, clientId: configured ? 'client-id' : '', clientSecret: configured ? 'test-secret-not-real-credential' : '', redirectUri: 'https://project.supabase.co/functions/v1/google-calendar-callback', now: () => instant, fetcher });
+  const service = createCalendarService({ store, searchIndex, clientId: configured ? 'client-id' : '', clientSecret: configured ? 'test-secret-not-real-credential' : '', redirectUri: 'https://project.supabase.co/functions/v1/google-calendar-callback', now: () => instant, fetcher });
   async function authorization() {
     const { url } = await service.start(admin, false);
     const authorization = new URL(url);
@@ -132,6 +134,24 @@ test('calendar pages are read completely, reader choices allowed and stale write
   const status = await f.service.status();
   assert.equal(status.syncEnabled, true);
   assert.equal(JSON.stringify(status).includes('ciphertext'), false);
+});
+
+test('calendar display names replace an email with a configured label without changing identity or access', async () => {
+  const id = 'integrador4@example.test';
+  const aliases = { [id]: 'Integrador Cuatro' };
+  assert.equal(calendarDisplayName(id, id, aliases), 'Integrador Cuatro');
+  assert.equal(calendarDisplayName(id, '', aliases), 'Integrador Cuatro');
+  assert.equal(calendarDisplayName(id, 'Nombre actualizado en Google', aliases), 'Nombre actualizado en Google');
+  assert.equal(calendarDisplayName('other@example.test', 'other@example.test', aliases), 'other@example.test');
+  const f = fixture({ pages: [[{ ...primary, id, summary: id, accessRole: 'reader' }]] });
+  const { callback } = await f.authorization(); await f.service.callback(callback);
+  await f.store.commitConnection(f.connection().revision, { calendar_aliases: aliases });
+  const list = await f.service.listCalendars();
+  assert.equal(list.calendars[0].name, 'Integrador Cuatro'); assert.equal(list.calendars[0].id, id);
+  assert.equal(list.calendars[0].accessRole, 'reader');
+  await f.service.selectCalendars(list.revision, [id], admin.id);
+  assert.equal((await f.service.status()).selectedCalendars[0].name, 'Integrador Cuatro');
+  assert.equal((await f.service.eventCalendars('test-access'))[0].name, 'Integrador Cuatro');
 });
 
 test('revoking an admin before saving calendar selection prevents the write', async () => {
@@ -242,6 +262,48 @@ test('database denies every public client role access to credentials and OAuth s
 const eventInput = (patch = {}) => ({ titulo: 'Prueba', descripcion: null, ubicacion: null, tipo: 'evento', fecha: '2026-10-20', hora: '10:00', repeticion: 'ninguna', intervalo: 1, dias_semana: [], repetir_hasta: null, ...patch });
 const remoteEvent = (patch = {}) => ({ id: 'event1', etag: '"v1"', summary: 'Hola bro, 10am', status: 'confirmed', start: { dateTime: '2026-10-20T10:00:00-07:00' }, end: { dateTime: '2026-10-20T11:30:00-07:00' }, ...patch });
 const officeCalendar = { id: 'office', name: 'Oficina', accessRole: 'writer', primary: false, timeZone: 'America/Mazatlan' };
+
+test('global Google search reads all dates and pages, matches accents and skips cancelled events', async () => {
+  const f = await connectedFixture(); const calls = [];
+  const events = createEventService(f.service, async url => {
+    const parsed = new URL(url); calls.push(parsed);
+    assert.equal(parsed.searchParams.get('singleEvents'), 'false');
+    assert.equal(parsed.searchParams.has('timeMin'), false); assert.equal(parsed.searchParams.has('timeMax'), false);
+    assert.equal(parsed.searchParams.has('q'), false);
+    return Response.json(parsed.searchParams.has('pageToken') ? { items: [remoteEvent({ id: 'old', summary: 'Sebastián en oficina', start: { date: '2020-01-01' }, end: { date: '2020-01-02' } })] } : { items: [remoteEvent({ summary: 'SEBASTIAN', status: 'cancelled' }), remoteEvent({ summary: 'Otro evento' })], nextPageToken: 'next' });
+  });
+  const result = await events.search(admin, 'sebast', '2026-10-23');
+  assert.equal(result.hits.length, 1); assert.equal(result.hits[0].event.fecha, '2020-01-01'); assert.equal(calls.length, 2);
+  await assert.rejects(events.search(admin, ' ', '2026-10-23'), error => error.status === 400);
+});
+
+test('global Google search represents unbounded recurring masters once and protects them from occurrence editing', async () => {
+  const f = await connectedFixture(); let instances = 0;
+  const events = createEventService(f.service, async url => {
+    if (new URL(url).pathname.endsWith('/instances')) {
+      instances++;
+      if (!new URL(url).searchParams.has('pageToken')) return Response.json({ items: [], nextPageToken: 'next-instance' });
+      return Response.json({ items: [remoteEvent({ id: 'occurrence', recurringEventId: 'series', start: { date: '2027-01-01' }, end: { date: '2027-01-02' } })] });
+    }
+    return Response.json({ items: [remoteEvent({ id: 'series', summary: 'Sebastián', recurrence: ['RRULE:FREQ=DAILY'] })] });
+  });
+  const { hits } = await events.search(admin, 'sebastian', '2026-10-23');
+  assert.equal(hits.length, 1); assert.equal(hits[0].series, true); assert.equal(hits[0].nextDate, '2027-01-01');
+  assert.equal(hits[0].event.google.editable, false); assert.equal(hits[0].event.google.recurring, true); assert.equal(instances, 2);
+});
+
+test('global Google search never exposes availability details or hides failed pages', async () => {
+  const available = { ...reader, accessRole: 'freeBusyReader' };
+  const f = fixture({ pages: [[primary, available]] }); const { callback } = await f.authorization(); await f.service.callback(callback);
+  await f.service.selectCalendars(f.connection().revision, ['readonly'], admin.id);
+  const events = createEventService(f.service, async () => { throw new Error('Availability has no searchable text'); });
+  assert.deepEqual(await events.search(admin, 'sebastian', '2026-10-23'), { hits: [], unavailableCalendars: 1 });
+  const g = await connectedFixture();
+  const broken = createEventService(g.service, async url => new URL(url).searchParams.has('pageToken') ? new Response('', { status: 403 }) : Response.json({ items: [remoteEvent({ summary: 'Sebastián' })], nextPageToken: 'next' }));
+  await assert.rejects(broken.search(admin, 'sebastian', '2026-10-23'), error => error.status === 403);
+  const looping = createEventService(g.service, async () => Response.json({ items: [], nextPageToken: 'same' }));
+  await assert.rejects(looping.search(admin, 'sebastian', '2026-10-23'), /páginas/);
+});
 test('Google event metadata carries the actual calendar background color', () => {
   assert.equal(normalizeGoogleEvent(remoteEvent(), { ...officeCalendar, backgroundColor: '#b39ddb' }).google.calendarColor, '#b39ddb');
 });
@@ -276,11 +338,101 @@ test('write permission is checked again when a selected calendar becomes read-on
   await assert.rejects(events.save(admin, { input: eventInput(), calendarId: 'office' }), error => error.status === 403);
   await assert.rejects(events.remove(admin, eventIdentity('office', 'event1'), '"v1"'), error => error.status === 403);
 });
-async function connectedFixture() {
-  const f = fixture(); const { callback } = await f.authorization(); await f.service.callback(callback);
+async function connectedFixture(searchIndex) {
+  const f = fixture({ searchIndex }); const { callback } = await f.authorization(); await f.service.callback(callback);
   await f.service.selectCalendars(f.connection().revision, ['office'], admin.id);
   return f;
 }
+
+function memorySearchIndex() {
+  let token = null; let role = ''; let lease = null; let fresh = false;
+  const docs = new Map(); const commits = [];
+  return { docs, commits,
+    async authorizedCalendars(_revision, calendars) { return fresh ? calendars.map(calendar => ({ ...calendar, accessRole: role })) : null; },
+    async lookup(_revision, _calendar, ids) { return ids.map(id => docs.get(id)).filter(Boolean); },
+    async claim(_revision, calendar) {
+      if (fresh && role === calendar.accessRole) return { lease: null, ready: true, token: null };
+      lease = crypto.randomUUID(); return { lease, ready: false, token: role === calendar.accessRole ? token : null };
+    },
+    async commit(_revision, calendar, current, next, full, items) {
+      assert.equal(current, lease); commits.push({ next, full, items });
+      if (full) docs.clear();
+      for (const item of items) { if (item.status === 'cancelled') docs.delete(item.id); else docs.set(item.id, item); }
+      token = next; role = calendar.accessRole; fresh = true;
+    },
+    async release() { lease = null; },
+    async invalidate() { fresh = false; },
+    async search(_revision, calendars) { return [...docs.values()].map(payload => ({ calendar_id: calendars[0].id, payload })); },
+  };
+}
+
+test('indexed Google search downloads once, reuses documents while fresh and incrementally applies updates/deletions', async () => {
+  const index = memorySearchIndex(); const f = await connectedFixture(index); const calls = [];
+  const events = createEventService(f.service, async url => {
+    const parsed = new URL(url); calls.push(parsed);
+    assert.equal(parsed.searchParams.get('singleEvents'), 'false'); assert.equal(parsed.searchParams.get('showDeleted'), 'true');
+    for (const forbidden of ['q','timeMin','timeMax','orderBy']) assert.equal(parsed.searchParams.has(forbidden), false);
+    if (parsed.searchParams.has('syncToken')) {
+      assert.equal(parsed.searchParams.get('syncToken'), 'sync-1');
+      return Response.json({ items: [{ id: 'one', status: 'cancelled' }, remoteEvent({ id: 'two', summary: 'Sebastián actualizado' })], nextSyncToken: 'sync-2' });
+    }
+    return Response.json({ items: [remoteEvent({ id: 'one', summary: 'Sebastián' })], nextSyncToken: 'sync-1' });
+  });
+  assert.equal((await events.search(admin, 'sebastian', '2026-10-23')).needsRefresh, true);
+  assert.equal(calls.length, 0, 'Cold search does not perform a blocking sync');
+  await events.prepareSearch(admin);
+  const googleCalls = f.calls.length;
+  assert.equal((await events.search(admin, 'sebastian', '2026-10-23')).hits.length, 1);
+  assert.equal((await events.search(admin, 'sebast', '2026-10-23')).hits.length, 1);
+  assert.equal(f.calls.length, googleCalls, 'Warm searches do not renew OAuth or list Google calendars');
+  assert.equal(calls.length, 1, 'No full Google scan on another query while the index is fresh');
+  await index.invalidate();
+  assert.equal((await events.search(admin, 'sebastian', '2026-10-23')).needsRefresh, true);
+  await events.prepareSearch(admin);
+  const result = await events.search(admin, 'sebastian', '2026-10-23');
+  assert.equal(result.hits.length, 1); assert.equal(result.hits[0].event.titulo, 'Sebastián actualizado');
+  assert.equal(index.commits[1].full, false); assert.equal(calls.length, 2);
+});
+
+test('expired sync tokens rebuild the index; failed pages never commit partial updates or advance tokens', async () => {
+  const index = memorySearchIndex();
+  await syncSearchCalendar(index, async () => ({ items: [remoteEvent()], nextSyncToken: 'sync-1' }), 'revision', officeCalendar, 'access');
+  await index.invalidate(); let rebuilt = 0;
+  await syncSearchCalendar(index, async path => {
+    if (new URL(path, 'https://google.test/').searchParams.has('syncToken')) {
+      const error = new Error('Expired'); Object.setPrototypeOf(error, (await import(coreUrl)).CalendarError.prototype); error.status = 410; throw error;
+    }
+    rebuilt++; return { items: [remoteEvent({ id: 'new' })], nextSyncToken: 'sync-rebuilt' };
+  }, 'revision', officeCalendar, 'access');
+  assert.equal(rebuilt, 1); assert.equal(index.commits.at(-1).full, true); assert.equal(index.docs.has('event1'), false);
+  await index.invalidate(); const before = index.commits.length;
+  await assert.rejects(syncSearchCalendar(index, async path => {
+    if (new URL(path, 'https://google.test/').searchParams.has('pageToken')) throw new Error('Network error');
+    return { items: [remoteEvent({ id: 'partial' })], nextPageToken: 'next' };
+  }, 'revision', officeCalendar, 'access'));
+  assert.equal(index.commits.length, before); assert.equal(index.docs.has('partial'), false);
+  assert.equal((await index.claim('revision', officeCalendar)).token, 'sync-rebuilt');
+});
+
+test('indexed recurring matches are returned before next-date requests and inactive users still fail fast', async () => {
+  const index = memorySearchIndex(); const f = await connectedFixture(index); let dateRequests = 0;
+  const events = createEventService(f.service, async url => {
+    if (new URL(url).pathname.endsWith('/instances')) {
+      dateRequests++; return Response.json({ items: [remoteEvent({ start: { date: '2027-02-01' }, end: { date: '2027-02-02' } })] });
+    }
+    return Response.json({ items: [remoteEvent({ id: 'series', summary: 'Sebastián', recurrence: ['RRULE:FREQ=DAILY'] })], nextSyncToken: 'token' });
+  });
+  await events.prepareSearch(admin);
+  const result = await events.search(admin, 'sebastian', '2026-10-23');
+  assert.equal(result.hits.length, 1); assert.equal(result.hits[0].nextDatePending, true); assert.equal(dateRequests, 0);
+  assert.equal(result.hits[0].event.google.editable, false);
+  const id = result.hits[0].event.id;
+  assert.equal((await events.searchDates(admin, [id], '2026-10-23')).dates[0].nextDate, '2027-02-01');
+  assert.equal(dateRequests, 1);
+  await assert.rejects(events.searchDates(admin, [eventIdentity('unselected', 'series')], '2026-10-23'), error => error.status === 403);
+  f.actor({ ...admin, activo: false });
+  await assert.rejects(events.search(admin, 'sebastian', '2026-10-23'), error => error.status === 403);
+});
 
 test('calendar visibility choices include selected empty calendars with their current color', async () => {
   const calendar = { ...office, backgroundColor: '#b39ddb' };

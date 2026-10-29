@@ -1,0 +1,171 @@
+[
+  {
+    "number": 1,
+    "title": "Contacto con el cliente",
+    "subtasks": [
+      "Contacto con el cliente",
+      "Enviar información del proyecto"
+    ]
+  },
+  {
+    "number": 2,
+    "title": "Anteproyecto",
+    "subtasks": [
+      "Solicitud de planos",
+      "Revisión de planos (CAD)",
+      "Levantamiento en sitio y/o planos",
+      "Revisión de status de obra",
+      "Contactos del proyecto"
+    ]
+  },
+  {
+    "number": 3,
+    "title": "Diseño de proyecto",
+    "subtasks": [
+      "Dibujo de planos CSY",
+      "Especificaciones",
+      "Propuesta"
+    ]
+  },
+  {
+    "number": 4,
+    "title": "Nuevo proyecto",
+    "subtasks": [
+      "W.O. autorizada",
+      "Carpeta de proyecto (SERVCSY)",
+      "Carpeta de proyecto (Drive)",
+      "Archivo de información (Drive)",
+      "Cronograma",
+      "Asignación de responsables de instalación e integración",
+      "Plano de zonas de audio",
+      "Plano y lista de cableado",
+      "Solicitud de dimensiones y/o alzados de mobiliario en zonas donde hay TVs",
+      "Archivo seguimiento de proyecto (WO)"
+    ]
+  },
+  {
+    "number": 5,
+    "title": "Seguimiento de infraestructura y obra",
+    "subtasks": [
+      "Supervisión de obra",
+      "Suministro de cajones de bocina",
+      "Suministro de gabinetes empotrados (CP)",
+      "Suministro de registros de jardín",
+      "Preparaciones y conexión HVAC",
+      "Preparaciones y conexión para pool",
+      "Preparaciones y conexión Lutron",
+      "Preparaciones y conexión para cortinas",
+      "Solicitud de dimensiones y/o alzados de mobiliario en zonas donde hay TVs"
+    ]
+  },
+  {
+    "number": 6,
+    "title": "Integración / pruebas oficina",
+    "subtasks": [
+      "Programación oficina",
+      "Creación de cuentas (Drive)",
+      "Diagramas Visio (SERVCSY)",
+      "Archivo de programación Savant",
+      "Ensamblado de rack (laboratorio)",
+      "Configuración red",
+      "Configuración pruebas de NVR y cámaras",
+      "Savant Host: activación y alta en Central",
+      "Savant Host: alta en AnyDesk",
+      "Prueba de audio (laboratorio)",
+      "Configuración pruebas equipos video en rack",
+      "Configuración pruebas doorphone laboratorio",
+      "Configuración equipos WattBox OvrC",
+      "Configuración telefonía"
+    ]
+  },
+  {
+    "number": 7,
+    "title": "Cableado",
+    "subtasks": []
+  },
+  {
+    "number": 8,
+    "title": "Accesorios",
+    "subtasks": [
+      "Jacks, keystones, etc.",
+      "Wallplates, 6-port frame, etc."
+    ]
+  },
+  {
+    "number": 9,
+    "title": "Communication panel",
+    "subtasks": []
+  },
+  {
+    "number": 10,
+    "title": "Certificación de cableado",
+    "subtasks": []
+  },
+  {
+    "number": 11,
+    "title": "Instalaciones fase 3",
+    "subtasks": [
+      "Instalación de bocinas",
+      "Instalación cámaras",
+      "Instalación access points",
+      "Interconexión de rack",
+      "Instalación de TVs"
+    ]
+  },
+  {
+    "number": 12,
+    "title": "Conexiones de TVs y equipos",
+    "subtasks": []
+  },
+  {
+    "number": 13,
+    "title": "Instalaciones fase 4",
+    "subtasks": [
+      "Instalación de teléfonos",
+      "Instalación de controles e interfaces de usuario",
+      "Instalación de controles",
+      "Instalación de iPads"
+    ]
+  },
+  {
+    "number": 14,
+    "title": "Programación en sitio (puesta en marcha)",
+    "subtasks": [
+      "Audio (música)",
+      "WiFi",
+      "TVs",
+      "CableTV (IPTV, Amino, etc.)",
+      "Apple TVs",
+      "Telefonía",
+      "Controles",
+      "Integración pool",
+      "Integración HVAC",
+      "Integración shades",
+      "Integración iluminación",
+      "Calibración de audio (bocinas)",
+      "Calibración de audio (AVR: Marantz, etc.)",
+      "WiFi: heat map y calibración",
+      "Savant: fotografías de home y zonas"
+    ]
+  },
+  {
+    "number": 15,
+    "title": "Entrega de proyecto",
+    "subtasks": [
+      "Manuales (Drive)",
+      "Plano CSY (Asbuilt)",
+      "Recorrido integración (VoBo)",
+      "Inventario físico",
+      "Pre-entrega",
+      "Carpeta entrega (Drive)",
+      "Carpeta entrega (física)",
+      "Conciliación con almacén",
+      "Entrega"
+    ]
+  },
+  {
+    "number": 16,
+    "title": "Pendientes y notas",
+    "subtasks": []
+  }
+]

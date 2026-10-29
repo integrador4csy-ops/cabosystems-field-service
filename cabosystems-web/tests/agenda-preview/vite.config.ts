@@ -3,9 +3,12 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
+  cacheDir: fileURLToPath(new URL('../../node_modules/.vite-agenda-preview', import.meta.url)),
   root: fileURLToPath(new URL('.', import.meta.url)),
   plugins: [react(), tailwindcss()],
   resolve: { alias: [
+    { find: /^.*calendarColorPreferences$/, replacement: fileURLToPath(new URL('./calendarColors.ts', import.meta.url)) },
+    { find: /^.*agendaSearchApi$/, replacement: fileURLToPath(new URL('./api.ts', import.meta.url)) },
     { find: /.*lib\/googleCalendarApi$/, replacement: fileURLToPath(new URL('./googleApi.ts', import.meta.url)) },
     { find: /.*context\/AdminAuthContext$/, replacement: fileURLToPath(new URL('./auth.ts', import.meta.url)) },
     { find: /.*lib\/agendaApi$/, replacement: fileURLToPath(new URL('./api.ts', import.meta.url)) },

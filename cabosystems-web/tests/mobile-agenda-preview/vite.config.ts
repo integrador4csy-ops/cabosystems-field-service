@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 const mobile = fileURLToPath(new URL('../../../cabosystems-mobile', import.meta.url));
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 export default defineConfig({
+  cacheDir: here('../../node_modules/.vite-mobile-agenda-preview'),
   root: here('.'), plugins: [react()],
   resolve: { alias: [
     { find: 'lucide-react-native', replacement: here('../../node_modules/lucide-react') },

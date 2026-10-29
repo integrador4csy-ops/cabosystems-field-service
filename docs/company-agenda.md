@@ -1,5 +1,11 @@
 # Agenda general de la empresa · 19 de octubre de 2026
 
+## Nombres visibles de calendarios Google · 27 de octubre de 2026
+
+Cuando Google devuelve el correo o identificador como título de un calendario, el servidor puede usar un nombre visible de la configuración `calendar_aliases` de la conexión. Un título descriptivo o `summaryOverride` recibido de Google conserva prioridad. Los identificadores, selección, permisos y autorización no cambian.
+
+Se configuró «Integrador Cuatro» para el calendario indicado por el usuario. Las funciones `google-calendar` v10 y `google-calendar-events` v12 están activas con validación JWT. No requiere una nueva compilación móvil: se recibe al actualizar la lista de calendarios. La configuración permanece exclusiva del servidor bajo las políticas existentes. Validación: 33 pruebas de Google Calendar, consulta de la configuración guardada y comprobación del código desplegado.
+
 Actualización del 20 de octubre: web y móvil también consultan los calendarios Google seleccionados por un administrador. Los eventos Google conservan su origen, se consultan por periodo y se gestionan directamente mediante una función autenticada; los registros locales anteriores permanecen locales. Al crear se elige el calendario de destino. La lectura real en web fue confirmada por el usuario. [Configuración, comportamiento y límites de Google Calendar](google-calendar-integration.md).
 
 La vista semanal web conserva el diseño por columnas de lunes a domingo, sin cuadrícula horaria. En todas las vistas, los eventos Google usan como fondo el color real del calendario de la cuenta conectada, consultado de nuevo al actualizar; el texto y los iconos usan negro o blanco automáticamente según el contraste. Las tarjetas indican inicio y fin, o Todo el día. Los eventos locales antiguos sin fin muestran Fin sin definir, sin inventar una duración.
@@ -35,3 +41,43 @@ El formulario Nuevo evento ahora abre con Todo el día desmarcado en web y móvi
 ## Unificación como eventos
 
 Se retiraron el selector Evento/Recordatorio y los filtros de tipo en web y móvil. Todo nuevo guardado usa tipo evento. Repetir está disponible para eventos locales y nuevas altas Google; las series Google existentes siguen editándose por ocurrencia. Las tarjetas recurrentes se distinguen con Repeat2 (flechas circulares) y nombre accesible Se repite. La migración 20261021001416_agenda_unified_events está aplicada: elimina la restricción que vinculaba repetición a recordatorios y convierte registros históricos conservando fechas, intervalos y días. La función google-calendar-events v6 acepta eventos recurrentes y normaliza el tipo de Google como evento sin modificar masivamente eventos externos. Permisos y RLS intactos. Validación: 67 pruebas web, 20 móviles, TypeScript web/móvil/servidor y creación de un evento semanal ficticio en la vista aislada con dos ocurrencias e iconos visibles.
+
+## Búsqueda global de agenda — 23 de octubre de 2026
+
+Al escribir en el buscador, web y móvil consultan todas las fechas de CaboSystems y de los calendarios Google seleccionados. La búsqueda combina palabras de título, descripción, ubicación y nombre de calendario, sin distinguir mayúsculas ni acentos. Respeta los calendarios ocultos. Al borrar la búsqueda se recupera el periodo anterior; «Ver fecha» abre el día del resultado.
+
+Las series locales aparecen una vez con su próxima fecha calculada sin expandirlas indefinidamente. Google se consulta con `singleEvents=false`, sin límites del mes ni filtro `q`, para aplicar la misma búsqueda por fragmentos sin acentos. Se incluyen las excepciones modificadas que devuelve Google. Los maestros recurrentes aparecen una vez y se consulta su próxima ocurrencia; si ya no tienen una próxima fecha, se identifica la fecha inicial. El maestro se abre en modo consulta; la edición de una ocurrencia se hace entrando a su fecha. Los calendarios que solo comparten disponibilidad no ofrecen texto para buscar y se informa de esa exclusión.
+
+Las consultas locales pasan por las políticas RLS del usuario y recorren páginas de 500 registros. Google mantiene validación de sesión, calendarios seleccionados y revisión de permisos, con hasta cuatro calendarios en paralelo. Se recorren las páginas; errores, páginas repetidas o límites de protección producen un error explícito en lugar de presentar un resultado parcial como completo. La interfaz espera 350 ms después de escribir y descarta respuestas de búsquedas anteriores. Web muestra bloques de 50 resultados; móvil virtualiza la lista.
+
+Validación: 35 pruebas de búsqueda/Google Calendar y 20 pruebas móviles de agenda completadas; TypeScript de web, móvil y funciones sin errores; compilación web correcta. Se verificó con datos ficticios la búsqueda «sebastian» sobre fechas de agosto de 2026, noviembre de 2026 y enero de 2027, la apertura de detalles, el salto a fecha y la recuperación del periodo anterior. Sigue pendiente la prueba autenticada con calendarios reales y la revisión en teléfono físico.
+
+La función `google-calendar-events` se desplegó en Supabase como versión 9 con `verify_jwt=true`. La interfaz queda en el código local; este cambio no publica la web ni genera un APK.
+
+## Optimización del buscador — índice y sincronización incremental
+
+La búsqueda local usa `agenda_search_local`, una función `SECURITY INVOKER` que conserva las políticas de acceso de `agenda_eventos`. Un disparador mantiene el texto normalizado y un índice GIN con trigramas permite buscar fragmentos sin distinguir acentos ni mayúsculas. El cliente recibe páginas de coincidencias, en lugar de descargar toda la tabla. Los símbolos `%` y `_` se tratan como texto literal.
+
+El índice Google y sus tokens de sincronización son exclusivos del servidor, sin permisos para `anon` ni `authenticated`. La primera consulta indexa los calendarios seleccionados. Las siguientes reutilizan una instantánea completa y, cuando corresponde, consultan solo los cambios con `syncToken`. La actualización se comprueba bajo demanda al buscar, con una ventana de 30 segundos; no se ha creado una tarea periódica. Las escrituras en la app invalidan ese plazo. Un contador impide perder una invalidación si coincide con una sincronización en curso.
+
+La sincronización aplica altas, modificaciones y bajas junto con el siguiente token en una sola transacción, después de leer la última página. Un token vencido (410) provoca una reconstrucción completa. Las consultas simultáneas usan una reserva temporal por calendario. La revisión de conexión y el nivel de acceso aíslan los índices: cambiar de cuenta o selección descarta el índice anterior; un cambio de rol exige reconstruirlo antes de consultar los documentos con el nuevo permiso. Los permisos actuales de Google y el estado activo del usuario se siguen comprobando en cada búsqueda. Las próximas fechas de series recurrentes se consultan en Google cuando coinciden con la búsqueda.
+
+Los resultados se ordenan por relevancia: título exacto, título que comienza o contiene la frase, palabras del título y después ubicación, calendario y descripción. Las fechas se usan para desempatar, priorizando próximas fechas y luego las pasadas más recientes. Web y móvil usan el mismo criterio.
+
+Validación: 100 pruebas web y 20 pruebas móviles completadas; TypeScript de web, móvil y funciones y compilación web correctos. Las pruebas de base de datos verifican el uso del índice sobre 20,000 eventos, RLS, acentos, paginación, bajas, actualización atómica, reservas concurrentes y protección ante cambios de permisos. Las pruebas de Google simulan reutilización del índice, sincronización incremental, tokens vencidos y páginas fallidas; no se ha medido aún la latencia con la cuenta Google real.
+
+Migración aplicada: `20261023193925_agenda_search_index.sql`. La función `google-calendar-events` quedó activa en Supabase en la versión 10, manteniendo validación JWT. La auditoría no añadió advertencias de seguridad para estas funciones; los dos avisos informativos de RLS sin políticas corresponden a tablas deliberadamente exclusivas del servidor. La interfaz web está disponible en el entorno local; móvil requiere una nueva compilación para distribuir estos cambios.
+
+## Búsqueda progresiva sin esperas de Google
+
+Actualización del 23 de octubre: la búsqueda con índice preparado ya no renueva OAuth, lista calendarios, sincroniza eventos ni consulta ocurrencias de Google antes de devolver coincidencias. Esas operaciones pasan a `prepare-search` y `search-dates`. La interfaz prepara el índice al entrar en Agenda y cada 25 segundos mientras está visible o activa. No es una tarea programada del servidor. Una primera carga o una instantánea vencida todavía puede requerir esperar a Google.
+
+La autorización de calendarios se conserva como máximo 30 segundos; la sincronización puede refrescarse desde los 20 segundos. Cada búsqueda comprueba el perfil activo y la revisión de conexión. Un error conocido de autorización invalida las instantáneas; cambios externos de permisos pueden tardar hasta 30 segundos en reflejarse. Los calendarios con disponibilidad únicamente no aportan documentos de texto. La migración `20261023201136_agenda_search_background_refresh.sql` está aplicada y la función `google-calendar-events` versión 11 está activa con JWT.
+
+Web y móvil muestran coincidencias de cada fuente conforme llegan, con un aviso mientras faltan resultados. La espera al escribir baja de 350 a 100 ms. Una caché exclusiva de la pantalla y sesión reutiliza búsquedas recientes durante cinco segundos al ampliar el texto y siempre vuelve a consultar. Las consultas anteriores se cancelan. Las próximas fechas se completan después para los resultados visibles, en lotes de hasta 50; se reutilizan durante 30 segundos por evento, versión y día. Los errores identifican resultados incompletos. Cambiar de cuenta limpia las cachés.
+
+Validación: 110 pruebas web y 20 móviles aprobadas, TypeScript web/móvil/servidor y compilación web correctos. Las pruebas nuevas comprueban resultados locales con Google pendiente, cancelación de ambos transportes, caché por sesión, fechas independientes y caducidad de autorización. La función añade `Server-Timing` para distinguir autenticación y operación. La revisión visual usa datos ficticios y no mide la latencia de una sesión real. La interfaz sigue siendo local; no se generó ni distribuyó un APK.
+
+### Colores personales de calendarios
+
+Cada usuario activo puede cambiar el color de cada calendario desde Agenda → Calendarios (móvil) o Mis calendarios (web), tocando el indicador de color. Los cambios se aplican a los eventos, incluida la búsqueda, y se guardan por cuenta en `agenda_calendar_colors`. No modifican los colores de Google ni los de otros usuarios. “Usar color original” elimina la preferencia. La tabla usa RLS para permitir lectura y escritura únicamente al usuario propietario activo. La interfaz requiere la versión actualizada de la app o web.

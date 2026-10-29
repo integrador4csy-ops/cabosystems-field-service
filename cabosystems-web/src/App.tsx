@@ -47,7 +47,7 @@ function DashboardContent() {
     setUnreadChatCount,
     setTargetGroupId,
   } = useSidebar();
-  const { user } = useAdminAuth();
+  const { user, adminProfile } = useAdminAuth();
   const [chatToasts, setChatToasts] = useState<ChatToastItem[]>([]);
   const [workers, setWorkers] = useState<LiveWorker[]>([]);
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
@@ -260,15 +260,29 @@ function DashboardContent() {
     let stop = () => {};
     void resources.ready.then(() => {
       if (cancelled) return;
-      // First paint/data have priority. Only the two common next views warm their code.
+      // Wait for the first view, then warm code AND session data before navigation.
+      // Keep requests sequential so background work does not flood the connection.
+      const warm = (loader: () => Promise<unknown>) => async () => {
+        if (!cancelled && canSpeculate()) await resources.prefetch(loader);
+      };
+      const admin = adminProfile?.rol === 'admin' && adminProfile.activo;
       stop = preloadModules([
-        () => canSpeculate() && !resources.queries.busy ? fetchFleet(false, false) : Promise.resolve(),
-        () => canSpeculate() && !resources.queries.busy ? loadTasks() : Promise.resolve(),
-        () => canSpeculate() && !resources.queries.busy ? loadAgenda() : Promise.resolve(),
+        warm(async () => { const module = await loadAgenda(); await module.prefetchAgenda(resources); }),
+        warm(async () => { const module = await loadTasks(); await module.prefetchTasks(resources); }),
+        warm(async () => { const module = await loadDirectory(); await module.prefetchDirectory(resources, Boolean(admin)); }),
+        warm(async () => { const module = await loadChat(); if (user) await module.prefetchChat(resources, user.id); }),
+        warm(async () => {
+          const module = await loadTeam();
+          if (admin) {
+            await module.prefetchTeam(resources, 'colaboradores');
+            if (!cancelled) await module.prefetchTeam(resources, 'invitaciones');
+          }
+        }),
+        warm(async () => { await loadLiveMap(); await fetchFleet(false, false); }),
       ]);
     });
     return () => { cancelled = true; stop(); };
-  }, [resources, fetchFleet]);
+  }, [resources, fetchFleet, user?.id, adminProfile?.rol, adminProfile?.activo]);
 
   // Realtime stays available; polling is a visible-radar fallback only.
   useEffect(() => {

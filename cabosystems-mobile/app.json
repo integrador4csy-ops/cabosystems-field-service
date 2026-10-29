@@ -2,18 +2,17 @@
   "expo": {
     "name": "CSY Field Service",
     "slug": "cabosystems-mobile",
-    "version": "1.2.1",
+    "version": "1.2.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "cabosystemsmobile",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "splash": {
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cabosystems.fieldservice"
+      "bundleIdentifier": "com.cabosystems.fieldservice",
+      "infoPlist": {
+        "CADisableMinimumFrameDurationOnPhone": true
+      }
     },
     "android": {
       "googleServicesFile": "./google-services.json",
@@ -22,7 +21,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.cabosystems.fieldservice",
-      "versionCode": 10,
+      "versionCode": 11,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -46,10 +45,16 @@
       }
     },
     "plugins": [
+      "./plugins/withGradleCompatibility",
       "./plugins/withChatNotifications",
       "expo-router",
       "expo-font",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#ffffff"
+        }
+      ],
       "expo-status-bar",
       "expo-web-browser",
       "expo-image",
@@ -68,7 +73,8 @@
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": false
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true

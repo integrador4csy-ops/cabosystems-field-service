@@ -24,6 +24,7 @@ import { ChatInput } from './ChatInput';
 import { ImageLightboxModal } from './ImageLightboxModal';
 import { useSectionResources } from '../../context/SectionResources';
 import { chatSnapshot } from '../../lib/chatSnapshot';
+import { createChatRefreshQueue } from '../../lib/chatRefreshQueue';
 
 interface ChatConversationProps {
   group: ChatGroup;
@@ -66,6 +67,10 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const activeGroupRef = useRef(group.id);
   const loadedGroup = useRef('');
+  const messagesRef = useRef(messages);
+  const pinsRef = useRef(pins);
+  const messageQueue = useRef<ReturnType<typeof createChatRefreshQueue> | null>(null);
+  useLayoutEffect(() => { messagesRef.current = messages; pinsRef.current = pins; }, [messages, pins]);
   useLayoutEffect(() => { activeGroupRef.current = group.id; }, [group.id]);
   const scrollToBottom = (smooth = true) => messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
 
@@ -86,32 +91,52 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
     }
     setActionError('');
     const report = (error: unknown) => { console.error('Chat refresh failed:', JSON.stringify(error)); if (active) setActionError(t('No se pudo actualizar el chat. Intenta de nuevo.')); };
-    refresh(false).then(() => { if (active && initial) requestAnimationFrame(() => scrollToBottom(false)); }).catch(report).finally(() => { if (active) setLoading(false); });
-    const reload = () => refresh().catch(report);
-    const focus = () => { if (document.visibilityState === 'visible') void refresh(false).catch(report); };
+    const initialRead = refresh(false).then(() => { if (active && initial) requestAnimationFrame(() => scrollToBottom(false)); }).catch(report).finally(() => { if (active) setLoading(false); });
+    const queue = createChatRefreshQueue(async (ids) => {
+      await initialRead;
+      if (!active) return;
+      if (ids.includes('#focus')) { await refresh(ids.length > 1); return; }
+      if (ids.includes('*')) { await refresh(); return; }
+      const updated = await Promise.all(ids.map(getChatMessage));
+      if (!active) return;
+      resources.queries.invalidate(`conversation:${group.id}`);
+      const byId = new Map(updated.filter((message): message is ChatMessage => Boolean(message && message.grupo_id === group.id)).map(message => [message.id, message]));
+      setMessages(previous => previous.map(message => byId.get(message.id) ?? message));
+    });
+    messageQueue.current = queue;
+    const reload = () => { void queue.request('*').catch(report); };
+    const focus = () => { if (document.visibilityState === 'visible') void queue.request('#focus').catch(report); };
     window.addEventListener('focus', focus);
     const channel = supabase.channel(`chat_web_${group.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensajes', filter: `grupo_id=eq.${group.id}` }, () => {
         const container = chatContainerRef.current;
         const atBottom = !container || container.scrollHeight - container.scrollTop - container.clientHeight < 140;
-        refresh().then(() => { if (active && atBottom) requestAnimationFrame(() => scrollToBottom()); }).catch(report);
+        queue.request('*').then(() => { if (active && atBottom) requestAnimationFrame(() => scrollToBottom()); }).catch(report);
         onGroupChanged();
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chat_mensajes' }, (payload) => {
+        if (!messagesRef.current.some(message => message.id === payload.old.id || message.reply_to_id === payload.old.id)) return;
         setMessages((prev) => prev.filter((message) => message.id !== payload.old.id).map((message) => message.reply?.id === payload.old.id ? { ...message, reply: null, reply_to_id: null } : message));
         setReplyTo((prev) => prev?.id === payload.old.id ? null : prev);
         reload();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_reacciones' }, reload)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_pins' }, reload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_reacciones' }, (payload) => {
+        const row = payload.eventType === 'DELETE' ? payload.old : payload.new;
+        const message = messagesRef.current.find(message => message.id === row.mensaje_id || message.reacciones?.some(reaction => reaction.id === row.id));
+        if (message) void queue.request(message.id).catch(report);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_pins' }, (payload) => {
+        const row = payload.eventType === 'DELETE' ? payload.old : payload.new;
+        if (row.grupo_id === group.id || pinsRef.current.some(pin => pin.mensaje_id === row.mensaje_id)) reload();
+      })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_grupos', filter: `id=eq.${group.id}` }, onGroupChanged)
       .subscribe();
-    return () => { active = false; window.removeEventListener('focus', focus); supabase.removeChannel(channel); };
+    return () => { active = false; queue.stop(); if (messageQueue.current === queue) messageQueue.current = null; window.removeEventListener('focus', focus); supabase.removeChannel(channel); };
   }, [group.id, refresh, onGroupChanged, t, resources]);
 
   const handleToggleReaction = async (messageId: string, emoji: string) => {
     setActionError('');
-    try { await toggleChatReaction(messageId, currentUserId, emoji); await refresh(); }
+    try { await toggleChatReaction(messageId, currentUserId, emoji); if (activeGroupRef.current === group.id) await messageQueue.current?.request(messageId); }
     catch { setActionError(t('No se pudo guardar la reacción. Intenta de nuevo.')); }
   };
   const handlePin = async (message: ChatMessage) => {
@@ -119,7 +144,7 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
     try {
       if (pins.some((pin) => pin.mensaje_id === message.id)) await unpinChatMessage(message.id);
       else await pinChatMessage(message, currentUserId);
-      await refresh();
+      await messageQueue.current?.request('*');
     } catch { setActionError(t('No se pudo cambiar el mensaje fijado. Revisa tus permisos e intenta de nuevo.')); }
   };
   const handleDeleteMessage = async () => {
@@ -129,7 +154,7 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
       await deleteChatMessage(deleteTarget);
       setReplyTo((prev) => prev?.id === deleteTarget ? null : prev);
       setDeleteTarget(null);
-      await refresh(); onGroupChanged();
+      await messageQueue.current?.request('*'); onGroupChanged();
     } catch { setActionError(t('No se pudo eliminar el mensaje. Revisa tus permisos e intenta de nuevo.')); }
     finally { setDeleting(false); deletingRef.current = false; }
   };
@@ -325,7 +350,7 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
         replyTo={replyTo}
         onCancelReply={() => setReplyTo(null)}
         onMessageSent={() => {
-          refresh().then(() => requestAnimationFrame(() => scrollToBottom())).catch(() => setActionError(t('No se pudo actualizar el chat. Intenta de nuevo.')));
+          messageQueue.current?.request('*').then(() => requestAnimationFrame(() => scrollToBottom())).catch(() => setActionError(t('No se pudo actualizar el chat. Intenta de nuevo.')));
           onGroupChanged();
         }}
       />

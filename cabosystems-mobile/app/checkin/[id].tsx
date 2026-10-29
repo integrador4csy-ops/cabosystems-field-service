@@ -11,8 +11,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  Keyboard,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { requireOptionalNativeModule } from 'expo-modules-core';
@@ -35,18 +36,22 @@ import {
   ChevronDown,
   Layers,
   AlertCircle,
+  Maximize2,
 } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
+import { BOTTOM_BAR_HEIGHT, BOTTOM_BAR_MIN_INSET } from '@/constants/NavigationLayout';
 import { useAuth } from '@/lib/auth';
 import { useProjects } from '@/lib/projects';
 import {
   uploadEvidencePhoto,
   createFieldRecord,
-  getLatestFieldRecord,
   getOrCreateCheckInTaskForProject,
   getTaskById,
 } from '@/lib/api';
+import { getLatestOfflineFieldRecord as getLatestFieldRecord, queueFieldRecord } from '@/lib/fieldSync';
+import { optimizeEvidencePhoto } from '@/lib/evidencePhoto';
 import type { Project } from '@/types/database';
+import { HeaderCaboSystems, useHeaderHeight } from '@/components/HeaderCaboSystems';
 
 function checkNativeModule(moduleName: string): boolean {
   if (Platform.OS === 'web') return false;
@@ -89,6 +94,8 @@ interface CameraSectionProps {
   onCapture: (uri: string) => void;
   flash: 'off' | 'on';
   onToggleFlash: () => void;
+  fullscreen?: boolean;
+  onExpand?: () => void;
 }
 
 function FallbackCameraSection({ onCapture }: { onCapture: (uri: string) => void }) {
@@ -213,6 +220,8 @@ function NativeCameraViewInner({
   facing,
   setFacing,
   cameraRef,
+  fullscreen,
+  onExpand,
 }: {
   CameraView: any;
   useCameraPermissions: any;
@@ -221,6 +230,8 @@ function NativeCameraViewInner({
   facing: 'back' | 'front';
   setFacing: (f: 'back' | 'front') => void;
   cameraRef: React.MutableRefObject<any>;
+  fullscreen?: boolean;
+  onExpand?: () => void;
 }) {
   const [permission, requestPermission] = useCameraPermissions ? useCameraPermissions() : [null, null];
 
@@ -264,7 +275,7 @@ function NativeCameraViewInner({
   }
 
   return (
-    <View style={styles.cameraContainer}>
+    <View style={[styles.cameraContainer, fullscreen && styles.fullscreenCamera]}>
       <CameraView
         ref={cameraRef}
         style={StyleSheet.absoluteFill}
@@ -294,13 +305,16 @@ function NativeCameraViewInner({
           <View style={styles.captureButtonInner} />
         </Pressable>
 
-        <View style={styles.controlPlaceholder} />
+        {onExpand ? <Pressable accessibilityRole="button" accessibilityLabel="Abrir cámara a pantalla completa" onPress={onExpand} style={({ pressed }) => [styles.controlButton, pressed && { opacity: 0.7 }]}>
+          <Maximize2 size={22} color={Colors.textWhite} />
+          <Text style={styles.controlText} numberOfLines={1}>AMPLIAR</Text>
+        </Pressable> : <View style={styles.controlPlaceholder} />}
       </View>
     </View>
   );
 }
 
-function CameraSection({ onCapture, flash, onToggleFlash }: CameraSectionProps) {
+function CameraSection({ onCapture, flash, onToggleFlash, fullscreen, onExpand }: CameraSectionProps) {
   const [CameraView, setCameraView] = useState<any>(null);
   const [useCameraPermissions, setUseCameraPermissions] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -366,15 +380,30 @@ function CameraSection({ onCapture, flash, onToggleFlash }: CameraSectionProps) 
       facing={facing}
       setFacing={setFacing}
       cameraRef={cameraRef}
+      fullscreen={fullscreen}
+      onExpand={onExpand}
     />
   );
 }
 
-export default function CheckinScreen() {
+export default function CheckinScreen({ embedded = false }: { embedded?: boolean } = {}) {
   const { id, type } = useLocalSearchParams<{ id: string; type?: string }>();
   const router = useRouter();
+  const leaveCheckin = () => {
+    if (embedded) router.replace('/(tabs)');
+    else if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  };
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
+  const [cameraActive, setCameraActive] = useState(false);
+  const manualVillaRef = useRef<{ key: string; projectId: string } | null>(null);
+  useFocusEffect(useCallback(() => {
+    setCameraActive(true);
+    return () => { manualVillaRef.current = null; setCameraActive(false); };
+  }, []));
   const { user } = useAuth();
+  const villaSelectionKey = JSON.stringify([user?.id, id, type]);
 
   const [isCheckOut, setIsCheckOut] = useState<boolean>(type === 'check_out');
   const { projects, selectedProject, setSelectedProject } = useProjects();
@@ -383,6 +412,8 @@ export default function CheckinScreen() {
   const [showVillaModal, setShowVillaModal] = useState(false);
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [cameraFullscreen, setCameraFullscreen] = useState(false);
+  useEffect(() => { if (!cameraActive) setCameraFullscreen(false); }, [cameraActive]);
   const [notes, setNotes] = useState('');
   const [flash, setFlash] = useState<'off' | 'on'>('off');
 
@@ -392,9 +423,11 @@ export default function CheckinScreen() {
     accuracy: number | null;
   } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
+  const locationTimestamp = useRef(0);
   const [locationError, setLocationError] = useState<string | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   const [feedbackModal, setFeedbackModal] = useState<{
     visible: boolean;
@@ -420,7 +453,7 @@ export default function CheckinScreen() {
   useEffect(() => {
     let mounted = true;
     async function determineTypeAndVilla() {
-      if (!user?.id) return;
+      if (!cameraActive || !user?.id) return;
       setProjectLoading(true);
       try {
         // 1. Detectar si la siguiente acción es salida o llegada
@@ -434,8 +467,10 @@ export default function CheckinScreen() {
         }
 
         // 2. Identificar automáticamente el Desarrollo y Villa correspondiente
-        let resolved: Project | null = null;
-        if (id && id !== 'new' && id !== 'villa') {
+        const manual = manualVillaRef.current;
+        let resolved: Project | null = manual?.key === villaSelectionKey
+          ? projects.find(project => project.id === manual.projectId) || null : null;
+        if (!resolved && id && id !== 'new' && id !== 'villa') {
           // Buscar si id es directamente el id de un proyecto
           resolved = projects.find((p) => p.id === id) || null;
           // Si no es un id de proyecto, verificar si es un id de tarea
@@ -457,6 +492,11 @@ export default function CheckinScreen() {
         }
 
         if (mounted) {
+          // A user may choose a villa while an earlier route lookup is still pending.
+          const latestManual = manualVillaRef.current;
+          if (latestManual?.key === villaSelectionKey) {
+            resolved = projects.find(project => project.id === latestManual.projectId) || resolved;
+          }
           setCurrentProject(resolved);
           if (resolved) {
             setSelectedProject(resolved);
@@ -473,7 +513,7 @@ export default function CheckinScreen() {
     return () => {
       mounted = false;
     };
-  }, [id, type, user?.id, projects, selectedProject, setSelectedProject]);
+  }, [id, type, user?.id, projects, selectedProject, setSelectedProject, cameraActive, villaSelectionKey]);
 
   const groupedVillas = useMemo(() => {
     const map = new Map<string, Project[]>();
@@ -486,113 +526,35 @@ export default function CheckinScreen() {
   }, [projects]);
 
   const fetchLocation = useCallback(async () => {
-    setLocationLoading(true);
-    setLocationError(null);
-
-    // 1. Web Geolocation handling
-    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setLocationCoords({
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-          });
-          setLocationLoading(false);
-        },
-        (err) => {
-          console.warn('Web geolocation fallback:', err.message);
-          setLocationCoords({
-            latitude: 22.89053,
-            longitude: -109.91674,
-            accuracy: 8,
-          });
-          setLocationLoading(false);
-        },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
-      );
-      return;
-    }
-
-    // 2. Native Geolocation via expo-location ONLY if module is linked
-    const hasExpoLocation = checkNativeModule('ExpoLocation');
-
-    if (hasExpoLocation) {
-      try {
-        const Location = require('expo-location');
-        if (Location && typeof Location.requestForegroundPermissionsAsync === 'function') {
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status !== 'granted') {
-            setLocationError('Permiso de GPS no concedido');
-            setLocationLoading(false);
-            return;
-          }
-
-          // 1. Intentar última ubicación conocida primero para respuesta inmediata
-          try {
-            const lastKnown = await Location.getLastKnownPositionAsync();
-            if (lastKnown?.coords) {
-              setLocationCoords(lastKnown.coords);
-              setLocationLoading(false);
-              return;
-            }
-          } catch {
-            // continuar a getCurrentPositionAsync
-          }
-
-          // 2. Intentar ubicación actual con precisión balanceada
-          try {
-            const position = await Location.getCurrentPositionAsync({
-              accuracy: Location.Accuracy?.Balanced ?? 3,
-            });
-
-            if (position?.coords) {
-              setLocationCoords(position.coords);
-              setLocationLoading(false);
-              return;
-            }
-          } catch (posErr) {
-            // 3. Fallback con Lowest accuracy si la configuración del teléfono restringe alta precisión
-            const positionLow = await Location.getCurrentPositionAsync({
-              accuracy: Location.Accuracy?.Lowest ?? 1,
-            });
-            if (positionLow?.coords) {
-              setLocationCoords(positionLow.coords);
-              setLocationLoading(false);
-              return;
-            }
-          }
-        }
-      } catch (err: any) {
-        console.warn('Native GPS fetch warning:', err);
+    setLocationLoading(true); setLocationError(null); setLocationCoords(null);
+    try {
+      if (Platform.OS === 'web') {
+        if (!navigator.geolocation) throw new Error('GPS no disponible en este navegador.');
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }));
+        locationTimestamp.current = position.timestamp;
+        setLocationCoords({ latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy });
+        return position.coords;
+      } else {
+        if (!checkNativeModule('ExpoLocation')) throw new Error('GPS no disponible. Instala la compilación actual de la app.');
+        const Location = require('expo-location') as typeof import('expo-location');
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (permission.status !== 'granted') throw new Error('Permiso de GPS no concedido.');
+        const recent = await Location.getLastKnownPositionAsync({ maxAge: 60000, requiredAccuracy: 100 });
+        const position = recent || await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        if (!Number.isFinite(position.coords.latitude) || !Number.isFinite(position.coords.longitude)) throw new Error('No se pudo obtener una ubicación válida.');
+        locationTimestamp.current = position.timestamp;
+        setLocationCoords(position.coords);
+        return position.coords;
       }
-    }
-
-    // 3. Fallback for Web/Simulator/Client without native GPS module
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setLocationCoords({
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-          });
-          setLocationLoading(false);
-        },
-        () => {
-          setLocationCoords({ latitude: 22.89053, longitude: -109.91674, accuracy: 8 });
-          setLocationLoading(false);
-        }
-      );
-    } else {
-      setLocationCoords({ latitude: 22.89053, longitude: -109.91674, accuracy: 8 });
-      setLocationLoading(false);
-    }
+    } catch (error) {
+      setLocationError(error instanceof Error ? error.message : 'No se pudo obtener el GPS. Vuelve a intentarlo.');
+      return null;
+    } finally { setLocationLoading(false); }
   }, []);
 
   useEffect(() => {
-    fetchLocation();
-  }, [fetchLocation]);
+    if (cameraActive) void fetchLocation();
+  }, [fetchLocation, cameraActive]);
 
   const handleCapturePhoto = (uri: string) => {
     setPhotoUri(uri);
@@ -607,6 +569,7 @@ export default function CheckinScreen() {
   };
 
   const handleSubmit = async () => {
+    if (submittingRef.current) return;
     if (!photoUri) {
       setFeedbackModal({
         visible: true,
@@ -647,22 +610,33 @@ export default function CheckinScreen() {
       return;
     }
 
+    submittingRef.current = true;
     setIsSubmitting(true);
     try {
+      const submissionLocation = Date.now() - locationTimestamp.current > 120_000 ? await fetchLocation() : locationCoords;
+      if (!submissionLocation) throw new Error('No se pudo validar una ubicación reciente. Comprueba el GPS y vuelve a intentarlo.');
+      if (Platform.OS !== 'web') {
+        await queueFieldRecord({ owner: user.id, projectId: currentProject.id, photoUri,
+          tipo: isCheckOut ? 'check_out' : 'check_in', latitude: submissionLocation.latitude,
+          longitude: submissionLocation.longitude, comments: notes.trim() || null });
+        setFeedbackModal({ visible: true, type: 'success', title: 'Registro guardado en el dispositivo',
+          message: 'La foto, la ubicación y la hora quedaron guardadas. Se enviará automáticamente cuando la app esté abierta y tenga conexión. Puedes consultar los pendientes en el aviso de sincronización.', onClose: leaveCheckin });
+        return;
+      }
       // Obtener o asociar automáticamente la orden de trabajo para esta villa
       const taskId = await getOrCreateCheckInTaskForProject(currentProject.id, user.id);
       const timestamp = Date.now();
       const prefix = isCheckOut ? 'checkout' : 'checkin';
       const storagePath = `${prefix}s/${taskId}_${timestamp}.jpg`;
 
-      const publicUrl = await uploadEvidencePhoto(photoUri, storagePath);
+      const publicUrl = await uploadEvidencePhoto(await optimizeEvidencePhoto(photoUri), storagePath);
 
       await createFieldRecord({
         tarea_id: taskId,
         tecnico_id: user.id,
         tipo: isCheckOut ? 'check_out' : 'check_in',
-        latitud: locationCoords.latitude,
-        longitud: locationCoords.longitude,
+        latitud: submissionLocation.latitude,
+        longitud: submissionLocation.longitude,
         foto_url: publicUrl,
         comentarios: notes.trim() ? notes.trim() : null,
       });
@@ -675,7 +649,7 @@ export default function CheckinScreen() {
         message: isCheckOut
           ? `Se registró tu salida de ${projectVilla} (${currentProject.desarrollo}) con éxito.`
           : `Se registró tu llegada a ${projectVilla} (${currentProject.desarrollo}) con éxito.`,
-        onClose: () => router.back(),
+        onClose: leaveCheckin,
       });
     } catch (err: any) {
       console.error('Error submitting field record:', err);
@@ -686,42 +660,16 @@ export default function CheckinScreen() {
         message: err?.message || 'Ocurrió un error al registrar en la base de datos.',
       });
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
 
-  const screenTitle = isCheckOut ? 'CHECK-OUT' : 'CHECK-IN';
-  const submitText = isCheckOut ? 'Registrar Check-Out' : 'Registrar Check-In';
+  const submitText = isCheckOut ? 'Registrar Check-out' : 'Registrar Check-in';
 
   return (
     <View style={styles.container}>
-      {/* Header Minimalista en Modo Claro */}
-      <View style={[styles.headerWrapper, { paddingTop: insets.top }]}>
-        <View style={styles.headerContent}>
-          <Pressable
-            onPress={() => router.back()}
-            style={({ pressed }) => [styles.headerButton, pressed && { opacity: 0.7 }]}
-            hitSlop={10}
-          >
-            <X size={18} color={Colors.text} />
-          </Pressable>
-
-          <Text style={styles.headerTitle}>{screenTitle}</Text>
-
-          <Pressable
-            onPress={toggleFlash}
-            style={({ pressed }) => [styles.headerButton, pressed && { opacity: 0.7 }]}
-            hitSlop={10}
-            disabled={!!photoUri}
-          >
-            {flash === 'on' ? (
-              <Zap size={18} color={Colors.primary} />
-            ) : (
-              <ZapOff size={18} color={photoUri ? Colors.textDisabled : Colors.textSecondary} />
-            )}
-          </Pressable>
-        </View>
-      </View>
+      <View style={{ height: headerHeight }}><HeaderCaboSystems showProjectSelector={false} /></View>
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -729,7 +677,10 @@ export default function CheckinScreen() {
       >
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: embedded
+            ? Math.max(insets.bottom, BOTTOM_BAR_MIN_INSET) + BOTTOM_BAR_HEIGHT + Spacing.xl
+            : Math.max(insets.bottom, Spacing.md) }]}
+          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.cameraWrapper}>
@@ -751,8 +702,14 @@ export default function CheckinScreen() {
                 </View>
               </View>
             ) : (
-              <CameraSection onCapture={handleCapturePhoto} flash={flash} onToggleFlash={toggleFlash} />
+              cameraActive && !cameraFullscreen ? <CameraSection onCapture={handleCapturePhoto} flash={flash} onToggleFlash={toggleFlash} onExpand={() => setCameraFullscreen(true)} /> : null
             )}
+              <Pressable accessibilityRole="button" accessibilityLabel={flash === 'on' ? 'Apagar flash' : 'Encender flash'} accessibilityState={{ selected: flash === 'on' }} onPress={toggleFlash} style={[styles.photoToolButton, styles.photoFlashButton]}>
+                {flash === 'on' ? <Zap size={21} color="#FFFFFF" /> : <ZapOff size={21} color="#FFFFFF" />}
+              </Pressable>
+              {photoUri && <Pressable accessibilityRole="button" accessibilityLabel="Abrir cámara a pantalla completa" onPress={() => setCameraFullscreen(true)} style={[styles.photoToolButton, styles.photoExpandButton]}>
+                <Maximize2 size={21} color="#FFFFFF" />
+              </Pressable>}
           </View>
 
           <View style={styles.infoSection}>
@@ -771,10 +728,13 @@ export default function CheckinScreen() {
                     </View>
                   ) : currentProject ? (
                     <>
-                      <Text style={styles.taskCardTitle} numberOfLines={1}>
-                        {currentProject.desarrollo} • {currentProject.villa || currentProject.unidad}
+                      <Text style={styles.taskCardTitle}>
+                        {currentProject.desarrollo}
                       </Text>
-                      <Text style={styles.taskCardSub} numberOfLines={1}>
+                      <Text style={styles.taskCardUnit}>
+                        {currentProject.villa || currentProject.unidad}
+                      </Text>
+                      <Text style={styles.taskCardSub}>
                         {isCheckOut
                           ? 'Registro de salida (Check-Out) de la villa'
                           : 'Registro de llegada (Check-In) a la villa'}
@@ -784,14 +744,50 @@ export default function CheckinScreen() {
                     <Text style={styles.taskCardEmptyText}>Sin villa seleccionada</Text>
                   )}
                 </View>
-
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.gpsIconButton,
+                    locationCoords && styles.gpsIconButtonSuccess,
+                    locationError && styles.gpsIconButtonError,
+                    pressed && { opacity: 0.7 },
+                  ]}
+                  onPress={async () => {
+                    const coords = await fetchLocation();
+                    if (coords) {
+                      Alert.alert(
+                        'Ubicación GPS',
+                        `Latitud: ${coords.latitude.toFixed(5)}\nLongitud: ${coords.longitude.toFixed(5)}\nEstado: Satélite conectado correctamente.`
+                      );
+                    } else {
+                      Alert.alert('Error de GPS', 'No se pudo actualizar la ubicación. Comprueba el permiso y la señal de GPS.');
+                    }
+                  }}
+                  disabled={locationLoading}
+                  accessibilityRole="button"
+                  accessibilityLabel="Ubicación GPS"
+                >
+                  {locationLoading ? (
+                    <ActivityIndicator size="small" color={Colors.primary} />
+                  ) : (
+                    <MapPin
+                      size={17}
+                      color={locationCoords || locationError ? Colors.primary : '#343e48'}
+                      strokeWidth={2.4}
+                    />
+                  )}
+                  {locationCoords && <View style={styles.gpsDotSuccess} />}
+                </Pressable>
+              </View>
+              <View style={styles.taskCardActionsRow}>
                 {projects.length > 1 && (
                   <Pressable
                     style={({ pressed }) => [styles.taskChangeBtn, pressed && { opacity: 0.7 }]}
-                    onPress={() => setShowVillaModal(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cambiar villa"
+                    onPress={() => { Keyboard.dismiss(); setShowVillaModal(true); }}
                   >
                     <Text style={styles.taskChangeBtnText}>CAMBIAR VILLA</Text>
-                    <ChevronDown size={14} color={Colors.primary} />
+                    <ChevronDown size={14} color="#343e48" />
                   </Pressable>
                 )}
               </View>
@@ -805,46 +801,6 @@ export default function CheckinScreen() {
                 </Text>
               </View>
             )}
-
-            <View style={styles.gpsCard}>
-              <View
-                style={[
-                  styles.gpsIconBox,
-                  locationCoords && !locationLoading && styles.gpsIconBoxSuccess,
-                ]}
-              >
-                {locationLoading ? (
-                  <ActivityIndicator size="small" color={Colors.primary} />
-                ) : locationCoords ? (
-                  <Check size={20} color={Colors.primary} strokeWidth={2.8} />
-                ) : (
-                  <MapPin size={20} color={Colors.textMuted} />
-                )}
-              </View>
-
-              <View style={styles.gpsDetails}>
-                <Text style={styles.gpsHeaderLabel}>UBICACIÓN GPS</Text>
-                {locationLoading ? (
-                  <Text style={styles.gpsLoadingText}>Obteniendo ubicación satelital...</Text>
-                ) : locationError ? (
-                  <Text style={styles.gpsErrorText}>{locationError}</Text>
-                ) : locationCoords ? (
-                  <View style={styles.gpsSuccessRow}>
-                    <Text style={styles.gpsSuccessText}>Ubicación tomada correctamente</Text>
-                  </View>
-                ) : (
-                  <Text style={styles.gpsErrorText}>GPS no disponible</Text>
-                )}
-              </View>
-
-              <Pressable
-                style={({ pressed }) => [styles.refreshGpsButton, pressed && { opacity: 0.7 }]}
-                onPress={fetchLocation}
-                disabled={locationLoading}
-              >
-                <RefreshCw size={17} color={Colors.textSecondary} />
-              </Pressable>
-            </View>
 
             <View style={styles.notesSection}>
               <Text style={styles.notesLabel}>
@@ -867,33 +823,42 @@ export default function CheckinScreen() {
               />
             </View>
           </View>
+          <View style={styles.footer}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.submitButton,
+                (!photoUri || !locationCoords || isSubmitting || !currentProject) &&
+                  styles.submitDisabled,
+                pressed && { opacity: 0.9 },
+              ]}
+              onPress={handleSubmit}
+              disabled={!photoUri || !locationCoords || isSubmitting || !currentProject}
+            >
+              {isSubmitting ? (
+                <>
+                  <ActivityIndicator size="small" color={Colors.textWhite} />
+                  <Text style={styles.submitButtonText}>Guardando registro...</Text>
+                </>
+              ) : (
+                <>
+                  <Send size={18} color={Colors.textWhite} />
+                  <Text style={styles.submitButtonText}>{submitText}</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.submitButton,
-            (!photoUri || !locationCoords || isSubmitting || !currentProject) &&
-              styles.submitDisabled,
-            pressed && { opacity: 0.9 },
-          ]}
-          onPress={handleSubmit}
-          disabled={!photoUri || !locationCoords || isSubmitting || !currentProject}
-        >
-          {isSubmitting ? (
-            <>
-              <ActivityIndicator size="small" color={Colors.textWhite} />
-              <Text style={styles.submitButtonText}>Guardando registro...</Text>
-            </>
-          ) : (
-            <>
-              <Send size={18} color={Colors.textWhite} />
-              <Text style={styles.submitButtonText}>{submitText}</Text>
-            </>
-          )}
-        </Pressable>
-      </View>
+      <Modal visible={cameraFullscreen && cameraActive} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setCameraFullscreen(false)}>
+        <View style={styles.fullscreenPage}>
+          {cameraFullscreen && cameraActive ? <CameraSection fullscreen flash={flash} onToggleFlash={toggleFlash} onCapture={uri => { handleCapturePhoto(uri); setCameraFullscreen(false); }} /> : null}
+          <View style={[styles.photoToolbar, { top: insets.top + 12 }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Cerrar cámara completa" onPress={() => setCameraFullscreen(false)} style={styles.photoToolButton}><X size={23} color="#FFFFFF" /></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={flash === 'on' ? 'Apagar flash' : 'Encender flash'} onPress={toggleFlash} style={styles.photoToolButton}>{flash === 'on' ? <Zap size={21} color="#FFFFFF" /> : <ZapOff size={21} color="#FFFFFF" />}</Pressable>
+          </View>
+        </View>
+      </Modal>
 
       {/* Modal de Selección de Desarrollo -> Villa */}
       <Modal
@@ -902,7 +867,8 @@ export default function CheckinScreen() {
         animationType="slide"
         onRequestClose={() => setShowVillaModal(false)}
       >
-        <Pressable style={styles.modalBackdrop} onPress={() => setShowVillaModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="Cerrar selección de villa" onPress={() => setShowVillaModal(false)} />
           <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
             <View style={styles.modalHeader}>
               <View style={styles.modalDragPill} />
@@ -912,7 +878,7 @@ export default function CheckinScreen() {
               </Text>
             </View>
 
-            <ScrollView style={styles.taskListScroll} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.taskListScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               {groupedVillas.map(([desarrollo, units]: [string, Project[]]) => (
                 <View key={desarrollo} style={styles.devSection}>
                   <Text style={styles.devName}>{desarrollo.toUpperCase()}</Text>
@@ -921,12 +887,15 @@ export default function CheckinScreen() {
                     return (
                       <Pressable
                         key={unit.id}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: isSelected }}
                         style={({ pressed }) => [
                           styles.taskItemCard,
                           isSelected && styles.taskItemCardSelected,
                           pressed && { opacity: 0.8 },
                         ]}
                         onPress={() => {
+                          manualVillaRef.current = { key: villaSelectionKey, projectId: unit.id };
                           setCurrentProject(unit);
                           setSelectedProject(unit);
                           setShowVillaModal(false);
@@ -936,7 +905,7 @@ export default function CheckinScreen() {
                           <View style={styles.taskItemRow}>
                             <Building
                               size={15}
-                              color={isSelected ? '#FFFFFF' : Colors.textSecondary}
+                              color={isSelected ? '#FFFFFF' : '#343e48'}
                             />
                             <Text
                               style={[styles.taskItemTitle, isSelected && styles.taskItemTitleSelected]}
@@ -955,7 +924,7 @@ export default function CheckinScreen() {
                         </View>
                         {isSelected && (
                           <View style={styles.taskItemCheck}>
-                            <Check size={16} color={Colors.textWhite} strokeWidth={2.5} />
+                            <Check size={16} color="#FFFFFF" strokeWidth={2.5} />
                           </View>
                         )}
                       </Pressable>
@@ -972,7 +941,7 @@ export default function CheckinScreen() {
               <Text style={styles.modalCloseBtnText}>CERRAR</Text>
             </Pressable>
           </View>
-        </Pressable>
+        </View>
       </Modal>
 
       {/* Modal de Confirmación / Alerta con Estilo CaboSystems */}
@@ -1023,6 +992,12 @@ export default function CheckinScreen() {
 }
 
 const styles = StyleSheet.create({
+  fullscreenPage: { flex: 1, backgroundColor: '#000000' },
+  fullscreenCamera: { height: '100%' },
+  photoToolbar: { position: 'absolute', top: 12, right: 12, left: 12, flexDirection: 'row', justifyContent: 'space-between' },
+  photoToolButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
+  photoFlashButton: { position: 'absolute', top: 12, right: 12 },
+  photoExpandButton: { position: 'absolute', bottom: 12, right: 12 },
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -1126,10 +1101,10 @@ const styles = StyleSheet.create({
   controlButton: {
     alignItems: 'center',
     gap: Spacing.xs,
-    width: 60,
+    width: 72,
   },
   controlPlaceholder: {
-    width: 60,
+    width: 72,
   },
   controlText: {
     fontFamily: 'Outfit_500Medium',
@@ -1403,14 +1378,13 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.md,
-    backgroundColor: Colors.card,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.md,
+    backgroundColor: 'transparent',
+    borderTopWidth: 0,
     maxWidth: 960,
     width: '100%',
     alignSelf: 'center',
-    ...Shadow.sm,
   },
   submitButton: {
     flexDirection: 'row',
@@ -1441,7 +1415,7 @@ const styles = StyleSheet.create({
   },
   taskCardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.sm,
   },
   taskCardIconBox: {
@@ -1454,6 +1428,7 @@ const styles = StyleSheet.create({
   },
   taskCardDetails: {
     flex: 1,
+    minWidth: 0,
   },
   taskCardHeaderLabel: {
     fontFamily: 'Outfit_700Bold',
@@ -1464,12 +1439,21 @@ const styles = StyleSheet.create({
   taskCardTitle: {
     fontFamily: 'Outfit_600SemiBold',
     fontSize: 14,
+    lineHeight: 20,
+    color: Colors.text,
+    marginTop: 2,
+  },
+  taskCardUnit: {
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 13,
+    lineHeight: 19,
     color: Colors.text,
     marginTop: 2,
   },
   taskCardSub: {
     fontFamily: 'Outfit_400Regular',
     fontSize: 12,
+    lineHeight: 18,
     color: Colors.textSecondary,
     marginTop: 1,
   },
@@ -1490,21 +1474,58 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     marginTop: 2,
   },
+  taskCardActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  gpsIconButton: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.md,
+    backgroundColor: '#FFFFFF',
+    flexShrink: 0,
+    alignSelf: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(52,62,72,0.20)',
+  },
+  gpsIconButtonSuccess: {
+    backgroundColor: 'transparent',
+    borderColor: 'transparent',
+  },
+  gpsIconButtonError: {
+    backgroundColor: '#FFFFFF',
+    borderColor: Colors.primary,
+  },
+  gpsDotSuccess: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.primary,
+  },
   taskChangeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: 48,
     gap: 4,
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: BorderRadius.md,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: Colors.borderBrand,
+    borderColor: 'rgba(52,62,72,0.20)',
   },
   taskChangeBtnText: {
     fontFamily: 'Outfit_700Bold',
     fontSize: 11,
-    color: Colors.primaryDark,
+    color: '#343e48',
   },
   taskWarningBox: {
     flexDirection: 'row',
@@ -1526,11 +1547,11 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(16, 24, 40, 0.45)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: Colors.card,
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: BorderRadius['2xl'],
     borderTopRightRadius: BorderRadius['2xl'],
     paddingHorizontal: Spacing.md,
@@ -1546,19 +1567,19 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.border,
+    backgroundColor: 'rgba(52,62,72,0.25)',
     marginBottom: Spacing.sm,
   },
   modalTitle: {
     fontFamily: 'Outfit_700Bold',
     fontSize: 14,
-    color: Colors.text,
+    color: '#000000',
     letterSpacing: 0.5,
   },
   modalSubtitle: {
     fontFamily: 'Outfit_400Regular',
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: '#343e48',
     marginTop: 2,
     textAlign: 'center',
   },
@@ -1571,7 +1592,7 @@ const styles = StyleSheet.create({
   devName: {
     fontFamily: 'Outfit_700Bold',
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: '#343e48',
     letterSpacing: 1,
     marginBottom: Spacing.xs,
     paddingLeft: Spacing.xs,
@@ -1581,9 +1602,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.card,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: 'rgba(52,62,72,0.20)',
     marginBottom: Spacing.sm,
   },
   taskItemRow: {
@@ -1601,7 +1622,7 @@ const styles = StyleSheet.create({
   taskItemTitle: {
     fontFamily: 'Outfit_600SemiBold',
     fontSize: 13,
-    color: Colors.text,
+    color: '#000000',
   },
   taskItemTitleSelected: {
     color: '#FFFFFF',
@@ -1610,7 +1631,7 @@ const styles = StyleSheet.create({
   taskItemSubtitle: {
     fontFamily: 'Outfit_400Regular',
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: '#343e48',
     marginTop: 2,
   },
   taskItemSubtitleSelected: {
@@ -1628,15 +1649,15 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     alignItems: 'center',
     borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.card,
+    backgroundColor: '#000000',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#000000',
     marginTop: Spacing.xs,
   },
   modalCloseBtnText: {
     fontFamily: 'Outfit_600SemiBold',
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: '#FFFFFF',
   },
   feedbackBackdrop: {
     flex: 1,

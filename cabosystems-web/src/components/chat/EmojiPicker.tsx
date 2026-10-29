@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Smile, Hand, Leaf, Coffee, Car, Volleyball, Lightbulb, Hash, Flag, Clock, Search, X } from 'lucide-react';
-import { EMOJI_CATALOG, type EmojiCategory } from '../../lib/emojiCatalog';
+import type { EmojiCategory } from '../../lib/emojiCatalog';
+import { EMOJI_PICKER_CATALOG as EMOJI_CATALOG } from '../../lib/emojiPickerCatalog';
 import { useTranslation } from '../../context/LanguageContext';
 import { FluentEmoji } from './FluentEmoji';
 import './chatActions.css';
@@ -59,7 +60,7 @@ export default function EmojiPicker({ onSelect, onClose }: { onSelect: (emoji: s
               const target = Math.max(0, Math.min(entries.length - 1, index + step));
               scrollRef.current?.scrollTo({ top: Math.max(0, Math.floor(target / 8) * 44 - 88) });
               requestAnimationFrame(() => scrollRef.current?.querySelector<HTMLButtonElement>(`[data-index="${target}"]`)?.focus({ preventScroll: true }));
-            }} data-index={index}><FluentEmoji emoji={emoji} size={30} /></button>;
+            }} data-index={index}><FluentEmoji emoji={emoji} size={30} nativeFallback={false} /></button>;
         })}
       </div> : <p className="emoji-empty">{category === 'recent' && !query ? t('Tus emojis recientes aparecerán aquí.') : t('No se encontraron emojis.')}</p>}
     </div>

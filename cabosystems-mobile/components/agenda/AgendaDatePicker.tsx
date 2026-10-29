@@ -25,9 +25,9 @@ export function AgendaDatePicker({ date, today, locale, onSelect, compact = fals
   const apply = (value: string) => { onSelect(value); close(); };
   return <>
     <Pressable accessibilityRole="button" accessibilityLabel={`${es ? 'Elegir fecha' : 'Choose date'}: ${fullDate.format(parseDateKey(date))}`} accessibilityState={{ expanded: open }} onPress={() => { setDraft(date); setMonths(false); setOpen(true); }} style={[styles.dateButton, compact && styles.compactButton]}>
-      <Text style={[styles.dateText, compact && styles.compactText]}>{label ? label.charAt(0).toLocaleUpperCase(locale) + label.slice(1) : date.split('-').reverse().join('/')}</Text>{!compact ? <CalendarDays size={18} color={P.ink} /> : null}
+      <Text numberOfLines={compact ? 1 : undefined} adjustsFontSizeToFit={compact} minimumFontScale={0.8} style={[styles.dateText, compact && styles.compactText]}>{label ? label.charAt(0).toLocaleUpperCase(locale) + label.slice(1) : date.split('-').reverse().join('/')}</Text>{!compact ? <CalendarDays size={18} color={P.ink} /> : null}
     </Pressable>
-    <Modal visible={open} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
+    {open && <Modal visible transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
       <View style={[styles.backdrop, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
         <Pressable accessibilityRole="button" accessibilityLabel={es ? 'Cerrar' : 'Close'} onPress={close} style={StyleSheet.absoluteFill} />
         <View style={styles.sheet} accessibilityViewIsModal>
@@ -46,7 +46,7 @@ export function AgendaDatePicker({ date, today, locale, onSelect, compact = fals
           <View style={styles.actions}><Pressable accessibilityRole="button" onPress={() => apply(today)} style={styles.action}><Text style={styles.dayText}>{es ? 'Hoy' : 'Today'}</Text></Pressable><Pressable accessibilityRole="button" onPress={() => apply(draft)} style={[styles.action, styles.apply]}><Text style={styles.selectedText}>{es ? 'Aplicar' : 'Apply'}</Text></Pressable></View>
         </View>
       </View>
-    </Modal>
+    </Modal>}
   </>;
 }
 const styles = StyleSheet.create({

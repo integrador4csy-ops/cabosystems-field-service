@@ -63,7 +63,7 @@ test('calendar API fetches all pages of older series and rejects failed writes',
 });
 test('cached calendars never cross account or date-range boundaries', async () => {
   const memory = new Map();
-  const cache = load('lib/companyAgendaCache.ts', { 'react-native': { Platform: { OS: 'web' } }, 'expo-file-system/legacy': {} }, { sessionStorage: { setItem: (key, value) => memory.set(key, value), getItem: key => memory.get(key) || null } });
+  const cache = load('lib/companyAgendaCache.ts', { 'react-native': { Platform: { OS: 'web' } }, 'expo-file-system/legacy': {}, './agendaTextCache': load('lib/agendaTextCache.ts') }, { sessionStorage: { setItem: (key, value) => memory.set(key, value), getItem: key => memory.get(key) || null } });
   await cache.cacheCompanyAgenda('user-a', '2026-10-19', '2026-10-25', [event({})]);
   assert.equal((await cache.readCompanyAgendaCache('user-a', '2026-10-19', '2026-10-25')).length, 1);
   assert.equal(await cache.readCompanyAgendaCache('user-b', '2026-10-19', '2026-10-25'), null);
@@ -104,4 +104,16 @@ test('web and mobile combine Google events, route Google writes and keep virtual
     assert.equal(localInput.hora_fin, null);
     failed = true; await assert.rejects(api.getCompanyEvents('2026-10-19', '2026-10-25'));
   }
+});
+
+test('mobile preserves the Google authorization error instead of reporting an empty or offline-only message', async () => {
+  let readable = true;
+  const supabase = { functions: { invoke: async () => ({ data: null, error: { context: { clone: () => ({ json: async () => {
+    if (!readable) throw Error('Not JSON');
+    return { error: 'Google no autorizó la operación. Vuelve a conectar la cuenta.' };
+  } }) } } }) } };
+  const api = load('lib/companyAgendaApi.ts', { './supabase': { supabase }, './companyAgendaRecurrence': recurrence, './companyAgenda': model });
+  await assert.rejects(api.getGoogleCalendars(), /Vuelve a conectar la cuenta/);
+  readable = false;
+  await assert.rejects(api.getGoogleCalendars(), /No se pudo consultar Google Calendar/);
 });

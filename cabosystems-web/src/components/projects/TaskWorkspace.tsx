@@ -1,11 +1,11 @@
 import { AppSelect } from '../ui/AppSelect';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Columns3, List, Loader2, SlidersHorizontal } from 'lucide-react';
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, ChevronRight, Columns3, Download, List, Loader2, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { useSessionPreference } from '../../hooks/useSessionPreference';
 import { isStringPreference } from '../../lib/sessionPreferences';
 import { useTranslation } from '../../context/LanguageContext';
 import { dateKey } from '../../lib/taskDates';
-import { countTaskStatuses, filterWorkspaceTasks } from '../../lib/taskFilters';
+import { countTaskStatuses, filterWorkspaceTasks, sortWorkspaceTasks, taskVillaScope } from '../../lib/taskFilters';
 import type { Proyecto, Tarea } from '../../types/projects';
 import type { Profile } from '../../types/fleet';
 import { CreateProjectModal } from './CreateProjectModal';
@@ -15,6 +15,10 @@ import { TaskAgenda } from './TaskAgenda';
 import type { AgendaView } from './TaskAgenda';
 import { TaskBoard } from './TaskBoard';
 import { TaskCard } from './TaskCard';
+import { TaskLocationNav } from './TaskLocationNav';
+import { TaskTemplateDialog } from './TaskTemplateDialog';
+import { TaskReportDialog } from './TaskReportDialog';
+import { useAdminAuth } from '../../context/AdminAuthContext';
 import './TaskWorkspace.css';
 
 const statusOptions = [
@@ -39,7 +43,11 @@ interface TaskWorkspaceProps {
 }
 
 export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, searchQuery, createVersion, onReload, onMoveTask, onDeleteProject }: TaskWorkspaceProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const { isAdmin, user } = useAdminAuth();
+  const [reportOpen, setReportOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [sortOrder, setSortOrder] = useSessionPreference<'asc' | 'desc'>('csy_task_sort', 'asc', (value): value is 'asc' | 'desc' => value === 'asc' || value === 'desc');
   const [savedDevelopment, setDevelopment] = useSessionPreference('csy_task_development', 'all', isStringPreference);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filterId = useId();
@@ -60,18 +68,23 @@ export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, se
   const [actionError, setActionError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const seenCreateVersion = useRef(createVersion);
-  const development = projects.find((project) => project.id === projectId)?.desarrollo ?? savedDevelopment;
+  const development = projects.find((project) => project.id === projectId)?.desarrollo ?? (projects.some(project => project.desarrollo === savedDevelopment) ? savedDevelopment : 'all');
   const developments = useMemo(() => [...new Set(projects.map((project) => project.desarrollo))].sort((a, b) => a.localeCompare(b)), [projects]);
   const availableProjects = useMemo(() => projects.filter((project) => development === 'all' || project.desarrollo === development), [projects, development]);
   const projectLabels = useMemo(() => Object.fromEntries(projects.map((project) => [project.id, `${project.desarrollo} · ${project.villa}`])), [projects]);
   // A removed project no longer constrains the view after a realtime update.
   const effectiveProject = projects.some((project) => project.id === projectId) ? projectId : 'all';
-  const showStatusFilters = mode === 'agenda' || view === 'list';
-  const activeFilterCount = [development, effectiveProject, assignee, showStatusFilters ? status : 'all'].filter((value) => value !== 'all').length;
-  const matchingTasks = useMemo(() => filterWorkspaceTasks(tasks, projects, { query: searchQuery, development, project: effectiveProject, assignee, status: 'all' }), [tasks, projects, searchQuery, development, effectiveProject, assignee]);
-  const visible = useMemo(() => !showStatusFilters || status === 'all' ? matchingTasks : matchingTasks.filter((task) => task.estatus === status), [matchingTasks, showStatusFilters, status]);
-  const statusCounts = useMemo(() => countTaskStatuses(matchingTasks, mode === 'agenda' ? agendaView === 'unscheduled' ? 'unscheduled' : 'scheduled' : 'all'), [matchingTasks, mode, agendaView]);
-  const modalProject = projects.find((project) => project.id === taskToEdit?.proyecto_id) || projects.find((project) => project.id === effectiveProject) || availableProjects[0] || projects[0];
+  const globalSearch = mode === 'tasks' && Boolean(searchQuery.trim());
+  const activeFilterCount = [mode === 'tasks' ? 'all' : development, mode === 'tasks' ? 'all' : effectiveProject, assignee, status].filter((value) => value !== 'all').length;
+  const matchingTasks = useMemo(() => filterWorkspaceTasks(tasks, projects, { query: searchQuery, development: mode === 'tasks' ? 'all' : development, project: mode === 'tasks' ? 'all' : effectiveProject, assignee, status: 'all' }), [tasks, projects, searchQuery, development, effectiveProject, assignee, mode]);
+  const selectedVilla = useMemo(() => mode === 'tasks' ? taskVillaScope(projects, matchingTasks, searchQuery, effectiveProject) : undefined, [mode, projects, matchingTasks, searchQuery, effectiveProject]);
+  const scopedTasks = useMemo(() => mode === 'tasks' ? matchingTasks.filter(task => task.proyecto_id === selectedVilla?.id) : matchingTasks, [mode, matchingTasks, selectedVilla]);
+  const visible = useMemo(() => {
+    const filtered = status === 'all' ? scopedTasks : scopedTasks.filter(task => task.estatus === status);
+    return mode === 'tasks' ? sortWorkspaceTasks(filtered, sortOrder, locale) : filtered;
+  }, [scopedTasks, status, mode, sortOrder, locale]);
+  const statusCounts = useMemo(() => countTaskStatuses(scopedTasks, mode === 'agenda' ? agendaView === 'unscheduled' ? 'unscheduled' : 'scheduled' : 'all'), [scopedTasks, mode, agendaView]);
+  const modalProject = projects.find((project) => project.id === taskToEdit?.proyecto_id) || selectedVilla || projects.find((project) => project.id === effectiveProject) || availableProjects[0] || projects[0];
 
   useEffect(() => {
     if (seenCreateVersion.current === createVersion || loading) return;
@@ -95,8 +108,8 @@ export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, se
     setProjectId(id);
   };
   const clearFilters = () => {
-    setDevelopment('all');
-    setProjectId('all');
+    setDevelopment(selectedVilla?.desarrollo ?? 'all');
+    setProjectId(selectedVilla?.id ?? 'all');
     setAssignee('all');
     setStatus('all');
   };
@@ -114,24 +127,65 @@ export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, se
     try { await onDeleteProject(project); } catch { setActionError('No se pudo eliminar la villa. Intenta de nuevo.'); } finally { setDeletingId(null); }
   };
 
-  return <section className="task-workspace operational-panel" aria-label={mode === 'agenda' ? t('sidebar.agenda') : t('sidebar.projects')}>
-    <div className="workspace-filterbar"><div id={filterId} className={`workspace-filters ${mobileFiltersOpen ? 'is-open' : ''}`}>
-      <div className="workspace-filter-group workspace-location-filters">
+  const assigneeSelect = <AppSelect aria-label={t('Responsable')} value={assignee} onChange={(event) => setAssignee(event.target.value)}><option value="all">{t('Cualquier responsable')}</option><option value="unassigned">{t('Sin asignar')}</option>{staff.map((person) => <option key={person.id} value={person.id}>{person.nombre || person.full_name || person.email}</option>)}</AppSelect>;
+  const assigneeControl = <label>{t('Responsable')}{assigneeSelect}</label>;
+  const templateApplied = () => {
+    setTemplateOpen(false);
+    void onReload();
+  };
+
+  return <section className={`task-workspace operational-panel ${mode === 'tasks' ? 'task-workspace-split' : ''}`} aria-label={mode === 'agenda' ? t('sidebar.agenda') : t('sidebar.projects')}>
+    {mode === 'tasks' && <TaskLocationNav projects={projects} development={selectedVilla?.desarrollo ?? 'all'} projectId={selectedVilla?.id ?? 'all'} revealProjectId={globalSearch ? selectedVilla?.id : undefined} loading={loading} onSelect={(name, villa) => { setDevelopment(name); setProjectId(villa); }} />}
+    <div className="task-workspace-content">
+    {mode === 'tasks' && (
+      <div className="task-location-context">
+        <span>{selectedVilla ? <>{selectedVilla.desarrollo}<ChevronRight size={14} aria-hidden="true" />{selectedVilla.villa}</> : t('Selecciona una villa')}</span>
+        <div className="task-location-actions">
+          <button type="button" className="workspace-button" onClick={() => setReportOpen(true)}>
+            <Download size={15} aria-hidden="true" />
+            {t('Informe de tareas')}
+          </button>
+          {isAdmin && selectedVilla && (
+            <button type="button" className="workspace-button" disabled={loading} onClick={() => setTemplateOpen(true)}>
+              {t('Aplicar plantilla')}
+            </button>
+          )}
+        </div>
+      </div>
+    )}
+    {mode === 'agenda' && <div className="workspace-filterbar"><div id={filterId} className={`workspace-filters ${mobileFiltersOpen ? 'is-open' : ''}`}>
+      {mode === 'agenda' && <div className="workspace-filter-group workspace-location-filters">
         <label>{t('Desarrollo')}<AppSelect aria-label={t('Desarrollo')} value={development} onChange={(event) => { setDevelopment(event.target.value); setProjectId('all'); }}><option value="all">{t('Todos')}</option>{developments.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect></label>
         <label>{t('Villa')}<AppSelect aria-label={t('Villa')} value={effectiveProject} onChange={(event) => selectVilla(event.target.value)}><option value="all">{t('Todas')}</option>{availableProjects.map((project) => <option key={project.id} value={project.id}>{project.villa}</option>)}</AppSelect></label>
-      </div>
+      </div>}
       <div className="workspace-filter-group workspace-work-filters">
-      <label>{t('Responsable')}<AppSelect aria-label={t('Responsable')} value={assignee} onChange={(event) => setAssignee(event.target.value)}><option value="all">{t('Cualquier responsable')}</option><option value="unassigned">{t('Sin asignar')}</option>{staff.map((person) => <option key={person.id} value={person.id}>{person.nombre || person.full_name || person.email}</option>)}</AppSelect></label>
-      {showStatusFilters && <label>{t('Estado')}<AppSelect aria-label={t('Estado')} value={status} onChange={(event) => setStatus(event.target.value)}>{statusOptions.map((option) => <option key={option.value} value={option.value}>{t(option.label)} ({statusCounts[option.value]})</option>)}</AppSelect></label>}
+      {mode === 'agenda' && assigneeControl}
+      <label>{t('Estado')}<AppSelect aria-label={t('Estado')} value={status} onChange={(event) => setStatus(event.target.value)}>{statusOptions.map((option) => <option key={option.value} value={option.value}>{t(option.label)} ({statusCounts[option.value]})</option>)}</AppSelect></label>
       </div>
-      {activeFilterCount > 0 && <button type="button" className="workspace-clear-filters" onClick={clearFilters}>{t('Limpiar filtros')}</button>}
-    </div><div className="workspace-tools"><button type="button" className="workspace-button workspace-mobile-filter-toggle" aria-expanded={mobileFiltersOpen} aria-controls={filterId} onClick={() => setMobileFiltersOpen((previous) => !previous)}><SlidersHorizontal size={15} aria-hidden="true" />{t('Filtros')}{activeFilterCount > 0 && <span>{activeFilterCount}</span>}</button></div></div>
+      {mode === 'agenda' && activeFilterCount > 0 && <button type="button" className="workspace-clear-filters" onClick={clearFilters}>{t('Limpiar filtros')}</button>}
+    </div><div className="workspace-tools"><button type="button" className="workspace-button workspace-mobile-filter-toggle" aria-expanded={mobileFiltersOpen} aria-controls={filterId} onClick={() => setMobileFiltersOpen((previous) => !previous)}><SlidersHorizontal size={15} aria-hidden="true" />{t('Filtros')}{activeFilterCount > 0 && <span>{activeFilterCount}</span>}</button></div></div>}
     {(error || actionError) && <div role="alert" className="workspace-error">{t(error || actionError || '')}<button type="button" disabled={refreshing} onClick={() => void refresh()}>{t('Reintentar')}</button></div>}
-    {mode === 'tasks' && <div className="workspace-toolbar"><div className="workspace-view-switch" role="group" aria-label={t('Vista de tareas')}><button type="button" aria-pressed={view === 'board'} onClick={() => changeView('board')}><Columns3 size={16} />{t('Tablero')}</button><button type="button" aria-pressed={view === 'list'} onClick={() => changeView('list')}><List size={16} />{t('Lista')}</button></div><span className="workspace-count">{visible.length} {t(visible.length === 1 ? 'tarea' : 'tareas')}</span></div>}
+    {mode === 'tasks' && <div className="workspace-toolbar task-workspace-toolbar">
+      <div className="workspace-view-switch" role="group" aria-label={t('Vista de tareas')}><button type="button" aria-pressed={view === 'board'} onClick={() => changeView('board')}><Columns3 size={16} />{t('Tablero')}</button><button type="button" aria-pressed={view === 'list'} onClick={() => changeView('list')}><List size={16} />{t('Lista')}</button></div>
+      <div className="workspace-toolbar-options">
+        <span className="workspace-count" role="status">{visible.length} {t(visible.length === 1 ? 'tarea' : 'tareas')}</span>
+        <div className="workspace-compact-filters">
+          <label className="workspace-compact-assignee"><span className="sr-only">{t('Responsable')}</span>{assigneeSelect}</label>
+          <label className="workspace-compact-status"><span className="sr-only">{t('Estado')}</span><AppSelect aria-label={t('Estado')} title={t('Estado')} value={status} onChange={event => setStatus(event.target.value)}>{statusOptions.map(option => <option key={option.value} value={option.value}>{t(option.label)} ({statusCounts[option.value]})</option>)}</AppSelect></label>
+          <button type="button" role="switch" aria-checked={sortOrder === 'desc'} aria-label={t('Orden descendente')} title={t(sortOrder === 'asc' ? 'Ascendente' : 'Descendente')} className="workspace-sort-switch" onClick={() => setSortOrder(previous => previous === 'asc' ? 'desc' : 'asc')}>
+            {sortOrder === 'asc' ? <ArrowUpNarrowWide size={16} aria-hidden="true"/> : <ArrowDownWideNarrow size={16} aria-hidden="true"/>}
+          </button>
+          {activeFilterCount > 0 && <button type="button" className="workspace-compact-reset" onClick={clearFilters} aria-label={t('Limpiar filtros')} title={t('Limpiar filtros')}><RotateCcw size={14} aria-hidden="true"/></button>}
+        </div>
+      </div>
+    </div>}
     {loading ? <div className="workspace-empty" role="status"><Loader2 size={24} className="animate-spin" /><p>{t('Cargando tareas...')}</p></div>
       : mode === 'agenda' ? <TaskAgenda tasks={visible} projectLabels={projectLabels} expandedTaskIds={expanded} onToggleExpand={toggleExpand} onTaskUpdated={() => void onReload()} onEditTask={editTask} onCreateTask={createTaskOnDay} selectedDate={agendaDate} view={agendaView} onDateChange={setAgendaDate} onViewChange={setAgendaView} />
-      : view === 'board' ? <TaskBoard tasks={visible} projectLabels={projectLabels} showSearch={false} expandedTaskIds={expanded} onToggleExpand={toggleExpand} onTaskUpdated={() => void onReload()} onEditTask={editTask} onMoveTask={onMoveTask} />
-      : <div className="workspace-task-list">{visible.length ? visible.map((task) => <TaskCard key={task.id} task={task} projectLabel={projectLabels[task.proyecto_id]} isExpanded={expanded.has(task.id)} onToggleExpand={() => toggleExpand(task.id)} onTaskUpdated={() => void onReload()} onEditTask={editTask} />) : <p className="workspace-empty">{t('No hay tareas que coincidan con los filtros.')}</p>}</div>}
+      : view === 'board' ? <TaskBoard tasks={visible} showSearch={false} expandedTaskIds={expanded} onToggleExpand={toggleExpand} onTaskUpdated={() => void onReload()} onEditTask={editTask} onMoveTask={onMoveTask} />
+      : <div className="workspace-task-list">{visible.length ? visible.map((task) => <TaskCard key={task.id} task={task} isExpanded={expanded.has(task.id)} onToggleExpand={() => toggleExpand(task.id)} onTaskUpdated={() => void onReload()} onEditTask={editTask} />) : <p className="workspace-empty">{t('No hay tareas que coincidan con los filtros.')}</p>}</div>}
+    </div>
+    {reportOpen && <TaskReportDialog key={user?.id} projects={projects} staff={staff} initialProject={selectedVilla?.id} onClose={() => setReportOpen(false)} />}
+    {templateOpen && selectedVilla && <TaskTemplateDialog key={selectedVilla.id} project={selectedVilla} onClose={() => setTemplateOpen(false)} onApplied={templateApplied} />}
     <ProjectCatalog open={catalogOpen} projects={projects} onClose={() => setCatalogOpen(false)} onSelect={(project) => { setDevelopment(project.desarrollo); setProjectId(project.id); }} onCreate={() => { setProjectToEdit(null); setProjectModalOpen(true); }} onEdit={(project) => { setProjectToEdit(project); setProjectModalOpen(true); }} onDelete={(project) => void deleteVilla(project)} deletingId={deletingId} error={actionError} />
     <CreateProjectModal isOpen={projectModalOpen} onClose={() => setProjectModalOpen(false)} onSuccess={() => { void onReload().then(() => { if (taskCreationDate) setTaskModalOpen(true); }); }} existingDesarrollos={developments} projectToEdit={projectToEdit} defaultDesarrollo={development} />
     {modalProject && <CreateTaskModal isOpen={taskModalOpen} onClose={() => { setTaskModalOpen(false); setTaskCreationDate(undefined); }} onSuccess={() => void onReload()} project={modalProject} projects={projects} defaultDate={taskCreationDate ?? (mode === 'agenda' && agendaView !== 'unscheduled' ? agendaDate : undefined)} taskToEdit={taskToEdit} staffList={staff} />}

@@ -19,19 +19,26 @@ import BackgroundLocationModal from '@/components/BackgroundLocationModal';
 import { useAppUpdateCheck } from '@/lib/appUpdateService';
 import AppUpdateModal from '@/components/AppUpdateModal';
 import { registerForPushNotificationsAsync, setupNotificationResponseListener } from '@/lib/notifications';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { startFieldSync } from '@/lib/fieldSync';
+import { FieldSyncStatus } from '@/components/FieldSyncStatus';
+import { startAgendaWindow } from '@/lib/agendaWindowService';
 
 export {
   ErrorBoundary,
 } from 'expo-router';
 
 export const unstable_settings = {
-  initialRouteName: '(tabs)',
+  anchor: '(tabs)',
 };
 
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
-  const { session, loading } = useAuth();
+  const { session, profile, loading } = useAuth();
+  const agendaOwner = profile?.activo && profile.id === session?.user.id ? profile.id : '';
+  useEffect(() => agendaOwner ? startAgendaWindow(agendaOwner, false) : undefined, [agendaOwner]);
+  useEffect(() => session?.user.id ? startFieldSync(session.user.id) : undefined, [session?.user.id]);
   const segments = useSegments();
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
@@ -76,7 +83,7 @@ function RootLayoutNav() {
 
   // Interceptar enlaces de invitación y enrutar directamente a Registro o Recuperación
   useEffect(() => {
-    const handleUrl = (url: string | null) => {
+    const handleUrl = (url: string | null | undefined) => {
       if (!url) return;
       try {
         let extractedToken = '';
@@ -139,6 +146,8 @@ function RootLayoutNav() {
     // Evitar navegación si el árbol de navegación no se ha montado aún o auth está cargando
     if (!rootNavigationState?.key || loading) return;
 
+    void SplashScreen.hideAsync().catch(() => {});
+
     const inAuthGroup = segments[0] === '(auth)';
     const isResettingPassword = segments[1] === 'reset-password';
 
@@ -153,7 +162,7 @@ function RootLayoutNav() {
 
   return (
     <>
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack screenOptions={{ headerShown: false, freezeOnBlur: true }}>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="pending" options={{ headerShown: false }} />
@@ -164,6 +173,7 @@ function RootLayoutNav() {
         <Stack.Screen name="chat/group-info/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />
       </Stack>
+      <FieldSyncStatus owner={session?.user.id || ''} />
       <BackgroundLocationModal
         visible={showBgLocationModal}
         onClose={() => setShowBgLocationModal(false)}
@@ -198,7 +208,11 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (loaded) {
-      SplashScreen.hideAsync();
+      // Fallback de seguridad en caso de que la navegación demore en resolver
+      const timer = setTimeout(() => {
+        void SplashScreen.hideAsync().catch(() => {});
+      }, 3500);
+      return () => clearTimeout(timer);
     }
   }, [loaded]);
 
@@ -207,12 +221,12 @@ export default function RootLayout() {
   }
 
   return (
-    <LanguageProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}><LanguageProvider>
       <AuthProvider>
         <ProjectsProvider>
           <RootLayoutNav />
         </ProjectsProvider>
       </AuthProvider>
-    </LanguageProvider>
+    </LanguageProvider></GestureHandlerRootView>
   );
 }

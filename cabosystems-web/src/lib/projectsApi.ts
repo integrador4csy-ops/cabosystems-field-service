@@ -122,6 +122,7 @@ export async function getTasksByProject(projectId?: string): Promise<Tarea[]> {
       descripcion,
       estatus,
       fecha_programada,
+      orden_plantilla,
       created_at,
       profiles:asignado_a (
         id,
@@ -134,11 +135,12 @@ export async function getTasksByProject(projectId?: string): Promise<Tarea[]> {
         tarea_id,
         titulo,
         completada,
+        orden_plantilla,
         created_at
       )
     `);
   if (projectId) query = query.eq('proyecto_id', projectId);
-  query = query.order('created_at', { ascending: false }).order('id');
+  query = query.order('orden_plantilla', { ascending: true, nullsFirst: false }).order('created_at', { ascending: false }).order('id');
   const allRows: any[] = [];
   for (let offset = 0; ; offset += 500) {
     const { data, error } = await query.range(offset, offset + 499);
@@ -155,11 +157,12 @@ export async function getTasksByProject(projectId?: string): Promise<Tarea[]> {
     descripcion: t.descripcion,
     estatus: t.estatus,
     fecha_programada: t.fecha_programada ?? null,
+    orden_plantilla: t.orden_plantilla ?? null,
     created_at: t.created_at,
     profiles: t.profiles,
     subtareas: (t.subtareas || []).sort(
       (a: Subtarea, b: Subtarea) =>
-        new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+        (a.orden_plantilla ?? Number.MAX_SAFE_INTEGER) - (b.orden_plantilla ?? Number.MAX_SAFE_INTEGER) || new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
     ),
   }));
 }

@@ -17,6 +17,7 @@ build/
 .gradle/
 *.apk
 *.aab
+supabase/.temp/
 
 # Logs
 *.log
@@ -34,3 +35,4 @@ Thumbs.db
 .expo/
 web-build/
 *.tsbuildinfo
+BitChord/

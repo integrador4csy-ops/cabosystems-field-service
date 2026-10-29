@@ -1,3 +1,4 @@
+import { layoutViewport } from '../../lib/layoutViewport';
 import { Children, Fragment, isValidElement, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode, SelectHTMLAttributes } from 'react';
 import { createPortal } from 'react-dom';
@@ -54,17 +55,17 @@ export function AppSelect({ children, className = '', triggerContent, style, id,
   useLayoutEffect(() => {
     if (!open || props.disabled) return;
     const position = () => {
-      const anchor = triggerRef.current?.getBoundingClientRect();
+      const layout = layoutViewport(); const anchor = triggerRef.current ? layout.rect(triggerRef.current) : undefined;
       const menu = menuRef.current;
       if (!anchor || !menu) return;
-      const width = Math.min(Math.max(anchor.width, 180), window.innerWidth - 16);
-      const below = window.innerHeight - anchor.bottom - 14;
+      const width = Math.min(Math.max(anchor.width, 180), layout.width - 16);
+      const below = layout.height - anchor.bottom - 14;
       const above = anchor.top - 14;
       const upwards = below < Math.min(240, menu.scrollHeight) && above > below;
       menu.style.width = `${width}px`;
       menu.style.maxHeight = `${Math.max(40, Math.min(280, upwards ? above : below))}px`;
-      menu.style.left = `${Math.max(8, Math.min(anchor.left, window.innerWidth - width - 8))}px`;
-      menu.style.top = `${upwards ? Math.max(8, anchor.top - menu.getBoundingClientRect().height - 6) : anchor.bottom + 6}px`;
+      menu.style.left = `${Math.max(8, Math.min(anchor.left, layout.width - width - 8))}px`;
+      menu.style.top = `${upwards ? Math.max(8, anchor.top - layout.rect(menu).height - 6) : anchor.bottom + 6}px`;
       menu.style.visibility = 'visible';
     };
     const outside = (event: PointerEvent) => {

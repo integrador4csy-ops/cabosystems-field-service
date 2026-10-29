@@ -10,6 +10,7 @@ export interface Proyecto {
 }
 
 export interface Subtarea {
+  orden_plantilla?: number | null;
   id: string;
   tarea_id: string;
   titulo: string;
@@ -18,6 +19,7 @@ export interface Subtarea {
 }
 
 export interface Tarea {
+  orden_plantilla?: number | null;
   id: string;
   proyecto_id: string;
   asignado_a: string | null;

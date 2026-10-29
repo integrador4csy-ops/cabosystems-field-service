@@ -15,7 +15,7 @@
 .team-section .admin-users-table-wrapper { border-radius: 12px; }
 .team-section .admin-users-table td { padding: 16px; }
 .team-section .admin-edit-submodal { position: fixed; }
-.team-section .admin-edit-card { max-height: calc(100dvh - 32px); display: flex; flex-direction: column; }
+.team-section .admin-edit-card { max-height: calc(var(--app-viewport-height) - 32px); display: flex; flex-direction: column; }
 .team-section .edit-card-body { min-height: 0; overflow-y: auto; }
 .team-section .invite-form { max-width: 540px; margin: 0; padding: 0; background: #fff; border: 0; }
 @media (max-width: 639px) {

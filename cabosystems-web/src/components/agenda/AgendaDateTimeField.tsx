@@ -1,3 +1,4 @@
+import { layoutViewport } from '../../lib/layoutViewport';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react';
@@ -35,13 +36,13 @@ export function AgendaDateTimeField({ type, value, label, locale, onChange, min,
   useLayoutEffect(() => {
     if (!open || disabled) return;
     const position = () => {
-      const anchor = trigger.current?.getBoundingClientRect(); const picker = panel.current;
+      const layout = layoutViewport(); const anchor = trigger.current ? layout.rect(trigger.current) : undefined; const picker = panel.current;
       if (!anchor || !picker) return;
-      const width = Math.min(type === 'date' ? 280 : 220, window.innerWidth - 16);
+      const width = Math.min(type === 'date' ? 280 : 220, layout.width - 16);
       picker.style.width = `${width}px`;
       const below = anchor.bottom + 6;
-      picker.style.maxHeight = `${Math.max(0, window.innerHeight - below - 8)}px`;
-      picker.style.left = `${Math.max(8, Math.min(anchor.left, window.innerWidth - width - 8))}px`;
+      picker.style.maxHeight = `${Math.max(0, layout.height - below - 8)}px`;
+      picker.style.left = `${Math.max(8, Math.min(anchor.left, layout.width - width - 8))}px`;
       picker.style.top = `${below}px`;
       picker.style.visibility = 'visible';
     };

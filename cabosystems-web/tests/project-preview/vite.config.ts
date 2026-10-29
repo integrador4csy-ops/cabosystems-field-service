@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 // Separate, opt-in test server. Never imported by the production app.
 export default defineConfig({
+  cacheDir: fileURLToPath(new URL('../../node_modules/.vite-project-preview', import.meta.url)),
   root: fileURLToPath(new URL('.', import.meta.url)),
   plugins: [react(), tailwindcss()],
   resolve: { alias: [

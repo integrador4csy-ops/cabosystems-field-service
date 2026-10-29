@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import test from 'node:test';
 import ts from 'typescript';
+import vm from 'node:vm';
 
 async function loadSource(path) {
   const compiled = ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2023 } }).outputText;
@@ -10,6 +11,50 @@ async function loadSource(path) {
 const { emojiToCode, splitEmojiText, getEmojiOnlyCount, getEmojiMessageSize } = await loadSource('../src/lib/emoji.ts');
 const { FLUENT_EMOJI_CODES, FLUENT_EMOJI_FILES } = await loadSource('../src/lib/fluentEmojiAssets.ts');
 const { EMOJI_CATALOG } = await loadSource('../src/lib/emojiCatalog.ts');
+
+function loadWithDependencies(path, dependencies) {
+  const compiled = ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2023, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  const exports = {};
+  vm.runInNewContext(compiled, { exports, require: name => {
+    if (!(name in dependencies)) throw Error(`Unexpected dependency: ${name}`);
+    return dependencies[name];
+  } });
+  return exports;
+}
+
+test('picker offers only bundled 3D artwork, excluding unsupported faces and split sequences', () => {
+  const { EMOJI_PICKER_CATALOG } = loadWithDependencies('../src/lib/emojiPickerCatalog.ts', {
+    './emojiCatalog': { EMOJI_CATALOG }, './fluentEmojiAssets': { FLUENT_EMOJI_FILES }, './emoji': { emojiToCode },
+  });
+  assert.ok(EMOJI_PICKER_CATALOG.length > 3000);
+  for (const [emoji] of EMOJI_PICKER_CATALOG) {
+    const code = FLUENT_EMOJI_FILES.get(emojiToCode(emoji));
+    assert.ok(code, emoji);
+    assert.ok(existsSync(new URL(`../public/emoji/fluent-3d/${code}.webp`, import.meta.url)), emoji);
+  }
+  for (const emoji of ['🙂‍↔️', '🙂‍↕️', '🫩', '🫪', '🫯']) assert.ok(!EMOJI_PICKER_CATALOG.some(entry => entry[0] === emoji));
+  for (const emoji of ['😂', '❤️', '👍🏽']) assert.ok(EMOJI_PICKER_CATALOG.some(entry => entry[0] === emoji));
+});
+
+test('loading artwork never paints native Unicode underneath and picker fallback cannot show missing glyph boxes', () => {
+  const jsx = (type, props) => ({ type, props });
+  let source = '/emoji.webp';
+  const { FluentEmoji } = loadWithDependencies('../src/components/chat/FluentEmoji.tsx', {
+    react: { Fragment: 'fragment', useState: () => [null, () => {}] },
+    'react/jsx-runtime': { jsx, jsxs: jsx }, '../../lib/emoji': { splitEmojiText },
+    '../../lib/emojiPreload': { getFluentEmojiSource: () => source, isEmojiPrepared: () => false },
+    './FluentEmoji.css': {},
+  });
+  const loading = FluentEmoji({ emoji: '😂' });
+  assert.equal(loading.props.children[0].props.className, 'fluent-emoji-placeholder');
+  assert.equal(loading.props.children[0].props.children, undefined);
+  source = null;
+  const unsupported = FluentEmoji({ emoji: '🫩', nativeFallback: false });
+  assert.equal(unsupported.props.children, undefined);
+  assert.equal(FluentEmoji({ emoji: '🫩' }).props.children, '🫩');
+});
 
 test('the complete picker includes every Unicode 17 emoji, all categories and skin tones', () => {
   assert.equal(EMOJI_CATALOG.length, 3953);

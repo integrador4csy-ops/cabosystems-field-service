@@ -195,7 +195,7 @@ export const AppSidebar: React.FC = () => {
               <img
                 src="/logo-cabosystems-light.svg"
                 alt="CaboSystems Field Service"
-                className="h-11 w-auto max-w-[215px] object-contain"
+                className="h-12 w-auto max-w-[240px] object-contain"
               />
             </div>
           ) : (

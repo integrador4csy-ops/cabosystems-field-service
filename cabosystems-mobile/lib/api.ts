@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import type { TaskPermissions } from './taskAccess';
 import type { Project, Task, Subtarea, TaskStatus, FieldRecord } from '@/types/database';
 
 export interface TaskWithProject extends Task {
@@ -7,6 +8,7 @@ export interface TaskWithProject extends Task {
 }
 
 export interface TaskDetail extends Task {
+  permissions?: TaskPermissions;
   proyectos: (Pick<Project, 'desarrollo'> & { villa?: string; unidad?: string }) | null;
   profiles: { nombre: string } | null;
   subtareas: Subtarea[];
@@ -81,6 +83,13 @@ export async function getTaskById(id: string): Promise<TaskDetail> {
   return normalizeTaskProject(data) as TaskDetail;
 }
 
+export async function getTaskPermissions(id: string): Promise<TaskPermissions> {
+  const { data, error } = await supabase.rpc('get_task_permissions', { p_task_id: id });
+  if (error) throw error;
+  if (!data?.user_id || typeof data.can_progress !== 'boolean' || typeof data.can_edit !== 'boolean') throw new Error('No se pudieron verificar los permisos de la tarea');
+  return data as TaskPermissions;
+}
+
 export async function updateTaskStatus(id: string, estatus: TaskStatus): Promise<void> {
   const { error } = await supabase
     .from('tareas')
@@ -129,7 +138,7 @@ function decodeBase64ToUint8Array(base64: string): Uint8Array {
   return bytes;
 }
 
-export async function uploadEvidencePhoto(localUri: string, path: string): Promise<string> {
+export async function uploadEvidencePhoto(localUri: string, path: string, reuseExisting = false): Promise<string> {
   let fileBody: ArrayBuffer | Uint8Array;
   let contentType = 'image/jpeg';
 
@@ -157,11 +166,15 @@ export async function uploadEvidencePhoto(localUri: string, path: string): Promi
     .from('evidencias-campo')
     .upload(path, fileBody, {
       contentType,
-      upsert: true,
+      upsert: !reuseExisting,
     });
 
   if (error) {
-    throw error;
+    const duplicate = String((error as { statusCode?: string }).statusCode) === '409' || /already exists|duplicate/i.test(error.message);
+    if (!reuseExisting || !duplicate) throw error;
+    // Evidence storage is INSERT/SELECT only. Confirm a previous upload instead of requiring UPDATE.
+    const existing = await supabase.storage.from('evidencias-campo').info(path);
+    if (existing.error) throw existing.error;
   }
 
   const { data: publicUrlData } = supabase.storage

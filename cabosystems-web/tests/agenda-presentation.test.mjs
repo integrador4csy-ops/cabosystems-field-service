@@ -5,7 +5,7 @@ import ts from 'typescript';
 const source = ts.transpileModule(readFileSync(new URL('../src/lib/agendaPresentation.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ES2022 } }).outputText;
 const { calendarAppearance, eventSchedule } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 
-test('calendar backgrounds follow Google color and maintain contrasting text', () => {
+test('calendar backgrounds follow Google color and use dark text only on very light colors', () => {
   assert.deepEqual(calendarAppearance({ google: { calendarColor: '#ffff00' } }), { backgroundColor: '#ffff00', color: '#000000' });
   assert.deepEqual(calendarAppearance({ google: { calendarColor: '#000000' } }), { backgroundColor: '#000000', color: '#FFFFFF' });
   assert.deepEqual(calendarAppearance({ google: { calendarColor: '#a47ae2' } }), { backgroundColor: '#a47ae2', color: '#FFFFFF' });

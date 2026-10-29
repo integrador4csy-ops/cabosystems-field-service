@@ -112,7 +112,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t("Villa y desarrollo")} tabIndex={-1}
-        className="minimal-modal w-full max-w-lg operational-panel rounded-2xl bg-white shadow-theme-md border border-slate-100 overflow-hidden flex flex-col max-h-[calc(100dvh-32px)]">
+        className="minimal-modal w-full max-w-lg operational-panel rounded-2xl bg-white shadow-theme-md border border-slate-100 overflow-hidden flex flex-col max-h-[calc(var(--app-viewport-height)-32px)]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-white">
           <div className="flex items-center gap-2.5">

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { SessionProfileRequest } from '../lib/sessionProfileRequest';
 import { supabase } from '../lib/supabase';
 import type { Profile } from '../types/fleet';
 import type { User } from '@supabase/supabase-js';
@@ -26,9 +27,21 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [loading, setLoading] = useState(true);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
+  const profileRequests = useRef(new SessionProfileRequest<Profile>());
+  const authVersion = useRef(0);
+  const selectedUserId = useRef<string | null>(null);
+
+  const selectUser = useCallback((next: User | null) => {
+    if (selectedUserId.current !== (next?.id ?? null)) setLoading(Boolean(next));
+    selectedUserId.current = next?.id ?? null;
+    profileRequests.current.select(next?.id ?? null);
+    setUser(next);
+    setAdminProfile(previous => previous?.id === next?.id ? previous : null);
+  }, []);
 
   const fetchAdminProfile = useCallback(async (userId: string, userEmail?: string) => {
     try {
+      return await profileRequests.current.load(userId, async () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -40,11 +53,10 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       if (data) {
-        setAdminProfile({
+        return {
           ...data,
           email: userEmail || data.email,
-        } as Profile);
-        return data as Profile;
+        } as Profile;
       } else {
         // A missing database profile must never confer administrator privileges.
         const fallback: Profile = {
@@ -55,9 +67,9 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           activo: false,
           email: userEmail,
         };
-        setAdminProfile(fallback);
         return fallback;
       }
+      }, setAdminProfile);
     } catch (err) {
       console.error('Error in fetchAdminProfile:', err);
       return null;
@@ -68,55 +80,52 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     let isMounted = true;
 
+    const applySession = async (next: User | null) => {
+      const version = ++authVersion.current;
+      selectUser(next);
+      setIsLoginModalOpen(!next);
+      if (next) {
+        await fetchAdminProfile(next.id, next.email);
+      }
+      if (isMounted && authVersion.current === version) setLoading(false);
+    };
+    const initialVersion = authVersion.current;
     const initAuth = async () => {
       setLoading(true);
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          if (isMounted) {
-            setUser(session.user);
-            await fetchAdminProfile(session.user.id, session.user.email);
-            setIsLoginModalOpen(false);
-          }
-        } else {
-          if (isMounted) {
-            setUser(null);
-            setAdminProfile(null);
-            // Require login when entering
-            setIsLoginModalOpen(true);
-          }
-        }
+        if (isMounted && authVersion.current === initialVersion) await applySession(session?.user ?? null);
       } catch (err) {
         console.error('Auth initialization error:', err);
-        if (isMounted) setIsLoginModalOpen(true);
-      } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted && authVersion.current === initialVersion) { setIsLoginModalOpen(true); setLoading(false); }
       }
     };
 
     initAuth();
 
     // Listen to Supabase auth events
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        await fetchAdminProfile(session.user.id, session.user.email);
-        setIsLoginModalOpen(false);
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setAdminProfile(null);
-        setIsLoginModalOpen(true);
-      }
+    // Do not await database calls while the auth client holds its event lock.
+    let authTimer: ReturnType<typeof setTimeout> | undefined;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const eventVersion = ++authVersion.current;
+      selectUser(session?.user ?? null);
+      if (!session?.user) { setIsLoginModalOpen(true); setLoading(false); }
+      clearTimeout(authTimer);
+      authTimer = setTimeout(() => { if (isMounted && authVersion.current === eventVersion) void applySession(session?.user ?? null); }, 0);
     });
 
     return () => {
       isMounted = false;
+      ++authVersion.current;
+      clearTimeout(authTimer);
+      profileRequests.current.reset();
       subscription.unsubscribe();
     };
-  }, [fetchAdminProfile]);
+  }, [fetchAdminProfile, selectUser]);
 
   // Login handler
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    const version = authVersion.current;
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
@@ -128,7 +137,10 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       if (data?.user) {
-        setUser(data.user);
+        if (version !== authVersion.current && selectedUserId.current !== data.user.id) {
+          return { success: false, error: 'La sesión cambió. Intenta de nuevo.' };
+        }
+        selectUser(data.user);
         const profile = await fetchAdminProfile(data.user.id, data.user.email);
         
         // Ensure user has admin privileges
@@ -136,6 +148,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           // Warning if not strictly admin, but still allow if authorized
         }
 
+        if (!profile) return { success: false, error: 'La sesión cambió. Intenta de nuevo.' };
         setIsLoginModalOpen(false);
         return { success: true };
       }
@@ -148,12 +161,15 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Logout handler
   const logout = async () => {
+    ++authVersion.current;
+    profileRequests.current.reset();
+    selectUser(null);
     try {
       await supabase.auth.signOut();
     } catch (err) {
       console.error('Error signing out:', err);
     } finally {
-      setUser(null);
+      selectUser(null);
       setAdminProfile(null);
       setIsLoginModalOpen(true);
       setIsEditProfileModalOpen(false);
@@ -163,6 +179,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Update Admin Profile (name and avatar)
   const updateAdminProfile = async (data: { nombre: string; avatar_url: string | null }) => {
     if (!user) return { success: false, error: 'No hay sesión de administrador activa.' };
+    const version = authVersion.current;
 
     try {
       const { error } = await supabase
@@ -176,6 +193,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (error) {
         throw error;
       }
+      if (version !== authVersion.current) return { success: false, error: 'La sesión cambió. Intenta de nuevo.' };
 
       setAdminProfile((prev) =>
         prev

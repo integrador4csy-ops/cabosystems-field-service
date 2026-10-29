@@ -6,8 +6,10 @@ import { MapPin, X, ChevronDown, Check } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { useProjects } from '@/lib/projects';
 import type { Project } from '@/types/database';
+import { ProfileNavButton } from './ProfileNavButton';
 
 interface HeaderProps {
+  selectorOnly?: boolean;
   showProjectSelector?: boolean;
   rightAccessory?: React.ReactNode;
   projects?: Project[];
@@ -28,7 +30,8 @@ export function useHeaderHeight() {
   return insets.top + baseHeight;
 }
 
-export function HeaderCaboSystems({
+export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
+  selectorOnly = false,
   showProjectSelector = true,
   rightAccessory,
   projects: propProjects,
@@ -60,11 +63,11 @@ export function HeaderCaboSystems({
   const displayCode = allProjectsSelected ? 'Todas las villas' : selected?.villa || selected?.unidad || 'Sin villa';
 
   return (
-    <View style={styles.headerWrapper}>
-      <SafeAreaView edges={['top']} style={styles.safeArea}>
-        <View style={[styles.container, isTablet && styles.containerTablet]}>
+    <View style={selectorOnly ? styles.selectorOnlyWrapper : styles.headerWrapper}>
+      <SafeAreaView edges={selectorOnly ? [] : ['top']} style={selectorOnly ? styles.selectorOnlySafeArea : styles.safeArea}>
+        <View style={[styles.container, isTablet && styles.containerTablet, selectorOnly && styles.selectorOnlyContainer]}>
           {/* Logo Minimalista CSY en Modo Claro */}
-          <View style={styles.logoContainer}>
+          {!selectorOnly && <View style={styles.logoContainer}>
             <Image
               source={LOGO_DARK}
               style={[styles.logo, isTablet && styles.logoTablet]}
@@ -72,10 +75,10 @@ export function HeaderCaboSystems({
               contentPosition="left center"
               priority="high"
             />
-          </View>
+          </View>}
 
           {/* Selector de Villa Minimalista */}
-          {rightAccessory}
+          {!selectorOnly && rightAccessory}
           {showProjectSelector && projects.length > 0 && (
             <Pressable
               style={({ pressed }) => [
@@ -83,6 +86,7 @@ export function HeaderCaboSystems({
                 allProjectsSelected && styles.selectorAll,
                 isTablet && styles.selectorTablet,
                 selected && styles.selectorActive,
+                selectorOnly && styles.selectorOnlyButton,
                 pressed && (selected ? styles.selectorActivePressed : styles.selectorPressed),
               ]}
               hitSlop={8}
@@ -91,22 +95,26 @@ export function HeaderCaboSystems({
               accessibilityState={{ expanded: visible }}
               onPress={() => setVisible(true)}
             >
-              <View style={[styles.selectorPinBox, selected && styles.selectorPinBoxActive]}>
-                <MapPin color={selected ? '#FFFFFF' : Colors.primary} size={14} strokeWidth={2.5} />
-              </View>
+              {!selectorOnly && <View style={[styles.selectorPinBox, selected && styles.selectorPinBoxActive]}>
+                <MapPin color={Colors.brandSlate} size={14} strokeWidth={2.5} />
+              </View>}
               <Text
                 style={[
                   styles.selectorText,
                   isTablet && styles.selectorTextTablet,
                   selected && styles.selectorTextActive,
+                  selectorOnly && styles.selectorOnlyText,
                 ]}
-                numberOfLines={allProjectsSelected ? 2 : 1}
+                numberOfLines={selectorOnly ? 1 : allProjectsSelected ? 2 : 1}
+                adjustsFontSizeToFit={selectorOnly}
+                minimumFontScale={0.8}
               >
                 {displayCode}
               </Text>
-              <ChevronDown color={selected ? '#FFFFFF' : Colors.textSecondary} size={14} strokeWidth={2.2} />
+              <ChevronDown color={Colors.primary} size={14} strokeWidth={2.2} />
             </Pressable>
           )}
+          {!selectorOnly && <ProfileNavButton />}
         </View>
       </SafeAreaView>
 
@@ -152,6 +160,8 @@ export function HeaderCaboSystems({
                     return (
                       <Pressable
                         key={unit.id}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: isSelected }}
                         style={({ pressed }) => [
                           styles.unitRow,
                           isSelected && styles.unitRowSelected,
@@ -177,9 +187,14 @@ export function HeaderCaboSystems({
       </Modal>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
+  selectorOnlyWrapper: { flex: 1, minWidth: 0 },
+  selectorOnlySafeArea: { backgroundColor: 'transparent' },
+  selectorOnlyContainer: { height: 44, minHeight: 44, paddingLeft: 0, paddingRight: 0 },
+  selectorOnlyButton: { flex: 1, width: '100%', maxWidth: '100%', minHeight: 44, paddingHorizontal: 8, borderRadius: 10, gap: 4 },
+  selectorOnlyText: { flex: 1, maxWidth: '100%', fontFamily: 'Outfit_500Medium', fontSize: 12 },
   headerWrapper: {
     position: 'absolute',
     top: 0,
@@ -249,30 +264,30 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   selectorPressed: {
-    backgroundColor: Colors.primaryLight,
-    borderColor: Colors.borderBrand,
+    backgroundColor: 'rgba(0,0,0,0.04)',
+    borderColor: Colors.brandSlate,
     opacity: 0.9,
   },
   selectorActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(0,0,0,0.12)',
     ...Shadow.xs,
   },
   selectorActivePressed: {
-    backgroundColor: Colors.primaryDark,
-    borderColor: Colors.primaryDark,
+    backgroundColor: 'rgba(0,0,0,0.04)',
+    borderColor: Colors.brandSlate,
     opacity: 0.9,
   },
   selectorPinBox: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: 'rgba(0,0,0,0.04)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   selectorPinBoxActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: 'rgba(0,0,0,0.04)',
   },
   selectorText: {
     flexShrink: 1,
@@ -283,7 +298,7 @@ const styles = StyleSheet.create({
     maxWidth: 140,
   },
   selectorTextActive: {
-    color: '#FFFFFF',
+    color: Colors.brandSlate,
   },
   selectorTextTablet: {
     fontSize: 14,

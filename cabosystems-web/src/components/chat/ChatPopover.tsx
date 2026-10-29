@@ -1,3 +1,4 @@
+import { layoutViewport } from '../../lib/layoutViewport';
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -12,11 +13,11 @@ export function ChatPopover({ anchor, onClose, children, width = 360, label }: {
     if (!popup) return;
     const previous = document.activeElement as HTMLElement | null;
     const place = () => {
-      const rect = anchor.getBoundingClientRect();
-      const height = popup.getBoundingClientRect().height;
-      const availableWidth = Math.min(width, window.innerWidth - 24);
-      const left = Math.max(12, Math.min(rect.right - availableWidth, window.innerWidth - availableWidth - 12));
-      const top = rect.top >= height + 20 ? rect.top - height - 8 : Math.min(rect.bottom + 8, window.innerHeight - height - 12);
+      const layout = layoutViewport(); const rect = layout.rect(anchor);
+      const height = layout.rect(popup).height;
+      const availableWidth = Math.min(width, layout.width - 24);
+      const left = Math.max(12, Math.min(rect.right - availableWidth, layout.width - availableWidth - 12));
+      const top = rect.top >= height + 20 ? rect.top - height - 8 : Math.min(rect.bottom + 8, layout.height - height - 12);
       setPosition({ left, top: Math.max(12, top), ready: true });
     };
     place();
@@ -51,5 +52,5 @@ export function ChatPopover({ anchor, onClose, children, width = 360, label }: {
     };
   }, [anchor, onClose, width]);
   return createPortal(<div ref={ref} role="dialog" aria-label={label} className="chat-popover"
-    style={{ left: position.left, top: position.top, width: `min(${width}px, calc(100vw - 24px))`, visibility: position.ready ? 'visible' : 'hidden' }}>{children}</div>, document.body);
+    style={{ left: position.left, top: position.top, width: `min(${width}px, calc(var(--app-viewport-width) - 24px))`, visibility: position.ready ? 'visible' : 'hidden' }}>{children}</div>, document.body);
 }

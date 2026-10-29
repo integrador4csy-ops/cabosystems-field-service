@@ -6,8 +6,8 @@ import { validCompanyEvent } from './companyAgenda';
 async function googleRequest<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke('google-calendar-events', { body });
   if (error) {
-    let message = '';
-    try { const result = await error.context?.json(); if (typeof result?.error === 'string') message = result.error; } catch { /* use the form fallback */ }
+    let message = 'No se pudo consultar Google Calendar. Comprueba tu conexión e intenta de nuevo.';
+    try { const response = error.context?.clone?.() || error.context; const result = await response?.json(); if (typeof result?.error === 'string' && result.error.trim()) message = result.error; } catch { /* Keep the actionable fallback if the response is not JSON. */ }
     throw new Error(message);
   }
   if (data?.error) throw new Error(String(data.error));

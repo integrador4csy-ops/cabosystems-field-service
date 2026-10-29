@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
+import { ProfileNavButton } from '@/components/ProfileNavButton';
 import {
   View,
   Text,
@@ -11,6 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { afterTabPaint } from '@/lib/tabPreparation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import {
@@ -27,7 +29,7 @@ import {
 } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { useAuth } from '@/lib/auth';
-import { getMyChatGroups } from '@/lib/chatApi';
+import { getMyChatGroups, getCachedMyChatGroups } from '@/lib/chatApi';
 import type { ChatGroup } from '@/types/database';
 
 const LOGO_DARK = require('@/assets/images/Logo-CaboSystems-Field-Service-Dark.png');
@@ -68,17 +70,162 @@ function formatChatTime(dateString: string): string {
 
 type ChatFilter = 'todos' | 'recientes' | 'evidencias';
 
+const LastMessagePreview = React.memo(function LastMessagePreview({ group }: { group: ChatGroup }) {
+  const lastMsg = group.ultimo_mensaje;
+  if (!lastMsg) {
+    return (
+      <Text style={styles.emptyMsgText} numberOfLines={1}>
+        Sin mensajes aún · Toca para abrir
+      </Text>
+    );
+  }
+
+  const sender = lastMsg.profiles?.nombre?.split(' ')[0] || 'Técnico';
+
+  if (lastMsg.tipo === 'imagen') {
+    return (
+      <View style={styles.mediaPreviewRow}>
+        <Camera size={13} color={Colors.primary} strokeWidth={2.2} />
+        <Text style={styles.mediaPreviewText} numberOfLines={1}>
+          {sender}: Foto de evidencia
+        </Text>
+      </View>
+    );
+  }
+
+  if (lastMsg.tipo === 'video') {
+    return (
+      <View style={styles.mediaPreviewRow}>
+        <Video size={13} color={Colors.primary} strokeWidth={2.2} />
+        <Text style={styles.mediaPreviewText} numberOfLines={1}>
+          {sender}: Video técnico
+        </Text>
+      </View>
+    );
+  }
+
+  if (lastMsg.tipo === 'sticker') {
+    return (
+      <View style={styles.mediaPreviewRow}>
+        <Sparkles size={13} color={Colors.primary} strokeWidth={2.2} />
+        <Text style={styles.mediaPreviewText} numberOfLines={1}>
+          {sender}: Sticker
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <Text style={styles.lastMsgText} numberOfLines={1}>
+      <Text style={styles.lastMsgSender}>{sender}: </Text>
+      {lastMsg.contenido}
+    </Text>
+  );
+});
+
+const ChatGroupItem = React.memo(function ChatGroupItem({
+  item,
+  onPress,
+}: {
+  item: ChatGroup;
+  onPress: (id: string) => void;
+}) {
+  const lastMsgTime = item.ultimo_mensaje
+    ? formatChatTime(item.ultimo_mensaje.created_at)
+    : '';
+
+  const isAdminOfGroup = item.mi_rol === 'admin';
+  const initials = getInitials(item.nombre);
+
+  const handlePress = useCallback(() => {
+    onPress(item.id);
+  }, [item.id, onPress]);
+
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.groupCard, pressed && styles.groupCardPressed]}
+      onPress={handlePress}
+    >
+      {/* Avatar */}
+      <View style={styles.avatarWrapper}>
+        {item.foto_url ? (
+          <Image
+            source={{ uri: item.foto_url }}
+            style={styles.avatarImage}
+            contentFit="cover"
+            transition={200}
+            cachePolicy="memory-disk"
+            recyclingKey={item.id}
+          />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <Text style={styles.avatarInitials}>{initials}</Text>
+          </View>
+        )}
+
+        {isAdminOfGroup && (
+          <View style={styles.adminMiniBadge}>
+            <Shield size={9} color="#FFFFFF" strokeWidth={2.4} />
+          </View>
+        )}
+      </View>
+
+      {/* Detalles del Grupo */}
+      <View style={styles.groupInfo}>
+        <View style={styles.groupHeaderRow}>
+          <Text style={styles.groupName} numberOfLines={1}>
+            {item.nombre}
+          </Text>
+          {!!lastMsgTime && <Text style={styles.timeText}>{lastMsgTime}</Text>}
+        </View>
+
+        {/* Badges de Atributos */}
+        <View style={styles.badgesRow}>
+          {item.solo_multimedia ? (
+            <View style={styles.multimediaBadge}>
+              <Camera size={10.5} color={Colors.primary} strokeWidth={2.2} />
+              <Text style={styles.multimediaBadgeText}>Evidencias</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.membersCountBadge}>
+            <Users size={10.5} color={Colors.textSecondary} strokeWidth={2} />
+            <Text style={styles.membersCountText}>{item.miembros_count || 1} miembros</Text>
+          </View>
+
+          {isAdminOfGroup && (
+            <View style={styles.roleTag}>
+              <Text style={styles.roleTagText}>Admin</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Vista previa último mensaje */}
+        <View style={styles.lastMessageContainer}>
+          <LastMessagePreview group={item} />
+        </View>
+      </View>
+
+      {/* Indicador flecha derecha */}
+      <View style={styles.arrowContainer}>
+        <ChevronRight size={17} color={Colors.textDisabled} strokeWidth={2.2} />
+      </View>
+    </Pressable>
+  );
+});
+
 export default function ChatTabScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const { profile } = useAuth();
-
-  const [groups, setGroups] = useState<ChatGroup[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cached = profile?.id ? getCachedMyChatGroups(profile.id) : null;
+  const [groups, setGroups] = useState<ChatGroup[]>(() => cached ?? []);
+  const [loading, setLoading] = useState(() => !cached);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<ChatFilter>('todos');
+  const lastFetchRef = useRef(cached ? Date.now() : 0);
 
   const isGlobalAdmin =
     profile?.rol === 'admin' ||
@@ -90,6 +237,7 @@ export default function ChatTabScreen() {
     try {
       const data = await getMyChatGroups(profile.id);
       setGroups(data);
+      lastFetchRef.current = Date.now();
     } catch (err) {
       console.error('Error loading chat groups:', err);
     } finally {
@@ -100,7 +248,16 @@ export default function ChatTabScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadGroups();
+      // Idle preparation may finish after this eagerly mounted tab's first render.
+      const prepared = profile?.id ? getCachedMyChatGroups(profile.id, 20_000) : null;
+      if (prepared) {
+        setGroups(prepared);
+        setLoading(false);
+        return;
+      }
+      if (Date.now() - lastFetchRef.current > 20000) {
+        return afterTabPaint(() => { void loadGroups(); });
+      }
     }, [profile?.id])
   );
 
@@ -111,13 +268,18 @@ export default function ChatTabScreen() {
 
   // Conteo para las cápsulas de filtro
   const stats = useMemo(() => {
-    const recientes = groups.filter((g) => !!g.ultimo_mensaje).length;
-    const evidencias = groups.filter(
-      (g) =>
+    let recientes = 0;
+    let evidencias = 0;
+    for (const g of groups) {
+      if (g.ultimo_mensaje) recientes++;
+      if (
         g.solo_multimedia ||
         g.ultimo_mensaje?.tipo === 'imagen' ||
         g.ultimo_mensaje?.tipo === 'video'
-    ).length;
+      ) {
+        evidencias++;
+      }
+    }
     return {
       todos: groups.length,
       recientes,
@@ -156,137 +318,16 @@ export default function ChatTabScreen() {
     });
   }, [groups, searchQuery, filter]);
 
-  const renderLastMessagePreview = (group: ChatGroup) => {
-    const lastMsg = group.ultimo_mensaje;
-    if (!lastMsg) {
-      return (
-        <Text style={styles.emptyMsgText} numberOfLines={1}>
-          Sin mensajes aún · Toca para abrir
-        </Text>
-      );
-    }
+  const handleOpenGroup = useCallback((groupId: string) => {
+    router.push(`/chat/${groupId}` as any);
+  }, [router]);
 
-    const sender = lastMsg.profiles?.nombre?.split(' ')[0] || 'Técnico';
-
-    if (lastMsg.tipo === 'imagen') {
-      return (
-        <View style={styles.mediaPreviewRow}>
-          <Camera size={13} color={Colors.primary} strokeWidth={2.2} />
-          <Text style={styles.mediaPreviewText} numberOfLines={1}>
-            {sender}: Foto de evidencia
-          </Text>
-        </View>
-      );
-    }
-
-    if (lastMsg.tipo === 'video') {
-      return (
-        <View style={styles.mediaPreviewRow}>
-          <Video size={13} color={Colors.primary} strokeWidth={2.2} />
-          <Text style={styles.mediaPreviewText} numberOfLines={1}>
-            {sender}: Video técnico
-          </Text>
-        </View>
-      );
-    }
-
-    if (lastMsg.tipo === 'sticker') {
-      return (
-        <View style={styles.mediaPreviewRow}>
-          <Sparkles size={13} color={Colors.primary} strokeWidth={2.2} />
-          <Text style={styles.mediaPreviewText} numberOfLines={1}>
-            {sender}: Sticker
-          </Text>
-        </View>
-      );
-    }
-
-    return (
-      <Text style={styles.lastMsgText} numberOfLines={1}>
-        <Text style={styles.lastMsgSender}>{sender}: </Text>
-        {lastMsg.contenido}
-      </Text>
-    );
-  };
-
-  const renderGroupItem = ({ item }: { item: ChatGroup }) => {
-    const lastMsgTime = item.ultimo_mensaje
-      ? formatChatTime(item.ultimo_mensaje.created_at)
-      : '';
-
-    const isAdminOfGroup = item.mi_rol === 'admin';
-    const initials = getInitials(item.nombre);
-
-    return (
-      <Pressable
-        style={({ pressed }) => [styles.groupCard, pressed && styles.groupCardPressed]}
-        onPress={() => router.push(`/chat/${item.id}` as any)}
-      >
-        {/* Avatar */}
-        <View style={styles.avatarWrapper}>
-          {item.foto_url ? (
-            <Image
-              source={{ uri: item.foto_url }}
-              style={styles.avatarImage}
-              contentFit="cover"
-              transition={200}
-            />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarInitials}>{initials}</Text>
-            </View>
-          )}
-
-          {isAdminOfGroup && (
-            <View style={styles.adminMiniBadge}>
-              <Shield size={9} color="#FFFFFF" strokeWidth={2.4} />
-            </View>
-          )}
-        </View>
-
-        {/* Detalles del Grupo */}
-        <View style={styles.groupInfo}>
-          <View style={styles.groupHeaderRow}>
-            <Text style={styles.groupName} numberOfLines={1}>
-              {item.nombre}
-            </Text>
-            {!!lastMsgTime && <Text style={styles.timeText}>{lastMsgTime}</Text>}
-          </View>
-
-          {/* Badges de Atributos */}
-          <View style={styles.badgesRow}>
-            {item.solo_multimedia ? (
-              <View style={styles.multimediaBadge}>
-                <Camera size={10.5} color={Colors.primary} strokeWidth={2.2} />
-                <Text style={styles.multimediaBadgeText}>Evidencias</Text>
-              </View>
-            ) : null}
-
-            <View style={styles.membersCountBadge}>
-              <Users size={10.5} color={Colors.textSecondary} strokeWidth={2} />
-              <Text style={styles.membersCountText}>{item.miembros_count || 1} miembros</Text>
-            </View>
-
-            {isAdminOfGroup && (
-              <View style={styles.roleTag}>
-                <Text style={styles.roleTagText}>Admin</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Vista previa último mensaje */}
-          <View style={styles.lastMessageContainer}>
-            {renderLastMessagePreview(item)}
-          </View>
-        </View>
-
-        {/* Indicador flecha derecha */}
-        <View style={styles.arrowContainer}>
-          <ChevronRight size={17} color={Colors.textDisabled} strokeWidth={2.2} />
-        </View>
-      </Pressable>
-    );
-  };
+  const renderGroupItem = useCallback(
+    ({ item }: { item: ChatGroup }) => (
+      <ChatGroupItem item={item} onPress={handleOpenGroup} />
+    ),
+    [handleOpenGroup]
+  );
 
   const renderListHeader = () => (
     <View style={styles.listHeaderContainer}>
@@ -378,44 +419,54 @@ export default function ChatTabScreen() {
     </View>
   );
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <View style={styles.emptyIconBox}>
-        <MessageSquare size={30} color={Colors.primary} strokeWidth={2.2} />
+  const renderEmptyState = () => {
+    if (loading && groups.length === 0) {
+      return (
+        <View style={styles.centerLoading}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Cargando canales del equipo...</Text>
+        </View>
+      );
+    }
+    return (
+      <View style={styles.emptyContainer}>
+        <View style={styles.emptyIconBox}>
+          <MessageSquare size={30} color={Colors.primary} strokeWidth={2.2} />
+        </View>
+        <Text style={styles.emptyTitle}>
+          {searchQuery ? 'Sin canales encontrados' : 'Sin grupos activos'}
+        </Text>
+        <Text style={styles.emptySubtitle}>
+          {searchQuery
+            ? `No hay canales que coincidan con "${searchQuery}". Intenta con otro término.`
+            : filter !== 'todos'
+            ? 'No hay conversaciones activas en esta sección. Cambia de filtro para ver otros grupos.'
+            : isGlobalAdmin
+            ? 'Crea un nuevo canal de cuadrilla para coordinar las labores y enviar reportes técnicos.'
+            : 'Tu supervisor te asignará a los canales correspondientes a tus proyectos.'}
+        </Text>
+        {searchQuery || filter !== 'todos' ? (
+          <Pressable
+            style={({ pressed }) => [styles.resetFilterBtn, pressed && { opacity: 0.85 }]}
+            onPress={() => {
+              setSearchQuery('');
+              setFilter('todos');
+            }}
+          >
+            <Text style={styles.resetFilterBtnText}>Ver todos los canales</Text>
+          </Pressable>
+        ) : isGlobalAdmin ? (
+          <Pressable
+            style={({ pressed }) => [styles.emptyActionBtn, pressed && { opacity: 0.85 }]}
+            onPress={() => router.push('/chat/new-group' as any)}
+          >
+            <Plus size={15} color="#FFFFFF" strokeWidth={2.6} />
+            <Text style={styles.emptyActionText}>Crear Primer Canal</Text>
+          </Pressable>
+        ) : null}
       </View>
-      <Text style={styles.emptyTitle}>
-        {searchQuery ? 'Sin canales encontrados' : 'Sin grupos activos'}
-      </Text>
-      <Text style={styles.emptySubtitle}>
-        {searchQuery
-          ? `No hay canales que coincidan con "${searchQuery}". Intenta con otro término.`
-          : filter !== 'todos'
-          ? 'No hay conversaciones activas en esta sección. Cambia de filtro para ver otros grupos.'
-          : isGlobalAdmin
-          ? 'Crea un nuevo canal de cuadrilla para coordinar las labores y enviar reportes técnicos.'
-          : 'Tu supervisor te asignará a los canales correspondientes a tus proyectos.'}
-      </Text>
-      {searchQuery || filter !== 'todos' ? (
-        <Pressable
-          style={({ pressed }) => [styles.resetFilterBtn, pressed && { opacity: 0.85 }]}
-          onPress={() => {
-            setSearchQuery('');
-            setFilter('todos');
-          }}
-        >
-          <Text style={styles.resetFilterBtnText}>Ver todos los canales</Text>
-        </Pressable>
-      ) : isGlobalAdmin ? (
-        <Pressable
-          style={({ pressed }) => [styles.emptyActionBtn, pressed && { opacity: 0.85 }]}
-          onPress={() => router.push('/chat/new-group' as any)}
-        >
-          <Plus size={15} color="#FFFFFF" strokeWidth={2.6} />
-          <Text style={styles.emptyActionText}>Crear Primer Canal</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -442,41 +493,30 @@ export default function ChatTabScreen() {
                 <Plus size={15} color="#FFFFFF" strokeWidth={2.8} />
                 <Text style={styles.newGroupBtnText}>Nuevo Chat</Text>
               </Pressable>
-            ) : (
-              <View style={styles.channelBadge}>
-                <MessageSquare size={13} color={Colors.primary} strokeWidth={2.4} />
-                <Text style={styles.channelBadgeText}>Canales CSY</Text>
-              </View>
-            )}
+            ) : null}
+            <ProfileNavButton />
           </View>
         </SafeAreaView>
       </View>
 
       {/* Lista de Grupos */}
-      {loading ? (
-        <View style={styles.centerLoading}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Cargando canales del equipo...</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredGroups}
-          keyExtractor={(item) => item.id}
-          renderItem={renderGroupItem}
-          ListHeaderComponent={renderListHeader}
-          ListEmptyComponent={renderEmptyState}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={[Colors.primary]}
-              tintColor={Colors.primary}
-            />
-          }
-        />
-      )}
+      <FlatList
+        data={filteredGroups}
+        keyExtractor={(item) => item.id}
+        renderItem={renderGroupItem}
+        ListHeaderComponent={renderListHeader}
+        ListEmptyComponent={renderEmptyState}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
+        }
+      />
     </View>
   );
 }
@@ -538,22 +578,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_600SemiBold',
     fontSize: 12.5,
     color: '#FFFFFF',
-  },
-  channelBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: 11,
-    paddingVertical: 6.5,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    borderColor: Colors.borderBrand,
-    gap: 5,
-  },
-  channelBadgeText: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 12,
-    color: Colors.primaryDark,
   },
   listContent: {
     paddingHorizontal: Spacing.md,

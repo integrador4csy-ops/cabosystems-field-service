@@ -1,3 +1,4 @@
+import { layoutViewport } from '../../lib/layoutViewport';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowRight, CalendarDays, UserRound, X } from 'lucide-react';
@@ -28,17 +29,17 @@ export function CalendarTaskPreview({ task, projectLabel, onViewDetails }: { tas
   useLayoutEffect(() => {
     if (!open) return;
     const position = () => {
-      const anchor = triggerRef.current?.getBoundingClientRect();
+      const layout = layoutViewport(); const anchor = triggerRef.current ? layout.rect(triggerRef.current) : undefined;
       const panel = panelRef.current;
       if (!anchor || !panel) return;
-      const width = Math.min(340, window.innerWidth - 24);
+      const width = Math.min(340, layout.width - 24);
       panel.style.width = `${width}px`;
-      const height = panel.getBoundingClientRect().height;
-      const beside = window.innerWidth - anchor.right >= width + 20;
+      const height = layout.rect(panel).height;
+      const beside = layout.width - anchor.right >= width + 20;
       const left = beside ? anchor.right + 8 : anchor.left >= width + 20 ? anchor.left - width - 8 : anchor.left;
-      const top = beside || anchor.left >= width + 20 ? anchor.top : anchor.bottom + 8 + height <= window.innerHeight - 12 ? anchor.bottom + 8 : anchor.top - height - 8;
-      panel.style.left = `${Math.max(12, Math.min(left, window.innerWidth - width - 12))}px`;
-      panel.style.top = `${Math.max(12, Math.min(top, window.innerHeight - height - 12))}px`;
+      const top = beside || anchor.left >= width + 20 ? anchor.top : anchor.bottom + 8 + height <= layout.height - 12 ? anchor.bottom + 8 : anchor.top - height - 8;
+      panel.style.left = `${Math.max(12, Math.min(left, layout.width - width - 12))}px`;
+      panel.style.top = `${Math.max(12, Math.min(top, layout.height - height - 12))}px`;
       panel.style.visibility = 'visible';
     };
     const outside = (event: PointerEvent) => {
@@ -49,8 +50,8 @@ export function CalendarTaskPreview({ task, projectLabel, onViewDetails }: { tas
     };
     const scroll = (event: Event) => {
       if (event.target instanceof Node && panelRef.current?.contains(event.target)) return;
-      const anchor = triggerRef.current?.getBoundingClientRect();
-      const viewport = triggerRef.current?.closest('.agenda-month-scroll')?.getBoundingClientRect();
+      const layout = layoutViewport(); const anchor = triggerRef.current ? layout.rect(triggerRef.current) : undefined;
+      const scrollViewport = triggerRef.current?.closest('.agenda-month-scroll'); const viewport = scrollViewport ? layout.rect(scrollViewport) : undefined;
       if (anchor && viewport && (anchor.bottom <= viewport.top || anchor.top >= viewport.bottom || anchor.right <= viewport.left || anchor.left >= viewport.right)) setOpen(false);
       else position();
     };

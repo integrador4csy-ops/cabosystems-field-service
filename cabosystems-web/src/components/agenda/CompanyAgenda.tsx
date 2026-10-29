@@ -11,6 +11,8 @@ import { supabase } from '../../lib/supabase';
 import type { AgendaGoogleCalendar, CompanyEvent } from '../../types/agenda';
 import { AppSelect } from '../ui/AppSelect';
 import { EventDialog } from './EventDialog';
+import { AgendaSearchClient } from '../../lib/agendaSearchClient';
+import { AgendaSearchResults } from './AgendaSearchResults';
 import { AgendaMiniCalendar } from './AgendaMiniCalendar';
 import { GoogleCalendarDialog } from './GoogleCalendarDialog';
 import { calendarAppearance, eventSchedule } from '../../lib/agendaPresentation';
@@ -18,6 +20,8 @@ import { readSessionPreference } from '../../lib/sessionPreferences';
 import { useSectionResources, canSpeculate, type SectionResources } from '../../context/SectionResources';
 import '../projects/TaskWorkspace.css';
 import './CompanyAgenda.css';
+import { useCalendarColors } from '../../lib/useCalendarColors';
+import { PersonalCalendarColors } from './PersonalCalendarColors';
 
 export async function prefetchAgenda(resources: SectionResources) {
   const anchor = readSessionPreference('csy_company_agenda_date', dateKey(new Date()), (value): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && dateKey(parseDateKey(value)) === value);
@@ -28,9 +32,26 @@ export async function prefetchAgenda(resources: SectionResources) {
 export function CompanyAgenda() {
   const { t, locale } = useTranslation();
   const { user, adminProfile } = useAdminAuth();
-  const { agendaSearchQuery, agendaCreateVersion } = useSidebar();
+  const { activeItem, agendaSearchQuery, setAgendaSearchQuery, agendaCreateVersion } = useSidebar();
+  const personalColors = useCalendarColors(user?.id || '');
+  useEffect(() => {
+    if (activeItem !== 'agenda') return;
+    const reload = () => { if (document.visibilityState === 'visible') void personalColors.reload(); };
+    reload(); window.addEventListener('focus', reload);
+    return () => window.removeEventListener('focus', reload);
+  }, [activeItem, personalColors.reload]);
   const canManage = Boolean(user && adminProfile?.activo && ['admin', 'supervisor_instalacion'].includes(adminProfile.rol || ''));
   const canConnectGoogle = Boolean(user && adminProfile?.activo && adminProfile.rol === 'admin');
+  const [searchRevision, setSearchRevision] = useState(0);
+  const searching = Boolean(agendaSearchQuery.trim());
+  const searchClient = useMemo(() => new AgendaSearchClient(), [user?.id]);
+  useEffect(() => {
+    if (!user?.id || activeItem !== 'agenda') return;
+    const prepare = () => { if (document.visibilityState === 'visible') void searchClient.prepare().catch(() => {}); };
+    prepare(); const timer = setInterval(prepare, 25_000);
+    document.addEventListener('visibilitychange', prepare);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', prepare); searchClient.clear(); };
+  }, [searchClient, user?.id, activeItem, searchRevision]);
   const [googleOpen, setGoogleOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [anchor, setAnchor] = useSessionPreference('csy_company_agenda_date', dateKey(new Date()), (value): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && dateKey(parseDateKey(value)) === value);
@@ -61,9 +82,17 @@ export function CompanyAgenda() {
     cache.setVisibleRange(monthFrom, monthTo);
     try {
       const fresh = cache.read(monthFrom, monthTo)?.fresh;
-      const [data, available] = await Promise.all([cache.load(monthFrom, monthTo), fresh && calendarsReady.current ? Promise.resolve(null) : resources.queries.load('google-calendars', getGoogleCalendars, invalidate)]);
+      const [, available] = await Promise.all([
+        cache.load(monthFrom, monthTo).then(data => {
+          // Events can render as soon as they arrive; calendar metadata may be slower.
+          if (request === version.current) {
+            setSnapshot({ from: monthFrom, to: monthTo, events: data });
+            setError('');
+          }
+        }),
+        fresh && calendarsReady.current ? Promise.resolve(null) : resources.queries.load('google-calendars', getGoogleCalendars, invalidate),
+      ]);
       if (request !== version.current) return;
-      setSnapshot({ from: monthFrom, to: monthTo, events: data });
       if (available) { setCalendars(available); calendarsReady.current = true; }
       setError('');
       prefetchTimer.current = setTimeout(() => {
@@ -113,7 +142,7 @@ export function CompanyAgenda() {
   const move = (direction: number) => setAnchor(view === 'month' ? shiftMonth(anchor, direction) : shiftDate(anchor, direction * (view === 'week' ? 7 : 1)));
   const today = dateKey(new Date());
   const heading = view === 'day' ? parseDateKey(anchor).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' }) : view === 'week' ? `${parseDateKey(from).toLocaleDateString(locale, { day: 'numeric', month: 'short' })} – ${parseDateKey(to).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}` : parseDateKey(anchor).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
-  const renderEvent = (event: CompanyEvent) => <button type="button" key={event.id} className={`company-event ${event.google ? 'has-calendar-color' : ''}`} style={calendarAppearance(event)} onClick={() => setDialog({ event, day: event.occurrence_date || event.fecha })}>
+  const renderEvent = (event: CompanyEvent) => <button type="button" key={event.id} className={`company-event ${event.google || personalColors.colors['local'] ? 'has-calendar-color' : ''}`} style={calendarAppearance(event, personalColors.colors[event.google?.calendarId || 'local'])} onClick={() => setDialog({ event, day: event.occurrence_date || event.fecha })}>
     {event.repeticion !== 'ninguna' || event.google?.recurring ? <Repeat2 size={14} role="img" aria-label={t('Se repite')} /> : <CalendarDays size={14} aria-hidden="true" />}
     <span><span className="company-event-title">{event.google?.availabilityOnly ? (locale.startsWith('en') ? 'Busy' : 'Ocupado') : event.titulo}</span><span className="company-event-meta">{eventSchedule(event, locale)}</span>{view !== 'month' && event.ubicacion && <span className="company-event-meta">{event.ubicacion}</span>}</span>
   </button>;
@@ -123,26 +152,26 @@ export function CompanyAgenda() {
     <div className="company-agenda-body">
     <aside id="company-agenda-sidebar" className={`company-agenda-sidebar ${sidebarOpen ? 'is-open' : ''}`} aria-label={locale.startsWith('en') ? 'Calendar navigation' : 'Navegación de calendario'}>
       <AgendaMiniCalendar selected={anchor} locale={locale} onSelect={day => { setAnchor(day); setSidebarOpen(false); }} />
-    <fieldset className="company-calendar-filters"><legend>{locale.startsWith('en') ? 'My calendars' : 'Mis calendarios'}</legend>{calendarFilters.map(calendar => <label key={calendar.id}><input type="checkbox" checked={!hiddenCalendars.includes(calendar.id)} onChange={() => toggleCalendar(calendar.id)} style={{ accentColor: calendar.backgroundColor && /^#[a-f0-9]{6}$/i.test(calendar.backgroundColor) ? calendar.backgroundColor : '#343e48' }} /><span>{calendar.name}</span></label>)}</fieldset>
+    <PersonalCalendarColors key={user?.id || ''} calendars={calendarFilters} hidden={hiddenCalendars} onToggle={toggleCalendar} colors={personalColors.colors} loading={personalColors.loading} failed={personalColors.failed} onRetry={personalColors.reload} onSave={personalColors.save} locale={locale} />
     </aside>
     <div className="company-agenda-main">
-    <div className="agenda-toolbar">
+    {!searching && <div className="agenda-toolbar">
       <div className="agenda-period-heading"><button className="workspace-button" onClick={() => setAnchor(today)}>{t('Hoy')}</button><div className="agenda-period-arrows"><button className="workspace-icon agenda-period-arrow" aria-label={t('Periodo anterior')} onClick={() => move(-1)}><ChevronLeft size={20} /></button><button className="workspace-icon agenda-period-arrow" aria-label={t('Periodo siguiente')} onClick={() => move(1)}><ChevronRight size={20} /></button></div><h2 className="agenda-month-title" aria-live="polite">{heading}</h2></div>
-      <div className="agenda-date-controls">{canConnectGoogle && <button type="button" className="workspace-button" onClick={() => setGoogleOpen(true)}>Google Calendar</button>}<AppSelect aria-label={t('Vista de agenda')} value={view} onChange={(e) => setView(e.target.value as CompanyAgendaView)}><option value="month">{t('Mes')}</option><option value="week">{t('Semana')}</option><option value="day">{t('Día')}</option></AppSelect><input type="date" min="1900-01-01" max="9999-12-31" aria-label={t('Ir a fecha')} value={anchor} onChange={(e) => { if (e.target.validity.valid && e.target.value) setAnchor(e.target.value); }} /></div>
-    </div>
+      <div className="agenda-date-controls">{canConnectGoogle && <button type="button" className="workspace-button" onClick={() => setGoogleOpen(true)}>{locale.startsWith('en') ? 'Sync calendar' : 'Sincronizar calendario'}<img className="google-calendar-sync-icon" src="/google-calendar.png" alt="" width={24} height={24} /></button>}<AppSelect aria-label={t('Vista de agenda')} value={view} onChange={(e) => setView(e.target.value as CompanyAgendaView)}><option value="month">{t('Mes')}</option><option value="week">{t('Semana')}</option><option value="day">{t('Día')}</option></AppSelect><input type="date" min="1900-01-01" max="9999-12-31" aria-label={t('Ir a fecha')} value={anchor} onChange={(e) => { if (e.target.validity.valid && e.target.value) setAnchor(e.target.value); }} /></div>
+    </div>}
 
-    {error ? <div role="alert" className="workspace-empty"><p>{t(error)}</p>{canConnectGoogle && error.includes('Vuelve a autorizar') && <button type="button" className="workspace-primary" onClick={() => setGoogleOpen(true)}>Google Calendar</button>}<button className="workspace-button" onClick={() => void load(true)}>{t('Reintentar')}</button></div> : null}
-    {loading && <p className="company-sync-status" role="status" aria-live="polite">{locale.startsWith('en') ? 'Loading events…' : 'Cargando eventos…'}</p>}
-    <div className="company-calendar-scroll" tabIndex={0} role="region" aria-label={t('Calendario de eventos')}>
+    {!searching && error ? <div role="alert" className="workspace-empty"><p>{t(error)}</p>{canConnectGoogle && error.includes('Vuelve a autorizar') && <button type="button" className="workspace-primary" onClick={() => setGoogleOpen(true)}>{locale.startsWith('en') ? 'Sync calendar' : 'Sincronizar calendario'}<img className="google-calendar-sync-icon" src="/google-calendar.png" alt="" width={24} height={24} /></button>}<button className="workspace-button" onClick={() => void load(true)}>{t('Reintentar')}</button></div> : null}
+    {!searching && loading && <p className="company-sync-status" role="status" aria-live="polite">{locale.startsWith('en') ? 'Loading events…' : 'Cargando eventos…'}</p>}
+    {searching ? <AgendaSearchResults colors={personalColors.colors} client={searchClient} key={user?.id || ''} query={agendaSearchQuery.trim()} today={today} locale={locale} hiddenCalendars={hiddenCalendars} revision={searchRevision} onOpen={event => setDialog({ event, day: event.occurrence_date || event.fecha })} onClear={() => setAgendaSearchQuery('')} onDate={day => { setAgendaSearchQuery(''); setAnchor(day); setView('day'); }} /> : <div className="company-calendar-scroll" tabIndex={0} role="region" aria-label={t('Calendario de eventos')}>
       {!loading && !error && byDay.size === 0 && <p className="company-empty" role="status">{t('No hay eventos en este periodo.')}</p>}
       {view === 'month' ? <table className="company-calendar"><thead><tr>{days.slice(0, 7).map((day) => <th key={day} scope="col">{parseDateKey(day).toLocaleDateString(locale, { weekday: 'short' })}</th>)}</tr></thead><tbody>{Array.from({ length: days.length / 7 }, (_, index) => <tr key={index}>{days.slice(index * 7, index * 7 + 7).map((day) => {
         const items = byDay.get(day) || [];
         return <td key={day} className={`${day.slice(0, 7) !== anchor.slice(0, 7) ? 'is-outside-month' : ''} ${day === today ? 'is-today' : ''}`}><div className="company-day-heading"><button type="button" className="agenda-month-date" aria-label={parseDateKey(day).toLocaleDateString(locale, { dateStyle: 'full' })} aria-current={day === today ? 'date' : undefined} onClick={() => { setAnchor(day); setView('day'); }}>{parseDateKey(day).getDate()}</button>{canManage && <button type="button" className="workspace-icon company-add" aria-label={t('Crear evento para el {date}', { date: parseDateKey(day).toLocaleDateString(locale) })} onClick={() => setDialog({ event: null, day })}><Plus size={14} /></button>}</div>{items.slice(0, 3).map(renderEvent)}{items.length > 3 && <button className="company-more" onClick={() => { setAnchor(day); setView('day'); }}>{t('Ver {count} más', { count: items.length - 3 })}</button>}</td>;
       })}</tr>)}</tbody></table> : <div className={`company-columns ${view === 'day' ? 'is-day' : ''}`}>{days.map((day) => <section key={day} className={day === today ? 'is-today' : ''}><header className="company-day-heading"><h3>{parseDateKey(day).toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' })}</h3>{canManage && <button className="workspace-icon company-add" aria-label={t('Crear evento para el {date}', { date: parseDateKey(day).toLocaleDateString(locale) })} onClick={() => setDialog({ event: null, day })}><Plus size={16} /></button>}</header>{(byDay.get(day) || []).map(renderEvent)}{!loading && !error && !byDay.has(day) && <p className="company-empty">{t('Sin eventos')}</p>}</section>)}</div>}
+    </div>}
     </div>
     </div>
-    </div>
-    {dialog && <EventDialog key={dialog.event?.id || dialog.day} {...dialog} canManage={canManage} onClose={() => setDialog(null)} onSaved={() => { setDialog(null); void load(true); }} />}
-    {googleOpen && canConnectGoogle && <GoogleCalendarDialog key={user!.id} onClose={() => { setGoogleOpen(false); void load(true); }} />}
+    {dialog && <EventDialog key={dialog.event?.id || dialog.day} {...dialog} canManage={canManage} onClose={() => setDialog(null)} onSaved={() => { setDialog(null); setSearchRevision(value => value + 1); void load(true); }} />}
+    {googleOpen && canConnectGoogle && <GoogleCalendarDialog key={user!.id} onClose={() => { setGoogleOpen(false); setSearchRevision(value => value + 1); void load(true); }} />}
   </section>;
 }

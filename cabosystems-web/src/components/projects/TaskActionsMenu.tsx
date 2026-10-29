@@ -1,3 +1,4 @@
+import { layoutViewport } from '../../lib/layoutViewport';
 import { useTranslation } from '../../context/LanguageContext';
 import { useLayoutEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -29,10 +30,10 @@ export function TaskActionsMenu({ title, deleting, onEdit, onDelete }: TaskActio
       const trigger = triggerRef.current;
       const menu = menuRef.current;
       if (!trigger || !menu) return;
-      const anchor = trigger.getBoundingClientRect();
-      const { width, height } = menu.getBoundingClientRect();
-      const left = Math.max(8, Math.min(anchor.right - width, window.innerWidth - width - 8));
-      const top = Math.max(8, Math.min(anchor.bottom + 6, window.innerHeight - height - 8));
+      const layout = layoutViewport(); const anchor = layout.rect(trigger);
+      const { width, height } = layout.rect(menu);
+      const left = Math.max(8, Math.min(anchor.right - width, layout.width - width - 8));
+      const top = Math.max(8, Math.min(anchor.bottom + 6, layout.height - height - 8));
       menu.style.left = `${left}px`;
       menu.style.top = `${top}px`;
       menu.style.visibility = 'visible';

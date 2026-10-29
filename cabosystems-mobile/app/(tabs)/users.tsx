@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { ProfileNavButton } from '@/components/ProfileNavButton';
 import {
   View,
   Text,
@@ -13,8 +14,9 @@ import {
   RefreshControl,
   useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
 import {
   UserPlus,
@@ -69,13 +71,41 @@ const AVAILABLE_ROLES = [
 ];
 
 type TabType = 'colaboradores' | 'invitaciones';
+type TeamRow = { kind: 'collaborator'; item: Profile } | { kind: 'invitation'; item: Invitacion };
+let cachedUsersData: { owner: string; users: Profile[]; invitaciones: Invitacion[]; timestamp: number } | null = null;
+
+export async function preloadUsersData(owner: string) {
+  if (cachedUsersData?.owner === owner && Date.now() - cachedUsersData.timestamp < 30000) return;
+  try {
+    const [usersRes, invitesRes] = await Promise.all([
+      supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+      supabase
+        .from('invitaciones')
+        .select('*')
+        .eq('estado', 'pendiente')
+        .order('created_at', { ascending: false }),
+    ]);
+    cachedUsersData = {
+      owner,
+      users: (usersRes.data as Profile[]) || [],
+      invitaciones: (invitesRes.data as Invitacion[]) || [],
+      timestamp: Date.now(),
+    };
+  } catch (e) {
+    console.warn('Error preloading users data:', e);
+  }
+}
 
 export default function UsersScreen() {
+  const { profile } = useAuth();
+  const prepared = cachedUsersData?.owner === profile?.id ? cachedUsersData : null;
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
-  const [users, setUsers] = useState<Profile[]>([]);
-  const [invitaciones, setInvitaciones] = useState<Invitacion[]>([]);
-  const [loadingData, setLoadingData] = useState(false);
+  const [users, setUsers] = useState<Profile[]>(() => prepared?.users ?? []);
+  const [invitaciones, setInvitaciones] = useState<Invitacion[]>(() => prepared?.invitaciones ?? []);
+  const [loadingData, setLoadingData] = useState(() => !prepared);
+  const lastFetchRef = useRef(prepared?.timestamp ?? 0);
 
   // Navegación por Cápsulas
   const [selectedTab, setSelectedTab] = useState<TabType>('colaboradores');
@@ -119,7 +149,6 @@ export default function UsersScreen() {
   });
   const [confirmLoading, setConfirmLoading] = useState(false);
 
-  const { profile } = useAuth();
 
   const isAdmin =
     profile?.rol === 'admin' ||
@@ -127,8 +156,11 @@ export default function UsersScreen() {
     profile?.rol === 'aux_operaciones';
 
   // 1. Cargar usuarios e invitaciones
-  const fetchData = useCallback(async () => {
-    setLoadingData(true);
+  const fetchData = useCallback(async (isSilent = false) => {
+    if (!profile?.id || !isAdmin) return;
+    if (!isSilent && users.length === 0 && invitaciones.length === 0) {
+      setLoadingData(true);
+    }
     try {
       const [usersRes, invitesRes] = await Promise.all([
         supabase.from('profiles').select('*').order('created_at', { ascending: false }),
@@ -139,21 +171,31 @@ export default function UsersScreen() {
           .order('created_at', { ascending: false }),
       ]);
 
-      if (usersRes.data) setUsers(usersRes.data as Profile[]);
-      if (invitesRes.data) setInvitaciones(invitesRes.data as Invitacion[]);
+      const nextUsers = (usersRes.data as Profile[]) || [];
+      const nextInvites = (invitesRes.data as Invitacion[]) || [];
+      cachedUsersData = { owner: profile.id, users: nextUsers, invitaciones: nextInvites, timestamp: Date.now() };
+      setUsers(nextUsers);
+      setInvitaciones(nextInvites);
+      lastFetchRef.current = Date.now();
     } catch (e) {
       console.error('Error fetching admin data:', e);
     } finally {
       setLoadingData(false);
     }
-  }, []);
+  }, [users.length, invitaciones.length, profile?.id, isAdmin]);
 
   useEffect(() => {
-    fetchData();
+    const isStale = cachedUsersData?.owner !== profile?.id || Date.now() - lastFetchRef.current > 30000;
+    if (isStale) {
+      fetchData(Boolean(cachedUsersData));
+    }
   }, [fetchData]);
 
   // Filtramos solo colaboradores activos
-  const activeCollaborators = users.filter((u) => u.activo !== false);
+  const activeCollaborators = useMemo(() => users.filter((u) => u.activo !== false), [users]);
+  const teamRows = useMemo<TeamRow[]>(() => selectedTab === 'colaboradores'
+    ? activeCollaborators.map(item => ({ kind: 'collaborator', item }))
+    : invitaciones.map(item => ({ kind: 'invitation', item })), [selectedTab, activeCollaborators, invitaciones]);
 
   // 2. Enviar invitación
   const handleSendInvite = async () => {
@@ -385,6 +427,121 @@ export default function UsersScreen() {
       .substring(0, 2)
       .toUpperCase() || 'CS';
 
+  const renderCollaborator = useCallback((item: Profile) => {
+    const initials =
+      item.nombre
+        .split(' ')
+        .filter(Boolean)
+        .map((n) => n[0])
+        .join('')
+        .substring(0, 2)
+        .toUpperCase() || 'CS';
+
+    const roleLabel =
+      AVAILABLE_ROLES.find((r) => r.id === item.rol)?.label ||
+      item.rol.replace('_', ' ').toUpperCase();
+
+    return (
+      <Pressable
+        style={({ pressed }) => [
+          styles.userCard,
+          pressed && { opacity: 0.85 },
+        ]}
+        onPress={() => openEditModal(item)}
+      >
+        {/* Avatar con foto o iniciales */}
+        <View style={styles.avatarWrapper}>
+          {item.avatar_url ? (
+            <Image source={{ uri: item.avatar_url }} style={styles.avatarImg} contentFit="cover" recyclingKey={item.id} cachePolicy="memory-disk" />
+          ) : (
+            <View style={styles.avatarFallback}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Información */}
+        <View style={styles.userInfo}>
+          <Text style={styles.userName} numberOfLines={1}>
+            {item.nombre}
+          </Text>
+          <Text style={styles.userRole}>{roleLabel}</Text>
+        </View>
+
+        {/* Acciones */}
+        <View style={styles.cardActions}>
+          <Pressable
+            style={styles.actionBtnEdit}
+            onPress={() => openEditModal(item)}
+            hitSlop={8}
+          >
+            <Edit2 size={16} color={Colors.text} />
+          </Pressable>
+
+          <Pressable
+            style={styles.actionBtnExpel}
+            onPress={() => handleExpelUser(item)}
+            hitSlop={8}
+          >
+            <UserX size={16} color={Colors.error} />
+          </Pressable>
+        </View>
+      </Pressable>
+    );
+  }, []);
+
+  const renderInvitation = useCallback((inv: Invitacion) => (
+    <View style={styles.inviteCardTailAdmin}>
+      <View style={styles.inviteIconCircle}>
+        <Mail size={18} color={Colors.primary} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.inviteEmail} numberOfLines={1}>
+          {inv.email}
+        </Text>
+        <Text style={styles.inviteMeta}>
+          Rol:{' '}
+          <Text style={{ fontFamily: 'Outfit_600SemiBold', color: Colors.primary }}>
+            {AVAILABLE_ROLES.find((r) => r.id === inv.rol)?.label || inv.rol.replace('_', ' ')}
+          </Text>
+        </Text>
+      </View>
+      <View style={styles.inviteActions}>
+        <Pressable
+          style={styles.iconBtn}
+          onPress={() => {
+            const link = `cabosystemsmobile://register?token=${inv.token}&email=${encodeURIComponent(inv.email)}`;
+            Share.share({
+              title: 'Enlace de Registro',
+              message: `Completa tu registro en CaboSystems Field Service: ${link}`,
+            });
+          }}
+          hitSlop={8}
+        >
+          <Share2 size={16} color={Colors.primary} />
+        </Pressable>
+        <Pressable
+          style={[styles.iconBtn, styles.iconBtnDanger]}
+          onPress={() => handleRevokeInvite(inv)}
+          hitSlop={8}
+        >
+          <Trash2 size={16} color={Colors.error} />
+        </Pressable>
+      </View>
+    </View>
+  ), []);
+
+  const renderTeamRow = useCallback(
+    ({ item: row }: { item: TeamRow }) =>
+      row.kind === 'collaborator' ? renderCollaborator(row.item) : renderInvitation(row.item),
+    [renderCollaborator, renderInvitation]
+  );
+
+  const listContentStyle = useMemo(
+    () => [styles.scrollContent, { paddingTop: Spacing.md, paddingBottom: insets.bottom + 110 }],
+    [insets.bottom]
+  );
+
   return (
     <View style={styles.container}>
       {/* Top Navbar Minimalista con Logo Oficial CSY pegado a la izquierda */}
@@ -411,27 +568,21 @@ export default function UsersScreen() {
                 <Text style={styles.inviteNavBtnText}>Invitar</Text>
               </Pressable>
             )}
+            <ProfileNavButton />
           </View>
         </SafeAreaView>
       </View>
 
-      <ScrollView
+      <FlashList<TeamRow>
         style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: Spacing.md, paddingBottom: 90 },
-        ]}
-        refreshControl={
-          <RefreshControl
-            refreshing={loadingData}
-            onRefresh={fetchData}
-            colors={[Colors.primary]}
-            tintColor={Colors.primary}
-          />
-        }
+        contentContainerStyle={listContentStyle}
+        data={teamRows}
+        keyExtractor={row => row.kind + '-' + row.item.id}
+        getItemType={row => row.kind}
+        renderItem={renderTeamRow}
+        refreshControl={<RefreshControl refreshing={loadingData} onRefresh={fetchData} colors={[Colors.primary]} tintColor={Colors.primary} />}
         showsVerticalScrollIndicator={false}
-      >
-        {/* Encabezado Principal */}
+        ListHeaderComponent={<View>        {/* Encabezado Principal */}
         <View style={styles.headerArea}>
           <Text style={styles.pageTitle}>Gestión de Personal</Text>
           <Text style={styles.pageSubtitle}>
@@ -494,10 +645,13 @@ export default function UsersScreen() {
           </Pressable>
         </View>
 
-        {/* CONTENIDO DE CÁPSULA 1: COLABORADORES */}
-        {selectedTab === 'colaboradores' && (
-          <View>
-            {activeCollaborators.length === 0 ? (
+</View>}
+        ListEmptyComponent={
+          loadingData && teamRows.length === 0 ? (
+            <View style={{ paddingVertical: 48, alignItems: 'center', justifyContent: 'center' }}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+          ) : selectedTab === 'colaboradores' ? (
               <View style={styles.emptyContainer}>
                 <View style={styles.emptyIconCircle}>
                   <Users size={32} color={Colors.primary} strokeWidth={1.8} />
@@ -514,78 +668,7 @@ export default function UsersScreen() {
                   <Text style={styles.emptyActionBtnText}>Invitar Primer Colaborador</Text>
                 </Pressable>
               </View>
-            ) : (
-              activeCollaborators.map((item) => {
-                const initials =
-                  item.nombre
-                    .split(' ')
-                    .filter(Boolean)
-                    .map((n) => n[0])
-                    .join('')
-                    .substring(0, 2)
-                    .toUpperCase() || 'CS';
-
-                const roleLabel =
-                  AVAILABLE_ROLES.find((r) => r.id === item.rol)?.label ||
-                  item.rol.replace('_', ' ').toUpperCase();
-
-                return (
-                  <Pressable
-                    key={item.id}
-                    style={({ pressed }) => [
-                      styles.userCard,
-                      pressed && { opacity: 0.85 },
-                    ]}
-                    onPress={() => openEditModal(item)}
-                  >
-                    {/* Avatar con foto o iniciales */}
-                    <View style={styles.avatarWrapper}>
-                      {item.avatar_url ? (
-                        <Image source={{ uri: item.avatar_url }} style={styles.avatarImg} contentFit="cover" />
-                      ) : (
-                        <View style={styles.avatarFallback}>
-                          <Text style={styles.avatarText}>{initials}</Text>
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Información */}
-                    <View style={styles.userInfo}>
-                      <Text style={styles.userName} numberOfLines={1}>
-                        {item.nombre}
-                      </Text>
-                      <Text style={styles.userRole}>{roleLabel}</Text>
-                    </View>
-
-                    {/* Acciones */}
-                    <View style={styles.cardActions}>
-                      <Pressable
-                        style={styles.actionBtnEdit}
-                        onPress={() => openEditModal(item)}
-                        hitSlop={8}
-                      >
-                        <Edit2 size={16} color={Colors.text} />
-                      </Pressable>
-
-                      <Pressable
-                        style={styles.actionBtnExpel}
-                        onPress={() => handleExpelUser(item)}
-                        hitSlop={8}
-                      >
-                        <UserX size={16} color={Colors.error} />
-                      </Pressable>
-                    </View>
-                  </Pressable>
-                );
-              })
-            )}
-          </View>
-        )}
-
-        {/* CONTENIDO DE CÁPSULA 2: INVITACIONES PENDIENTES */}
-        {selectedTab === 'invitaciones' && (
-          <View>
-            {invitaciones.length === 0 ? (
+) : (
               <View style={styles.emptyContainer}>
                 <View style={styles.emptyIconCircle}>
                   <Clock size={32} color={Colors.primary} strokeWidth={1.8} />
@@ -602,52 +685,8 @@ export default function UsersScreen() {
                   <Text style={styles.emptyActionBtnText}>Crear Nueva Invitación</Text>
                 </Pressable>
               </View>
-            ) : (
-              invitaciones.map((inv) => (
-                <View key={inv.id} style={styles.inviteCardTailAdmin}>
-                  <View style={styles.inviteIconCircle}>
-                    <Mail size={18} color={Colors.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.inviteEmail} numberOfLines={1}>
-                      {inv.email}
-                    </Text>
-                    <Text style={styles.inviteMeta}>
-                      Rol:{' '}
-                      <Text style={{ fontFamily: 'Outfit_600SemiBold', color: Colors.primary }}>
-                        {AVAILABLE_ROLES.find((r) => r.id === inv.rol)?.label || inv.rol.replace('_', ' ')}
-                      </Text>
-                    </Text>
-                  </View>
-                  <View style={styles.inviteActions}>
-                    <Pressable
-                      style={styles.iconBtn}
-                      onPress={() => {
-                        const link = `cabosystemsmobile://register?token=${inv.token}&email=${encodeURIComponent(inv.email)}`;
-                        Share.share({
-                          title: 'Enlace de Registro',
-                          message: `Completa tu registro en CaboSystems Field Service: ${link}`,
-                        });
-                      }}
-                      hitSlop={8}
-                    >
-                      <Share2 size={16} color={Colors.primary} />
-                    </Pressable>
-                    <Pressable
-                      style={[styles.iconBtn, styles.iconBtnDanger]}
-                      onPress={() => handleRevokeInvite(inv)}
-                      hitSlop={8}
-                    >
-                      <Trash2 size={16} color={Colors.error} />
-                    </Pressable>
-                  </View>
-                </View>
-              ))
-            )}
-          </View>
-        )}
-
-      </ScrollView>
+)}
+      />
 
       {/* Modal: Invitar Nuevo Colaborador */}
       <Modal
@@ -936,7 +975,7 @@ export default function UsersScreen() {
         visible={confirmModal.visible}
         transparent
         animationType="fade"
-        onRequestClose={() => !confirmLoading && setConfirmModal((prev) => ({ ...prev, visible: false }))}
+        onRequestClose={() => { if (!confirmLoading) setConfirmModal((prev) => ({ ...prev, visible: false })); }}
       >
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmCard}>
@@ -1046,12 +1085,12 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: Spacing.md,
     maxWidth: 960,
     width: '100%',
     alignSelf: 'center',
+  },
+  scrollContent: {
+    paddingHorizontal: Spacing.md,
   },
   noAccess: {
     flex: 1,

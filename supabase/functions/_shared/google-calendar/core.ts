@@ -1,4 +1,5 @@
 import { challenge, digest, randomToken, seal, unseal } from './crypto.ts';
+import type { GoogleSearchIndex } from './search-index.ts';
 
 export const SCOPES = ['https://www.googleapis.com/auth/calendar.calendarlist.readonly', 'https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.events.freebusy'];
 export interface Calendar { id: string; name: string; timeZone: string; accessRole: string; primary: boolean; backgroundColor?: string }
@@ -6,6 +7,7 @@ export interface Actor { id: string; rol: string; activo: boolean }
 export interface Connection {
   revision: string; refresh_token_ciphertext: string | null; connected_by: string | null;
   account_label: string | null; selected_calendars: Calendar[]; connected_at: string | null;
+  calendar_aliases?: Record<string, string>;
 }
 export interface OAuthState { admin_id: string; base_revision: string; verifier_ciphertext: string }
 export interface Store {
@@ -16,7 +18,7 @@ export interface Store {
   consumeState(hash: string, now: string): Promise<OAuthState | null>;
   commitConnection(revision: string, patch: Partial<Connection>): Promise<boolean>;
 }
-interface Options { store: Store; clientId: string; clientSecret: string; redirectUri: string; fetcher?: typeof fetch; now?: () => number }
+interface Options { store: Store; clientId: string; clientSecret: string; redirectUri: string; fetcher?: typeof fetch; now?: () => number; searchIndex?: GoogleSearchIndex }
 export class CalendarError extends Error {
   status: number;
   constructor(message: string, status = 400) { super(message); this.status = status; }
@@ -25,6 +27,13 @@ export const isAdmin = (actor: Actor | null) => actor?.activo === true && actor.
 export const isWritable = (calendar: Calendar) => ['owner', 'writer'].includes(calendar.accessRole);
 export const isReadable = (calendar: Calendar) => ['owner', 'writer', 'reader', 'writerWithoutPrivateAccess', 'freeBusyReader'].includes(calendar.accessRole);
 const canManageEvents = (actor: Actor | null) => actor?.activo === true && ['admin', 'supervisor_instalacion'].includes(actor.rol);
+export function calendarDisplayName(id: string, title: unknown, aliases: Record<string, string> = {}): string {
+  const name = typeof title === 'string' ? title.trim() : '';
+  const candidate = Object.prototype.hasOwnProperty.call(aliases, id) ? aliases[id] : undefined;
+  const alias = typeof candidate === 'string' ? candidate.trim().slice(0, 120) : '';
+  // Google's primary calendar can expose an email even when its UI shows a person's name.
+  return alias && (!name || name === id || /^[^\s@]+@[^\s@]+$/.test(name)) ? alias : name || id;
+}
 export function createCalendarService(options: Options) {
   const { store, clientId, clientSecret, redirectUri } = options;
   const fetcher = options.fetcher || fetch;
@@ -42,7 +51,7 @@ export function createCalendarService(options: Options) {
     }
     return await response.json();
   }
-  async function calendars(accessToken: string): Promise<Calendar[]> {
+  async function calendars(accessToken: string, aliases: Record<string, string> = {}): Promise<Calendar[]> {
     const result: Calendar[] = [];
     let pageToken = '';
     const seen = new Set<string>();
@@ -54,7 +63,7 @@ export function createCalendarService(options: Options) {
       for (const entry of data.items) {
         if (!entry || typeof entry !== 'object' || typeof entry.id !== 'string' || entry.deleted) continue;
         if (result.some((item) => item.id === entry.id)) continue;
-        result.push({ id: entry.id, name: String(entry.summaryOverride || entry.summary || entry.id), timeZone: String(entry.timeZone || ''), accessRole: String(entry.accessRole || ''), primary: entry.primary === true, ...(typeof entry.backgroundColor === 'string' && /^#[a-f0-9]{6}$/i.test(entry.backgroundColor) ? { backgroundColor: entry.backgroundColor } : {}) });
+        result.push({ id: entry.id, name: calendarDisplayName(entry.id, entry.summaryOverride || entry.summary, aliases), timeZone: String(entry.timeZone || ''), accessRole: String(entry.accessRole || ''), primary: entry.primary === true, ...(typeof entry.backgroundColor === 'string' && /^#[a-f0-9]{6}$/i.test(entry.backgroundColor) ? { backgroundColor: entry.backgroundColor } : {}) });
       }
       pageToken = typeof data.nextPageToken === 'string' ? data.nextPageToken : '';
       if (pageToken && (seen.has(pageToken) || seen.size >= 40)) throw new CalendarError('La lista de calendarios es demasiado grande o inválida.', 502);
@@ -73,7 +82,15 @@ export function createCalendarService(options: Options) {
     return data.access_token;
   }
   return {
-    eventCalendars: calendars,
+    searchIndex: options.searchIndex,
+    async indexedEventSession(actor: Actor) {
+      const current = await store.actorById(actor.id);
+      if (!current?.activo) throw new CalendarError('Tu perfil no tiene acceso a la agenda.', 403);
+      return store.connection();
+    },
+    async eventCalendars(token: string) {
+      return calendars(token, (await store.connection()).calendar_aliases || {});
+    },
     async requireUser(request: Request): Promise<Actor> {
       const match = request.headers.get('Authorization')?.match(/^Bearer (.+)$/i);
       if (!match) throw new CalendarError('Inicia sesión para continuar.', 401);
@@ -102,7 +119,7 @@ export function createCalendarService(options: Options) {
     },
     async status() {
       const connection = await store.connection();
-      return { configured, connected: Boolean(connection.refresh_token_ciphertext), revision: connection.revision, account: connection.account_label, selectedCalendars: connection.selected_calendars, connectedAt: connection.connected_at, syncEnabled: true };
+      return { configured, connected: Boolean(connection.refresh_token_ciphertext), revision: connection.revision, account: connection.account_label, selectedCalendars: connection.selected_calendars.map(calendar => ({ ...calendar, name: calendarDisplayName(calendar.id, calendar.name, connection.calendar_aliases) })), connectedAt: connection.connected_at, syncEnabled: true };
     },
     async start(actor: Actor, replace: boolean) {
       ensureConfig();
@@ -142,13 +159,13 @@ export function createCalendarService(options: Options) {
     },
     async listCalendars() {
       const connection = await store.connection();
-      return { revision: connection.revision, calendars: await calendars(await accessToken(connection)) };
+      return { revision: connection.revision, calendars: await calendars(await accessToken(connection), connection.calendar_aliases) };
     },
     async selectCalendars(revision: unknown, ids: unknown, actorId: string) {
       if (typeof revision !== 'string' || !Array.isArray(ids) || ids.length > 100 || ids.some((id) => typeof id !== 'string' || !id || id.length > 1024) || new Set(ids).size !== ids.length) throw new CalendarError('La selección de calendarios no es válida.');
       const connection = await store.connection();
       if (connection.revision !== revision) throw new CalendarError('La conexión cambió. Actualiza antes de guardar.', 409);
-      const list = await calendars(await accessToken(connection));
+      const list = await calendars(await accessToken(connection), connection.calendar_aliases);
       const selected = ids.map((id) => list.find((calendar) => calendar.id === id));
       if (selected.some((calendar) => !calendar || !isReadable(calendar))) throw new CalendarError('Selecciona únicamente calendarios con permiso para consultar eventos.');
       if (!isAdmin(await store.actorById(actorId))) throw new CalendarError('Permiso de administrador revocado.', 403);

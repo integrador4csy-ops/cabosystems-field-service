@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
@@ -26,7 +26,7 @@ import {
 } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { Badge, Card, Button } from '@/components/ui';
-import { getTaskById, updateTaskStatus, toggleSubtarea, type TaskDetail } from '@/lib/api';
+import { getTaskById, getTaskPermissions, updateTaskStatus, toggleSubtarea, type TaskDetail } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { canUpdateTaskProgress } from '@/lib/taskAccess';
 import type { Subtarea } from '@/types/database';
@@ -95,55 +95,70 @@ export default function TaskDetailScreen() {
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const request = useRef(0);
+  const savingLock = useRef(false);
   const canProgress = canUpdateTaskProgress(task, profile);
 
   const load = useCallback(async () => {
     if (!id) return;
-    setLoading(true);
+    const sequence = ++request.current;
+    setTask(current => {
+      if (current?.id !== id) {
+        setLoading(true);
+        return null;
+      }
+      return current;
+    });
     try {
-      const data = await getTaskById(id);
-      setTask(data);
+      const [data, permissions] = await Promise.all([getTaskById(id), getTaskPermissions(id)]);
+      if (sequence === request.current) setTask({ ...data, permissions });
     } catch (e) {
-      console.error('Task load error:', e);
-      Alert.alert('Error', 'No se pudo cargar la tarea');
+      if (sequence === request.current) {
+        console.error('Task load error:', e);
+        Alert.alert('Error', 'No se pudo cargar la tarea');
+      }
     } finally {
-      setLoading(false);
+      if (sequence === request.current) setLoading(false);
     }
   }, [id]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useFocusEffect(useCallback(() => {
+    void load();
+    return () => { request.current++; };
+  }, [load]));
 
   const handleStatusChange = async () => {
-    if (!task || !canProgress) return;
+    if (!task || !canProgress || savingLock.current) return;
     const next = NEXT_STATUS[task.estatus];
     if (!next) return;
-    setSaving(true);
+    savingLock.current = true; setSaving(true);
     try {
       await updateTaskStatus(task.id, next.estatus);
-      setTask({ ...task, estatus: next.estatus });
+      setTask(current => current?.id === task.id ? { ...current, estatus: next.estatus } : current);
     } catch (e) {
       console.error('Status update error:', e);
       Alert.alert('Error', 'No se pudo actualizar el estatus');
     } finally {
-      setSaving(false);
+      savingLock.current = false; setSaving(false);
     }
   };
 
   const handleToggleSubtarea = async (sub: Subtarea) => {
-    if (!task || !canProgress) return;
+    if (!task || !canProgress || savingLock.current) return;
+    savingLock.current = true; setSaving(true);
     try {
       await toggleSubtarea(sub.id, !sub.completada);
-      setTask({
-        ...task,
-        subtareas: task.subtareas.map((s) =>
+      setTask(current => current?.id === task.id ? {
+        ...current,
+        subtareas: current.subtareas.map((s) =>
           s.id === sub.id ? { ...s, completada: !s.completada } : s
         ),
-      });
+      } : current);
     } catch (e) {
       console.error('Subtarea toggle error:', e);
       Alert.alert('Error', 'No se pudo actualizar la subtarea');
+    } finally {
+      savingLock.current = false; setSaving(false);
     }
   };
 
@@ -192,9 +207,6 @@ export default function TaskDetailScreen() {
             </Text>
           </View>
 
-          <Badge color={meta.badgeColor} variant="light" size="sm">
-            {meta.label}
-          </Badge>
         </View>
       </View>
 
@@ -203,16 +215,6 @@ export default function TaskDetailScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Ubicación / Villa Bar */}
-        <View style={styles.locationBar}>
-          <View style={styles.locationIconBox}>
-            <MapPin size={16} color={Colors.primary} />
-          </View>
-          <Text style={styles.address} numberOfLines={1}>
-            {villa} · {development}
-          </Text>
-        </View>
-
         {/* Tarjeta de Título Principal */}
         <View style={styles.titleCard}>
           <Text style={styles.category}>{development.toUpperCase()}</Text>
@@ -304,9 +306,9 @@ export default function TaskDetailScreen() {
                     pressed && { opacity: 0.75 },
                   ]}
                   onPress={() => handleToggleSubtarea(sub)}
-                  disabled={!canProgress}
+                  disabled={!canProgress || saving}
                   accessibilityRole="checkbox"
-                  accessibilityState={{ checked: sub.completada, disabled: !canProgress }}
+                  accessibilityState={{ checked: sub.completada, disabled: !canProgress || saving }}
                 >
                   {sub.completada ? (
                     <CheckSquare size={18} color={Colors.success} />
@@ -415,32 +417,6 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
     gap: Spacing.md,
-  },
-  locationBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.card,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    gap: Spacing.sm,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Shadow.xs,
-  },
-  locationIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  address: {
-    flex: 1,
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 13,
-    color: Colors.text,
   },
   titleCard: {
     backgroundColor: Colors.card,

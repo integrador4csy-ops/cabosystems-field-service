@@ -1,20 +1,21 @@
 import { Fragment, useState } from 'react';
-import { FLUENT_EMOJI_FILES } from '../../lib/fluentEmojiAssets';
-import { emojiToCode, splitEmojiText } from '../../lib/emoji';
+import { splitEmojiText } from '../../lib/emoji';
+import { getFluentEmojiSource, isEmojiPrepared } from '../../lib/emojiPreload';
 import './FluentEmoji.css';
 
-export function getFluentEmojiSource(emoji: string): string | null {
-  const code = FLUENT_EMOJI_FILES.get(emojiToCode(emoji));
-  return code ? `${import.meta.env.BASE_URL}emoji/fluent-3d/${code}.webp` : null;
-}
+export { getFluentEmojiSource } from '../../lib/emojiPreload';
 
-export function FluentEmoji({ emoji, size = 20 }: { emoji: string; size?: number }) {
+export function FluentEmoji({ emoji, size = 20, nativeFallback = true }: { emoji: string; size?: number; nativeFallback?: boolean }) {
   const source = getFluentEmojiSource(emoji);
   const [failedSource, setFailedSource] = useState<string | null>(null);
+  const [loadedSource, setLoadedSource] = useState<string | null>(null);
   if (!source || source === failedSource) {
+    if (!nativeFallback) return <span className="fluent-emoji fluent-emoji-placeholder" style={{ width: size, height: size }} aria-label={emoji} />;
     return <span className="fluent-emoji fluent-emoji-fallback" style={{ fontSize: size }}>{emoji}</span>;
   }
   return (
+    <span className="fluent-emoji fluent-emoji-frame" style={{ width: size, height: size, fontSize: size }}>
+    {loadedSource !== source && !isEmojiPrepared(source) && <span aria-hidden="true" className="fluent-emoji-placeholder" style={{ width: size, height: size }} />}
     <img
       src={source}
       alt={emoji}
@@ -22,10 +23,13 @@ export function FluentEmoji({ emoji, size = 20 }: { emoji: string; size?: number
       height={size}
       className="fluent-emoji"
       draggable={false}
-      loading="lazy"
+      loading="eager"
       decoding="async"
+      style={{ opacity: loadedSource === source || isEmojiPrepared(source) ? 1 : 0 }}
+      onLoad={() => setLoadedSource(source)}
       onError={() => setFailedSource(source)}
     />
+    </span>
   );
 }
 

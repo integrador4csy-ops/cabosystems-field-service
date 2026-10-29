@@ -9,7 +9,7 @@ export interface EventInput {
 }
 export interface GoogleEvent {
   id: string; etag: string; status?: string; summary?: string; description?: string; location?: string;
-  created?: string; updated?: string; eventType?: string; locked?: boolean; recurringEventId?: string;
+  created?: string; updated?: string; eventType?: string; locked?: boolean; recurringEventId?: string; recurrence?: string[];
   start?: { date?: string; dateTime?: string; timeZone?: string };
   end?: { date?: string; dateTime?: string; timeZone?: string };
   extendedProperties?: { private?: Record<string, string>; shared?: Record<string, string> };

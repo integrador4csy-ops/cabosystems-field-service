@@ -38,7 +38,7 @@ export const AuthSplitScreen: React.FC = () => {
     <div className="relative min-h-dvh w-full bg-white font-outfit text-gray-800 antialiased flex">
       <div className="flex w-full lg:w-1/2 flex-col px-6 py-8 sm:px-12 sm:py-10 lg:px-14">
         <div className="flex w-full shrink-0 justify-center">
-          <img src="/logo-cabosystems-light.svg" alt="CaboSystems Field Service" width={510} height={170} className="h-auto w-64 max-w-full object-contain sm:w-80" />
+          <img src="/logo-cabosystems-light.svg" alt="CaboSystems Field Service" width={510} height={170} className="h-auto w-55 max-w-full object-contain sm:w-70" />
         </div>
        
 

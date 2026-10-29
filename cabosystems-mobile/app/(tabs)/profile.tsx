@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,12 +14,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   Switch,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Image } from 'expo-image';
 import {
   User,
+  ArrowLeft,
   Mail,
   Briefcase,
   MapPin,
@@ -84,6 +86,14 @@ export default function ProfileScreen() {
   const { profile, user, session, signOut, refreshProfile } = useAuth();
   const { language, setLanguage, t } = useLanguage();
   const router = useRouter();
+  const goHome = useCallback(() => router.replace('/(tabs)'), [router]);
+  useFocusEffect(useCallback(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      goHome();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [goHome]));
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { width } = useWindowDimensions();
@@ -334,6 +344,9 @@ export default function ProfileScreen() {
       <View style={styles.headerWrapper}>
         <SafeAreaView edges={['top']} style={styles.safeArea}>
           <View style={[styles.navContainer, isTablet && styles.navContainerTablet]}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('profile.backHome')} onPress={goHome} style={styles.backButton}>
+              <ArrowLeft size={22} color={Colors.brandSlate} />
+            </Pressable>
             <View style={styles.logoGroup}>
               <Image
                 source={LOGO_DARK}
@@ -346,7 +359,7 @@ export default function ProfileScreen() {
 
             <View style={[styles.profilePill, isTablet && styles.profilePillTablet]}>
               <User color="#FFFFFF" size={14} strokeWidth={2.5} />
-              <Text style={styles.profilePillText}>{t('profile.title')}</Text>
+              <Text style={styles.profilePillText} numberOfLines={1}>{t('profile.title')}</Text>
             </View>
           </View>
         </SafeAreaView>
@@ -356,7 +369,7 @@ export default function ProfileScreen() {
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: headerHeight + Spacing.md, paddingBottom: insets.bottom + 80 },
+          { paddingTop: headerHeight + Spacing.md, paddingBottom: insets.bottom + 110 },
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -450,7 +463,7 @@ export default function ProfileScreen() {
                   styles.menuItem,
                   pressed && { opacity: 0.75, transform: [{ scale: Animation.pressScale }] },
                 ]}
-                onPress={() => router.push('/checkin/villa' as any)}
+                onPress={() => router.navigate('/(tabs)/fab')}
               >
                 <View style={styles.menuIconCircle}>
                   <MapPin size={18} color="#FFFFFF" strokeWidth={2.2} />
@@ -740,7 +753,7 @@ export default function ProfileScreen() {
         visible={passwordModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => !updatingPassword && setPasswordModalVisible(false)}
+        onRequestClose={() => { if (!updatingPassword) setPasswordModalVisible(false); }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -859,7 +872,7 @@ export default function ProfileScreen() {
         visible={bioPasswordModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => !bioLoading && setBioPasswordModalVisible(false)}
+        onRequestClose={() => { if (!bioLoading) setBioPasswordModalVisible(false); }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -986,6 +999,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  backButton: { width: 44, height: 44, flexShrink: 0, marginRight: 4, alignItems: 'center', justifyContent: 'center' },
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -1021,19 +1035,25 @@ const styles = StyleSheet.create({
     paddingRight: Spacing.xl,
   },
   logoGroup: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: Spacing.sm,
     justifyContent: 'center',
     alignItems: 'flex-start',
     transform: [{ translateY: -3 }],
   },
   logo: {
-    width: 220,
+    width: '100%',
+    maxWidth: 220,
     height: 54,
   },
   logoTablet: {
-    width: 250,
+    maxWidth: 250,
     height: 60,
   },
   profilePill: {
+    flexShrink: 0,
+    maxWidth: '38%',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -1050,6 +1070,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   profilePillText: {
+    flexShrink: 1,
     fontFamily: 'Outfit_700Bold',
     fontSize: 13,
     color: '#FFFFFF',

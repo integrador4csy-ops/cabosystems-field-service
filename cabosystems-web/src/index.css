@@ -56,6 +56,13 @@
 }
 
 @layer base {
+  :root {
+    --app-zoom: 1.1;
+    --app-viewport-height: calc(100dvh / var(--app-zoom));
+    --app-viewport-width: calc(100vw / var(--app-zoom));
+  }
+  html { zoom: var(--app-zoom); }
+
   *,
   ::after,
   ::before,
@@ -79,7 +86,7 @@
 
   #root {
     width: 100%;
-    height: 100dvh;
+    height: var(--app-viewport-height);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -90,6 +97,11 @@
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+}
+
+@layer utilities {
+  .h-dvh { height: var(--app-viewport-height); }
+  .min-h-dvh { min-height: var(--app-viewport-height); }
 }
 
 /* Custom Scrollbars */

@@ -125,15 +125,15 @@ test('accessible tasks fetch every page in a stable order and propagate server f
   assert.equal(empty.calls.length, 0, 'No task query while the account is unavailable');
 });
 
-test('viewing project tasks does not grant progress updates to a global auxiliary user', () => {
+test('client does not infer progress permissions from role, task assignment or visibility', () => {
   const { canUpdateTaskProgress } = load('lib/taskAccess.ts');
   const auxiliary = { id: 'auxiliary', rol: 'aux_integracion', activo: true };
   const admin = { id: 'admin', rol: 'admin', activo: true };
   assert.equal(canUpdateTaskProgress({ asignado_a: 'other' }, auxiliary), false);
   assert.equal(canUpdateTaskProgress({ asignado_a: null }, auxiliary), false);
-  assert.equal(canUpdateTaskProgress({ asignado_a: 'auxiliary' }, auxiliary), true);
-  assert.equal(canUpdateTaskProgress({ asignado_a: 'other' }, admin), true);
-  assert.equal(canUpdateTaskProgress({ asignado_a: null }, admin), true);
+  assert.equal(canUpdateTaskProgress({ asignado_a: 'auxiliary' }, auxiliary), false);
+  assert.equal(canUpdateTaskProgress({ asignado_a: 'other' }, admin), false);
+  assert.equal(canUpdateTaskProgress({ asignado_a: null }, admin), false);
   assert.equal(canUpdateTaskProgress({ asignado_a: 'auxiliary' }, { ...auxiliary, activo: false }), false);
   assert.equal(canUpdateTaskProgress({ asignado_a: 'other' }, { ...admin, activo: false }), false);
   assert.equal(canUpdateTaskProgress(null, admin), false);
@@ -152,4 +152,28 @@ test('task and checklist writes reject zero-row responses instead of reporting f
   await assert.rejects(api.updateTaskStatus('foreign-task', 'completada'), error => error === denied);
   await assert.rejects(api.toggleSubtarea('foreign-checklist', true), error => error === denied);
   assert.deepEqual(calls, ['id', 'id']);
+});
+
+
+test('villa membership permissions enable progress without granting content editing or crossing accounts', () => {
+ const {canUpdateTaskProgress}=load('lib/taskAccess.ts');
+ const member={id:'member',rol:'aux_integracion',activo:true};
+ const task={asignado_a:'other',permissions:{user_id:'member',can_progress:true,can_edit:false}};
+ assert.equal(canUpdateTaskProgress(task,member),true);
+ assert.equal(canUpdateTaskProgress({...task,asignado_a:null},member),true);
+ assert.equal(canUpdateTaskProgress(task,{...member,id:'other-account'}),false);
+ assert.equal(canUpdateTaskProgress(task,{...member,activo:false}),false);
+ assert.equal(canUpdateTaskProgress({...task,permissions:{...task.permissions,can_progress:false}},member),false);
+ const supervisor={id:'supervisor',rol:'supervisor_instalacion',activo:true};
+ assert.equal(canUpdateTaskProgress({...task,permissions:{user_id:'supervisor',can_progress:true,can_edit:true}},supervisor),true);
+});
+test('task permissions come from the authenticated server and fail closed on denied or missing responses', async()=>{
+ let response={data:{user_id:'member',can_progress:true,can_edit:false},error:null};
+ const calls=[];
+ const api=load('lib/api.ts',{'./supabase':{supabase:{rpc:async(...args)=>{calls.push(args);return response;}}}});
+ assert.equal((await api.getTaskPermissions('villa-task')).can_progress,true);
+ assert.deepEqual(plain(calls),[['get_task_permissions',{p_task_id:'villa-task'}]]);
+ response={data:null,error:new Error('permission denied')};await assert.rejects(api.getTaskPermissions('hidden-task'),/permission denied/);
+ response={data:null,error:null};await assert.rejects(api.getTaskPermissions('missing-task'),/permisos/);
+ response={data:{user_id:'member'},error:null};await assert.rejects(api.getTaskPermissions('malformed'),/permisos/);
 });

@@ -6,5 +6,9 @@
   user-select: none;
 }
 .fluent-emoji-fallback { line-height: 1; font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; }
+.fluent-emoji-frame { position: relative; line-height: 1; }
+.fluent-emoji-placeholder { display: inline-block; border-radius: 50%; background: #f1f5f9; }
+.fluent-emoji-frame > img { position: absolute; inset: 0; margin: 0; }
+.emoji-only-message .fluent-emoji-frame > img { margin: 0; }
 .emoji-only-message { background: transparent; border: 0; box-shadow: none; line-height: 1.2; white-space: pre-wrap; overflow-wrap: anywhere; }
 .emoji-only-message .fluent-emoji { margin: 2px; vertical-align: middle; }

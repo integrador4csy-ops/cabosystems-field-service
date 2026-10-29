@@ -10,7 +10,7 @@ async function loadModule(file) {
 }
 
 const { dateKey, parseDateKey, shiftDate, shiftMonth, weekDates, monthWorkWeeks, isOverdue } = await loadModule('taskDates');
-const { countTaskStatuses, filterWorkspaceTasks } = await loadModule('taskFilters');
+const { countTaskStatuses, filterWorkspaceTasks, sortWorkspaceTasks, taskSearchLocation, taskVillaScope } = await loadModule('taskFilters');
 
 test('calendar days stay unchanged across timezones and daylight saving transitions', () => {
   const original = process.env.TZ;
@@ -71,6 +71,14 @@ const tasks = [
 ];
 const filters = { query: '', development: 'all', project: 'all', assignee: 'all', status: 'all' };
 
+test('ascending and descending task order follow numeric stage titles without mutating the source', () => {
+  const numbered = [10, 2, 16, 1, 9].map(number => ({ id: String(number), titulo: `${number}. Etapa` }));
+  assert.deepEqual(sortWorkspaceTasks(numbered, 'asc', 'es-MX').map(task => task.id), ['1', '2', '9', '10', '16']);
+  assert.deepEqual(sortWorkspaceTasks(numbered, 'desc', 'en-US').map(task => task.id), ['16', '10', '9', '2', '1']);
+  assert.deepEqual(numbered.map(task => task.id), ['10', '2', '16', '1', '9']);
+  assert.deepEqual(sortWorkspaceTasks([{ titulo: 'Wifi' }, { titulo: 'Áudio' }, { titulo: 'Cableado' }], 'asc', 'es-MX').map(task => task.titulo), ['Áudio', 'Cableado', 'Wifi']);
+});
+
 test('agenda status counts exclude undated tasks and count them only in the unscheduled view', () => {
   const mixed = [...tasks, { ...tasks[1], id: '4' }];
   assert.deepEqual(countTaskStatuses(mixed, 'scheduled'), { all: 2, pendiente: 1, en_proceso: 0, completada: 1 });
@@ -97,6 +105,44 @@ test('search finds task content, villas, developments and assignees', () => {
   assert.deepEqual(ids({ query: ' CARLOS ' }), ['1']);
   assert.deepEqual(ids({ query: 'Villa 14' }), ['1', '2']);
   assert.deepEqual(ids({ query: 'pedregal' }), ['3']);
+});
+
+test('global task search crosses selected locations and restores them when cleared', () => {
+  const selected = { development: 'Querencia', project: 'a', searchAllProjects: true };
+  assert.deepEqual(ids({ ...selected, query: 'pedregal' }), ['3']);
+  assert.deepEqual(ids({ ...selected, query: 'Casa 2' }), ['3']);
+  assert.deepEqual(ids({ ...selected, query: 'cableado' }), ['3']);
+  assert.deepEqual(ids({ ...selected, query: '' }), ['1', '2']);
+  assert.deepEqual(ids({ ...selected, query: '   ' }), ['1', '2']);
+  assert.deepEqual(ids({ ...selected, query: 'pedregal', assignee: 'carlos' }), []);
+  assert.deepEqual(ids({ ...selected, query: 'pedregal', searchAllProjects: false }), []);
+});
+
+test('search navigation identifies developments, villas and ambiguous results without changing saved filters', () => {
+  assert.deepEqual(taskSearchLocation(projects, [tasks[2]], 'pedregal'), { development: 'Pedregal', projectId: 'all' });
+  assert.deepEqual(taskSearchLocation(projects, [tasks[2]], 'Casa 2'), { development: 'Pedregal', projectId: 'b' });
+  assert.deepEqual(taskSearchLocation(projects, [tasks[2]], 'cableado'), { development: 'Pedregal', projectId: 'b' });
+  assert.deepEqual(taskSearchLocation(projects, tasks, 'red'), { development: 'all', projectId: 'all' });
+  assert.deepEqual(taskSearchLocation(projects, [], 'Casa 2'), { development: 'Pedregal', projectId: 'b' });
+  assert.deepEqual(taskSearchLocation([...projects, { id: 'c', desarrollo: 'Chileno', villa: 'Casa 2' }], [tasks[2]], 'Casa 2'), { development: 'all', projectId: 'all' });
+  assert.deepEqual(taskSearchLocation(projects, [], 'sin coincidencias'), { development: 'all', projectId: 'all' });
+  assert.deepEqual(filters, { query: '', development: 'all', project: 'all', assignee: 'all', status: 'all' });
+});
+
+test('villa workspace never combines villas and keeps a valid scope through search and removal', () => {
+  assert.equal(taskVillaScope(projects, tasks, '', 'all').id, 'a');
+  assert.equal(taskVillaScope(projects, tasks, '', 'b').id, 'b');
+  assert.equal(taskVillaScope(projects, [tasks[2]], 'pedregal', 'a').id, 'b');
+  assert.equal(taskVillaScope(projects, [tasks[2]], 'cableado', 'a').id, 'b');
+  assert.equal(taskVillaScope(projects, [], 'Casa 2', 'a').id, 'b');
+  assert.equal(taskVillaScope(projects, [], 'sin resultados', 'a').id, 'a');
+  assert.equal(taskVillaScope(projects.slice(1), tasks, '', 'a').id, 'b');
+  assert.equal(taskVillaScope([], [], '', 'a'), undefined);
+  const multiple = [...projects, { id: 'c', desarrollo: 'Pedregal', villa: 'Casa 3' }];
+  const matches = [tasks[2], { ...tasks[2], id: '4', proyecto_id: 'c' }];
+  const scope = taskVillaScope(multiple, matches, 'pedregal', 'c');
+  assert.equal(scope.id, 'c');
+  assert.deepEqual(matches.filter(task => task.proyecto_id === scope.id).map(task => task.id), ['4']);
 });
 
 test('unscheduled tasks remain available when using day or week views of the same data', () => {

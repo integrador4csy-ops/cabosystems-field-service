@@ -4,12 +4,14 @@ import { ClipboardCheck, CheckCircle2, ChevronRight } from 'lucide-react-native'
 import { Colors, Spacing, BorderRadius, Shadow, Animation } from '@/constants/Theme';
 import { Badge } from '@/components/ui/Badge';
 import { formatCompletedTime } from '@/lib/dailyForm';
+import { useLanguage } from '@/lib/i18n';
 
 interface DailyFormCardProps {
   completed: boolean;
   completedAt?: string | null;
   onPress: () => void;
   loading?: boolean;
+  compact?: boolean;
 }
 
 export default function DailyFormCard({
@@ -17,8 +19,21 @@ export default function DailyFormCard({
   completedAt,
   onPress,
   loading = false,
+  compact = false,
 }: DailyFormCardProps) {
+  const { language } = useLanguage();
   const timeFormatted = formatCompletedTime(completedAt);
+  if (compact) {
+    const label = language === 'en'
+      ? (completed ? 'Daily field form completed' : 'Open daily field form · pending')
+      : (completed ? 'Formulario diario completado' : 'Abrir formulario diario · pendiente');
+    return <Pressable accessibilityRole="button" accessibilityLabel={`${label}${completed && timeFormatted ? ` · ${timeFormatted}` : ''}`}
+      accessibilityState={{ disabled: loading || completed, busy: loading }} disabled={loading || completed} onPress={onPress}
+      style={({ pressed }) => [styles.compactButton, pressed && { opacity: 0.7 }]}>
+      {completed ? <CheckCircle2 size={23} color="#343e48" /> : <ClipboardCheck size={23} color={Colors.primary} />}
+      {!completed && <View style={styles.compactPending} />}
+    </Pressable>;
+  }
 
   if (completed) {
     return (
@@ -81,6 +96,8 @@ export default function DailyFormCard({
 }
 
 const styles = StyleSheet.create({
+  compactButton: { width: 48, height: 48, flexShrink: 0, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  compactPending: { position: 'absolute', right: 7, top: 7, width: 5, height: 5, borderRadius: 3, backgroundColor: Colors.primary },
   card: {
     borderRadius: BorderRadius.lg, // 16px TailAdmin
     paddingVertical: 14,

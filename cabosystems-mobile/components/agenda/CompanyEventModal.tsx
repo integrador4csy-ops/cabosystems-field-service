@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { randomUUID } from 'expo-crypto';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Check, X } from 'lucide-react-native';
+import { CalendarDays, Clock3, MapPin, Repeat2, Check, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AgendaPalette as P } from '@/constants/Theme';
-import { dateKey } from '@/lib/agenda';
+import { dateKey, parseDateKey } from '@/lib/agenda';
+import { eventSchedule } from '@/lib/companyAgendaPresentation';
 import { isoWeekday } from '@/lib/companyAgendaRecurrence';
 import { validCompanyEvent } from '@/lib/companyAgenda';
 import type { CompanyAgendaCopy } from '@/lib/companyAgendaCopy';
@@ -54,12 +55,27 @@ export function CompanyEventModal({ event, day, canManage: allowed, copy: c, loc
   };
   const dateField = (label: string, value: string, setValue: (value: string) => void) => <View style={s.field}><Text style={s.label}>{label}</Text>{disabled ? <Text style={s.readonly}>{value.split('-').reverse().join('/')}</Text> : <AgendaDatePicker date={value} today={dateKey(new Date())} locale={locale} onSelect={setValue} />}</View>;
   const textField = (label: string, value: string, setValue: (value: string) => void, maxLength: number, multiline = false) => <View style={s.field}><Text style={s.label}>{label}</Text>{!canManage ? <Text selectable style={s.readonly}>{value || '—'}</Text> : <TextInput accessibilityLabel={label} editable={!busy} value={value} onChangeText={setValue} maxLength={maxLength} multiline={multiline} textAlignVertical={multiline ? 'top' : 'center'} style={[s.input, multiline && s.description]} />}</View>;
+  const formatDate = (value: string) => parseDateKey(value).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
+  const detailDate = event?.occurrence_date || input.fecha;
+  const repeatLabel = input.repeticion === 'ninguna' ? c.repeats : `${c.every} ${input.intervalo} ${input.repeticion === 'diaria' ? c.days : input.repeticion === 'semanal' ? c.weeks : c.months}`;
+  const repeatHint = [input.repeticion === 'semanal' ? input.dias_semana.map(value => new Date(2024, 0, value, 12).toLocaleDateString(locale, { weekday: 'short' })).join(', ') : '', input.repetir_hasta ? `${c.until}: ${formatDate(input.repetir_hasta)}` : ''].filter(Boolean).join(' · ');
+  const detailRow = (Icon: typeof CalendarDays, label: string, value: string, hint?: string) => <View style={s.detailRow}><Icon size={20} color={P.accent} /><View style={s.detailBody}><Text style={s.label}>{label}</Text><Text selectable style={s.detailValue}>{value}</Text>{hint ? <Text style={s.help}>{hint}</Text> : null}</View></View>;
   return <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={() => { if (!busy) onClose(); }}>
     <StatusBar style="dark" />
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[s.page, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={s.sheet} accessibilityViewIsModal>
-        <View style={s.header}><Text accessibilityRole="header" style={s.title}>{!canManage ? c.details : event ? c.edit : c.newEvent}</Text><Pressable accessibilityRole="button" accessibilityLabel={c.close} disabled={busy} style={s.icon} onPress={onClose}><X size={22} color={P.ink} /></Pressable></View>
+        <View style={s.header}><CalendarDays size={23} color={P.accent} /><Text accessibilityRole="header" style={s.title}>{!canManage ? c.details : event ? c.edit : c.newEvent}</Text><Pressable accessibilityRole="button" accessibilityLabel={c.close} disabled={busy} style={s.icon} onPress={onClose}><X size={22} color={P.slate} /></Pressable></View>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
+          {!canManage && event ? <>
+            <View style={s.eventSummary}><Text style={s.calendarName}>{event.google?.calendarName || c.localCalendar}</Text><Text selectable accessibilityRole="header" style={s.eventTitle}>{input.titulo}</Text></View>
+            <View style={s.details}>
+              {detailRow(CalendarDays, c.date, formatDate(detailDate), input.fecha_fin && input.fecha_fin !== detailDate ? `${c.endDate}: ${formatDate(input.fecha_fin)}` : undefined)}
+              {detailRow(Clock3, locale.startsWith('en') ? 'Time' : 'Horario', eventSchedule(event, locale), event.google ? c.googleTime : undefined)}
+              {input.ubicacion ? detailRow(MapPin, locale.startsWith('en') ? 'Location' : 'Ubicación', input.ubicacion) : null}
+              {event.google?.recurring || event.repeticion !== 'ninguna' ? detailRow(Repeat2, c.repeat, repeatLabel, repeatHint || undefined) : null}
+            </View>
+            {input.descripcion ? <View style={s.descriptionBlock}><Text style={s.label}>{c.description}</Text><Text selectable style={s.descriptionText}>{input.descripcion}</Text></View> : null}
+          </> : <>
           {event ? <Text style={s.help}>{c.calendar}: {event.google?.calendarName || c.localCalendar}</Text> : <CompanyChoice label={c.calendar} value={input.calendar_id || ''} disabled={disabled} options={[{ value: '', label: c.localCalendar }, ...calendars.map(calendar => ({ value: calendar.id, label: calendar.name }))]} onChange={calendar_id => change({ calendar_id })} />}
           {calendarError ? <Text style={s.help}>{c.calendarFailed}</Text> : null}
           {textField(c.titleLabel, input.titulo, titulo => change({ titulo }), 160)}
@@ -84,17 +100,28 @@ export function CompanyEventModal({ event, day, canManage: allowed, copy: c, loc
           {event && event.repeticion !== 'ninguna' ? <Text style={s.help}>{canManage ? c.series : c.seriesRead}</Text> : null}
           {textField(c.location, input.ubicacion || '', ubicacion => change({ ubicacion }), 240)}
           {textField(c.description, input.descripcion || '', descripcion => change({ descripcion }), 5000, true)}
+          </>}
           {error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text> : null}
           {deleting ? <View style={s.confirmation}><Text style={s.readonly}>{event?.repeticion !== 'ninguna' ? c.deleteSeries : c.deleteOne}</Text><Pressable accessibilityRole="button" disabled={busy} onPress={() => setDeleting(false)} style={s.button}><Text style={s.buttonText}>{c.cancel}</Text></Pressable><Pressable accessibilityRole="button" disabled={busy} onPress={() => void remove()} style={[s.button, s.deleteButton]}><Text style={s.primaryText}>{busy ? c.deleting : c.confirm}</Text></Pressable></View> : null}
         </ScrollView>
-        <View style={s.footer}>{canManage && event && !deleting ? <Pressable accessibilityRole="button" disabled={busy} onPress={() => setDeleting(true)} style={s.button}><Text style={s.buttonText}>{c.remove}</Text></Pressable> : null}<View style={s.spacer} /><Pressable accessibilityRole="button" disabled={busy} onPress={onClose} style={s.button}><Text style={s.buttonText}>{c.close}</Text></Pressable>{canManage && !deleting ? <Pressable accessibilityRole="button" accessibilityLabel={c.save} disabled={busy} onPress={() => void submit()} style={[s.button, s.primary]}>{busy ? <ActivityIndicator color={P.white} /> : <Text style={s.primaryText}>{c.save}</Text>}</Pressable> : null}</View>
+        <View style={s.footer}>{canManage && event && !deleting ? <Pressable accessibilityRole="button" disabled={busy} onPress={() => setDeleting(true)} style={s.button}><Text style={s.buttonText}>{c.remove}</Text></Pressable> : null}{canManage ? <View style={s.spacer} /> : null}<Pressable accessibilityRole="button" disabled={busy} onPress={onClose} style={[s.button, !canManage && s.closePrimary]}><Text style={!canManage ? s.primaryText : s.buttonText}>{c.close}</Text></Pressable>{canManage && !deleting ? <Pressable accessibilityRole="button" accessibilityLabel={c.save} disabled={busy} onPress={() => void submit()} style={[s.button, s.primary]}>{busy ? <ActivityIndicator color={P.white} /> : <Text style={s.primaryText}>{c.save}</Text>}</Pressable> : null}</View>
       </View>
     </KeyboardAvoidingView>
   </Modal>;
 }
 const s = StyleSheet.create({
+  eventSummary: { gap: 8, paddingVertical: 4 },
+  calendarName: { color: P.slate, fontFamily: 'Outfit_500Medium', fontSize: 13, lineHeight: 19 },
+  eventTitle: { color: P.ink, fontFamily: 'Outfit_600SemiBold', fontSize: 26, lineHeight: 33 },
+  details: { backgroundColor: P.wash, borderRadius: 10, paddingHorizontal: 16 },
+  detailRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 15 },
+  detailBody: { flex: 1, minWidth: 0, gap: 4 },
+  detailValue: { color: P.ink, fontFamily: 'Outfit_500Medium', fontSize: 15, lineHeight: 22 },
+  descriptionBlock: { gap: 8, paddingTop: 4 },
+  descriptionText: { color: P.slate, fontFamily: 'Outfit_400Regular', fontSize: 15, lineHeight: 24 },
+  closePrimary: { flex: 1, backgroundColor: P.accent, borderColor: P.accent, minHeight: 48 },
   checkboxRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10 },
   checkbox: { width: 20, height: 20, borderRadius: 4, borderWidth: 1, borderColor: P.slate, alignItems: 'center', justifyContent: 'center' },
   checkboxChecked: { backgroundColor: P.accent, borderColor: P.accent },
-  page: { flex: 1, backgroundColor: P.white, alignItems: 'center' }, sheet: { width: '100%', maxWidth: 600, flex: 1 }, header: { minHeight: 64, paddingLeft: 20, paddingRight: 12, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: P.line }, title: { flex: 1, fontFamily: 'Outfit_600SemiBold', color: P.ink, fontSize: 20 }, icon: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }, content: { padding: 20, gap: 18 }, field: { gap: 8 }, label: { fontFamily: 'Outfit_500Medium', color: P.slate, fontSize: 13 }, input: { minHeight: 48, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: P.line, fontFamily: 'Outfit_400Regular', color: P.ink, fontSize: 15 }, description: { minHeight: 110 }, readonly: { fontFamily: 'Outfit_400Regular', color: P.ink, fontSize: 15, lineHeight: 23 }, recurrence: { paddingVertical: 16, gap: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: P.line }, weekdays: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 }, weekday: { minWidth: 44, minHeight: 44, borderRadius: 8, borderWidth: 1, borderColor: P.line, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }, selectedDay: { borderColor: P.accent, backgroundColor: P.wash }, dayText: { color: P.slate, fontFamily: 'Outfit_400Regular', fontSize: 13, textTransform: 'capitalize' }, selectedDayText: { color: P.ink, fontFamily: 'Outfit_600SemiBold' }, help: { color: P.slate, fontFamily: 'Outfit_400Regular', fontSize: 13, lineHeight: 20 }, error: { padding: 12, borderWidth: 1, borderColor: P.accent, borderRadius: 8, fontFamily: 'Outfit_400Regular', color: P.ink, fontSize: 14 }, confirmation: { gap: 12, paddingVertical: 12 }, footer: { flexDirection: 'row', gap: 8, alignItems: 'center', borderTopWidth: 1, borderColor: P.line, padding: 12 }, spacer: { flex: 1 }, button: { minHeight: 44, paddingHorizontal: 14, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 1, borderColor: P.line }, buttonText: { fontFamily: 'Outfit_500Medium', fontSize: 14, color: P.ink }, primary: { backgroundColor: P.accent, borderColor: P.accent }, primaryText: { fontFamily: 'Outfit_600SemiBold', color: P.white, fontSize: 14 }, deleteButton: { backgroundColor: P.ink },
+  page: { flex: 1, backgroundColor: P.white, alignItems: 'center' }, sheet: { width: '100%', maxWidth: 600, flex: 1, backgroundColor: P.white }, header: { minHeight: 68, paddingLeft: 20, paddingRight: 12, gap: 10, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 2, borderColor: P.accent }, title: { flex: 1, fontFamily: 'Outfit_600SemiBold', color: P.slate, fontSize: 18 }, icon: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }, content: { padding: 20, gap: 16 }, field: { gap: 8 }, label: { fontFamily: 'Outfit_500Medium', color: P.slate, fontSize: 13 }, input: { backgroundColor: P.wash, minHeight: 48, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: P.line, fontFamily: 'Outfit_400Regular', color: P.ink, fontSize: 15 }, description: { minHeight: 110 }, readonly: { fontFamily: 'Outfit_400Regular', color: P.ink, fontSize: 15, lineHeight: 23 }, recurrence: { paddingVertical: 16, gap: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: P.line }, weekdays: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 }, weekday: { minWidth: 44, minHeight: 44, borderRadius: 8, borderWidth: 1, borderColor: P.line, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }, selectedDay: { borderColor: P.accent, backgroundColor: P.wash }, dayText: { color: P.slate, fontFamily: 'Outfit_400Regular', fontSize: 13, textTransform: 'capitalize' }, selectedDayText: { color: P.ink, fontFamily: 'Outfit_600SemiBold' }, help: { color: P.slate, fontFamily: 'Outfit_400Regular', fontSize: 13, lineHeight: 20 }, error: { padding: 12, borderWidth: 1, borderColor: P.accent, borderRadius: 8, fontFamily: 'Outfit_400Regular', color: P.ink, fontSize: 14 }, confirmation: { gap: 12, paddingVertical: 12 }, footer: { backgroundColor: P.white, flexDirection: 'row', gap: 8, alignItems: 'center', borderTopWidth: 1, borderColor: P.line, padding: 12 }, spacer: { flex: 1 }, button: { minHeight: 44, paddingHorizontal: 14, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 1, borderColor: P.line }, buttonText: { fontFamily: 'Outfit_500Medium', fontSize: 14, color: P.ink }, primary: { backgroundColor: P.accent, borderColor: P.accent }, primaryText: { fontFamily: 'Outfit_600SemiBold', color: P.white, fontSize: 14 }, deleteButton: { backgroundColor: P.ink },
 });

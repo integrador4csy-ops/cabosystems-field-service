@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ViewInstance, TextInputInstance } from 'react-native';
 import { View, Text, StyleSheet, TextInput, Pressable, Modal, ActivityIndicator, KeyboardAvoidingView, Keyboard, Platform, BackHandler, useWindowDimensions } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -63,12 +64,12 @@ export default function ChatRoomScreen() {
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const listRef = useRef<FlashListRef<ChatMessage>>(null);
-  const rootRef = useRef<View>(null);
-  const feedRef = useRef<View>(null);
+  const rootRef = useRef<ViewInstance>(null);
+  const feedRef = useRef<ViewInstance>(null);
   const selectedIdRef = useRef<string | null>(null);
   const selectedMeasure = useRef<((callback: (rect: ChatRect) => void) => void) | null>(null);
   const anchorFrame = useRef<number | null>(null);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const sendLock = useRef(false); const activeRoom = useRef(id);
   const sendSequence = useRef(0);
   const errorCopy = useRef(c.failed);
@@ -272,7 +273,7 @@ export default function ChatRoomScreen() {
           <TextInput ref={inputRef} accessibilityLabel={c.message} style={styles.input} placeholder={textBlocked ? c.restricted : c.placeholder} placeholderTextColor={P.muted} multiline editable={!textBlocked && !sending} value={text} onChangeText={setText} onFocus={() => setMediaPanelOpen(false)} selection={selection} onSelectionChange={(event) => setSelection(event.nativeEvent.selection)} />
           <Pressable accessibilityRole="button" accessibilityLabel={c.gallery} disabled={sending} style={styles.attachmentIcon} onPress={() => void gallery()}><Paperclip size={20} color={P.slate} /></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={c.camera} disabled={sending} style={styles.iconButton} onPress={() => void capture()}><Camera size={22} color={P.slate} /></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel={c.send} disabled={textBlocked || sending || !text.trim()} onPress={() => void send('texto')} style={[styles.send, (textBlocked || sending || !text.trim()) && styles.disabled]}>{sending ? <ActivityIndicator size="small" color={P.ink} /> : <Send size={19} color={P.ink} />}</Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={c.send} disabled={textBlocked || sending || !text.trim()} onPress={() => void send('texto')} style={[styles.send, (textBlocked || sending || !text.trim()) && styles.disabled]}>{sending ? <ActivityIndicator size="small" color={P.white} /> : <Send size={19} color={P.white} />}</Pressable>
         </View>
       </View> : null}
       {(mediaPanelReady || mediaPanelOpen) && group ? <View style={!mediaPanelOpen ? styles.closedMediaPanel : undefined} pointerEvents={mediaPanelOpen ? 'auto' : 'none'} accessibilityElementsHidden={!mediaPanelOpen} importantForAccessibility={mediaPanelOpen ? 'auto' : 'no-hide-descendants'}>

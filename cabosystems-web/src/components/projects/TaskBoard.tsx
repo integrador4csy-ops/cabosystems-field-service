@@ -93,7 +93,7 @@ export function TaskBoard({ tasks, expandedTaskIds, onToggleExpand, onTaskUpdate
                       title={t("Arrastrar tarea a otro estado")}
                       aria-label={t("Arrastrar tarea a otro estado")}
                       className="task-board-drag-handle"
-                    ><GripVertical size={15} aria-hidden="true" /></span>
+                    ><GripVertical size={16} aria-hidden="true" /></span>
                   </div>
                   <TaskCard task={task} variant="board" projectLabel={projectLabels?.[task.proyecto_id]} isExpanded={expandedTaskIds.has(task.id)} onToggleExpand={() => onToggleExpand(task.id)} onTaskUpdated={onTaskUpdated} onEditTask={onEditTask} />
                 </div>

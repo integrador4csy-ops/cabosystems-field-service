@@ -12,6 +12,7 @@ import {
   ChevronDown,
   X,
   ArrowRightLeft,
+  UserRound,
 } from 'lucide-react';
 import type { Tarea, Subtarea } from '../../types/projects';
 import { TaskActionsMenu } from './TaskActionsMenu';
@@ -50,6 +51,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const canProgress = isAdmin || task.asignado_a === user?.id;
   const scheduledLabel = showScheduledDate && task.fecha_programada ? parseDateKey(task.fecha_programada).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : '';
   const contextLabel = [projectLabel, scheduledLabel].filter(Boolean).join(' · ');
+  const [failedAvatar, setFailedAvatar] = useState('');
+  const assigneeName = task.profiles?.nombre || t(task.asignado_a ? 'Responsable' : 'Sin asignar');
+  const initials = task.profiles?.nombre?.split(' ').filter(Boolean).map(part => part[0]).slice(0, 2).join('');
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [addingSubtask, setAddingSubtask] = useState(false);
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
@@ -74,6 +78,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
   const completedSubtasks = subtasks.filter((s) => s.completada).length;
   const totalSubtasks = subtasks.length;
+  const hasSubtasks = totalSubtasks > 0;
+  const hasExpandableContent = hasSubtasks || Boolean(task.descripcion);
   const progressPercent =
     totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : 0;
 
@@ -184,7 +190,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
   return (
     <div
-      className={`${variant === 'board' ? 'task-card-board' : ''} rounded-2xl border bg-white transition-all duration-200 shadow-2xs hover:shadow-xs hover:border-slate-300 ${
+      className={`${variant === 'board' ? 'task-card-board' : ''} ${hasSubtasks ? 'has-subtasks' : 'no-subtasks'} rounded-2xl border bg-white transition-all duration-200 shadow-2xs hover:shadow-xs hover:border-slate-300 ${
         task.estatus === 'completada'
           ? 'border-emerald-200 bg-emerald-50/15'
           : 'border-slate-200'
@@ -192,113 +198,187 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     >
       {/* Compact Main Row (Click to toggle accordion) */}
       <div
-        role="button" tabIndex={0} aria-expanded={isExpanded} aria-label={t("Ver pasos de {value0}", { value0: task.titulo })}
-        onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); toggleExpand(); } }}
-        onClick={toggleExpand}
-        className="task-card-header flex items-center justify-between gap-2 p-3 sm:p-3.5 cursor-pointer flex-wrap sm:flex-nowrap select-none"
+        role={hasExpandableContent ? "button" : undefined}
+        tabIndex={hasExpandableContent ? 0 : undefined}
+        aria-expanded={hasExpandableContent ? isExpanded : undefined}
+        aria-label={hasExpandableContent ? t("Ver pasos de {value0}", { value0: task.titulo }) : undefined}
+        onKeyDown={hasExpandableContent ? (event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); toggleExpand(); } } : undefined}
+        onClick={hasExpandableContent ? toggleExpand : undefined}
+        className={`task-card-header select-none ${hasExpandableContent ? 'cursor-pointer' : ''} ${variant === 'board' ? 'task-card-header-board' : 'flex items-center justify-between gap-2 p-3 sm:p-3.5 flex-wrap sm:flex-nowrap'}`}
       >
-        <div className="task-card-main flex items-center gap-2.5 min-w-0 flex-1 basis-full sm:basis-auto">
-          {/* Chevron Indicator */}
-          <ChevronDown
-            size={16}
-            className={`text-slate-400 transition-transform duration-200 shrink-0 ${
-              isExpanded ? 'rotate-180 text-brand-500' : ''
-            }`}
-          />
+        {variant === 'board' ? (
+          <>
+            <div className="task-card-board-top flex items-start gap-2 min-w-0 w-full">
+              {hasSubtasks && (
+                <ChevronDown
+                  size={15}
+                  className={`text-slate-400 transition-transform duration-200 shrink-0 mt-0.5 ${
+                    isExpanded ? 'rotate-180 text-brand-500' : ''
+                  }`}
+                />
+              )}
+              <h4
+                title={task.titulo}
+                className={`min-w-0 flex-1 text-sm font-semibold text-slate-800 leading-snug line-clamp-2 ${
+                  task.estatus === 'completada' ? 'line-through text-slate-400' : ''
+                }`}
+              >
+                {task.titulo}
+              </h4>
+            </div>
 
-          {/* Status Pill Badge with Dropdown */}
-          {variant === 'list' && <div
-            className="relative inline-flex items-center shrink-0"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <AppSelect
-              value={task.estatus}
-              onChange={(event) => handleStatusChange(event.target.value as Tarea['estatus'])}
-              disabled={updatingStatus || !canProgress}
-              aria-label={t("Cambiar estatus de la tarea")}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${statusConfig.badgeClass}`}
-              triggerContent={<>
-              <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dotClass}`} />
-              <span>{statusConfig.label}</span>
-              <ChevronDown size={11} className="opacity-60 -mr-0.5" />
-              </>}
+            <div className="task-card-board-footer flex items-center justify-between gap-2.5 w-full pt-1.5 min-w-0">
+              <div className="task-card-board-footer-left min-w-0 flex-1 truncate">
+                {contextLabel && (
+                  <span className={`task-card-context text-[11.5px] ${isOverdue(task) ? 'task-overdue font-medium text-red-600' : 'text-slate-500'}`} title={contextLabel}>
+                    {contextLabel}{isOverdue(task) && <span> · {t('Vencida')}</span>}
+                  </span>
+                )}
+              </div>
+              <div className="task-card-board-footer-right flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                {totalSubtasks > 0 && (
+                  <span
+                    aria-label={`${t('Subtareas')} ${completedSubtasks}/${totalSubtasks}`}
+                    className="task-subtasks-count text-[11px] font-medium text-slate-600 px-2 py-0.5 rounded-md bg-slate-100"
+                  >
+                    {completedSubtasks}/{totalSubtasks}
+                  </span>
+                )}
+                <span
+                  className="task-assignee-avatar inline-flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-[10px] font-medium text-slate-700"
+                  role="img"
+                  aria-label={assigneeName}
+                  title={assigneeName}
+                >
+                  {task.profiles?.avatar_url && task.profiles.avatar_url !== failedAvatar ? (
+                    <img src={task.profiles.avatar_url} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" onError={() => setFailedAvatar(task.profiles?.avatar_url || '')} />
+                  ) : (
+                    initials || <UserRound size={13} aria-hidden="true" />
+                  )}
+                </span>
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      if (!isExpanded) toggleExpand();
+                      setIsAddingSubtask(true);
+                    }}
+                    className="task-board-action-btn flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                    title={t("Añadir subtarea")}
+                  >
+                    <Plus size={14} />
+                  </button>
+                )}
+                {isAdmin && (
+                  <TaskActionsMenu
+                    title={task.titulo}
+                    deleting={isDeleting}
+                    onEdit={() => onEditTask(task)}
+                    onDelete={handleDeleteTask}
+                  />
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="task-card-main flex items-center gap-2.5 min-w-0 flex-1 basis-full sm:basis-auto">
+              {/* Chevron Indicator */}
+              {hasSubtasks && (
+                <ChevronDown
+                  size={16}
+                  className={`text-slate-400 transition-transform duration-200 shrink-0 ${
+                    isExpanded ? 'rotate-180 text-brand-500' : ''
+                  }`}
+                />
+              )}
+
+              {/* Status Pill Badge with Dropdown */}
+              <div
+                className="relative inline-flex items-center shrink-0"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <AppSelect
+                  value={task.estatus}
+                  onChange={(event) => handleStatusChange(event.target.value as Tarea['estatus'])}
+                  disabled={updatingStatus || !canProgress}
+                  aria-label={t("Cambiar estatus de la tarea")}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${statusConfig.badgeClass}`}
+                  triggerContent={<>
+                  <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dotClass}`} />
+                  <span>{statusConfig.label}</span>
+                  <ChevronDown size={11} className="opacity-60 -mr-0.5" />
+                  </>}
+                >
+                  <option value="pendiente">{t("Pendiente")}</option>
+                  <option value="en_proceso">{t("En Proceso")}</option>
+                  <option value="completada">{t("Completada")}</option>
+                </AppSelect>
+              </div>
+
+              {/* Main Task Title */}
+              <h4
+                title={task.titulo}
+                className={`min-w-0 flex-1 text-sm font-semibold text-slate-800 line-clamp-2 sm:line-clamp-none sm:truncate ${
+                  task.estatus === 'completada' ? 'line-through text-slate-400' : ''
+                }`}
+              >
+                {task.titulo}
+              </h4>
+
+              {/* Minimal Steps Counter: 0/1 */}
+              <span className="task-card-progress-assignee inline-flex items-center gap-2 shrink-0">
+              {totalSubtasks > 0 && (
+                <span aria-label={`${t('Subtareas')} ${completedSubtasks}/${totalSubtasks}`} className="task-subtasks-count text-[11px] font-medium text-slate-400 shrink-0 px-2 py-0.5 rounded-full bg-slate-100">
+                  {completedSubtasks}/{totalSubtasks}
+                </span>
+              )}
+              <span className="task-assignee-avatar inline-flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-[11px] font-medium text-slate-700" role="img" aria-label={assigneeName} title={assigneeName}>
+                {task.profiles?.avatar_url && task.profiles.avatar_url !== failedAvatar ? <img src={task.profiles.avatar_url} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" onError={() => setFailedAvatar(task.profiles?.avatar_url || '')} /> : initials || <UserRound size={15} aria-hidden="true" />}
+              </span>
+              </span>
+            </div>
+
+            {/* Action Icon Buttons: +, Edit, Delete */}
+            <div
+              className="task-card-actions flex w-full sm:w-auto justify-end items-center gap-1 shrink-0"
+              onClick={(e) => e.stopPropagation()}
             >
-              <option value="pendiente">{t("Pendiente")}</option>
-              <option value="en_proceso">{t("En Proceso")}</option>
-              <option value="completada">{t("Completada")}</option>
-            </AppSelect>
-          </div>}
-
-          {/* Main Task Title */}
-          <h4
-            title={task.titulo}
-            className={`min-w-0 flex-1 text-sm font-semibold text-slate-800 line-clamp-2 sm:line-clamp-none sm:truncate ${
-              task.estatus === 'completada' ? 'line-through text-slate-400' : ''
-            }`}
-          >
-            {task.titulo}
-          </h4>
-
-          {variant === 'board' && contextLabel && <span className="task-card-context" title={contextLabel}>{contextLabel}{isOverdue(task) && <span className="task-overdue"> · {t('Vencida')}</span>}</span>}
-
-          {/* Minimal Steps Counter: 0/1 */}
-          {totalSubtasks > 0 && (
-            <span aria-label={`${t('Subtareas')} ${completedSubtasks}/${totalSubtasks}`} className="task-subtasks-count text-[11px] font-medium text-slate-400 shrink-0 px-2 py-0.5 rounded-full bg-slate-100">
-              {completedSubtasks}/{totalSubtasks}
-            </span>
-          )}
-        </div>
-
-        {/* Action Icon Buttons: +, Edit, Delete */}
-        <div
-          className="task-card-actions flex w-full sm:w-auto justify-end items-center gap-1 shrink-0"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {variant === 'board' && <div className="task-board-assignee" title={task.profiles?.nombre || t("Sin asignar")}>
-            {task.profiles?.avatar_url ? <img src={task.profiles.avatar_url} alt="" /> : <span className="task-board-initials">{task.profiles?.nombre?.split(' ').filter(Boolean).map((part) => part[0]).slice(0, 2).join('') || '—'}</span>}
-            <span>{task.profiles?.nombre || t("Sin asignar")}</span>
-          </div>}
-          {isAdmin && <button
-            onClick={() => {
-              if (!isExpanded) toggleExpand();
-              setIsAddingSubtask(true);
-            }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-            title={t("Añadir subtarea")}
-          >
-            <Plus size={15} />
-          </button>}
-          {variant === 'board' ? <>
-              <AppSelect className="task-board-status-control" title={t("Cambiar estado")} triggerContent={updatingStatus ? <Loader2 size={15} className="animate-spin" /> : <ArrowRightLeft size={15} aria-hidden="true" />} value={task.estatus} onChange={(event) => handleStatusChange(event.target.value as Tarea['estatus'])} disabled={updatingStatus || isDeleting || !canProgress} aria-label={t("Cambiar estado de {value0}", { value0: task.titulo })}>
-                <option value="pendiente">{t("Pendiente")}</option>
-                <option value="en_proceso">{t("En proceso")}</option>
-                <option value="completada">{t("Completada")}</option>
-              </AppSelect>
-            {isAdmin && <TaskActionsMenu title={task.titulo} deleting={isDeleting} onEdit={() => onEditTask(task)} onDelete={handleDeleteTask} />}
-          </> : isAdmin ? <>
-          <button
-            onClick={() => onEditTask(task)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-            title={t("Editar tarea")}
-          >
-            <Edit2 size={14} />
-          </button>
-          <button
-            onClick={handleDeleteTask}
-            disabled={isDeleting}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-            title={t("Eliminar tarea")}
-          >
-            {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-          </button>
-          </> : null}
-        </div>
+              {isAdmin && <button
+                onClick={() => {
+                  if (!isExpanded) toggleExpand();
+                  setIsAddingSubtask(true);
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                title={t("Añadir subtarea")}
+              >
+                <Plus size={15} />
+              </button>}
+              {isAdmin ? <>
+              <button
+                onClick={() => onEditTask(task)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                title={t("Editar tarea")}
+              >
+                <Edit2 size={14} />
+              </button>
+              <button
+                onClick={handleDeleteTask}
+                disabled={isDeleting}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                title={t("Eliminar tarea")}
+              >
+                {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              </button>
+              </> : null}
+            </div>
+          </>
+        )}
       </div>
 
       {variant === 'list' && contextLabel && <p className="px-4 pb-3 text-xs text-slate-500">{contextLabel}{isOverdue(task) && <span className="task-overdue"> · {t('Vencida')}</span>}</p>}
 
       {/* Expanded Details (Description, Progress, Checklist) */}
-      {isExpanded && (
+      {isExpanded && (hasSubtasks || Boolean(task.descripcion) || (isAdmin && isAddingSubtask)) && (
         <div className="px-4 pb-4 pt-1 border-t border-slate-100 space-y-3">
           {/* Optional Task Description */}
           {task.descripcion && (
@@ -326,10 +406,10 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 <div
                   key={sub.id}
                   onClick={(e) => e.stopPropagation()}
-                  className="group flex items-center justify-between gap-2.5 rounded-xl border border-slate-200/70 bg-slate-50/40 p-2.5 transition-all hover:bg-white hover:border-slate-300"
+                  className="group flex items-start justify-between gap-2 rounded-xl border border-slate-200/70 bg-slate-50/40 p-2.5 transition-all hover:bg-white hover:border-slate-300"
                 >
-                  <label className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer select-none">
-                    <div className="relative flex items-center justify-center w-4.5 h-4.5 shrink-0">
+                  <label className="flex items-start gap-2 flex-1 min-w-0 cursor-pointer select-none">
+                    <div className="relative mt-0.5 flex items-center justify-center w-4.5 h-4.5 shrink-0">
                       <input
                         type="checkbox"
                         className="w-4.5 h-4.5 appearance-none cursor-pointer border border-slate-300 rounded-md checked:bg-brand-500 checked:border-transparent transition-all focus:outline-hidden focus:ring-2 focus:ring-orange-500/20"
@@ -362,7 +442,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                         sub.completada
                           ? 'text-slate-400 line-through'
                           : 'text-slate-700 font-medium'
-                      } truncate`}
+                      } min-w-0 whitespace-normal wrap-anywhere leading-5`}
                     >
                       {sub.titulo}
                     </span>
@@ -395,6 +475,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                   if (e.key === 'Escape') {
                     setIsAddingSubtask(false);
                     setNewSubtaskTitle('');
+                    if (!hasSubtasks && !task.descripcion && isExpanded) toggleExpand();
                   }
                 }}
                 className="h-8.5 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#f78c26] focus:outline-hidden focus:ring-2 focus:ring-orange-500/10 shadow-2xs transition-all"
@@ -416,6 +497,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 onClick={() => {
                   setIsAddingSubtask(false);
                   setNewSubtaskTitle('');
+                  if (!hasSubtasks && !task.descripcion && isExpanded) toggleExpand();
                 }}
                 className="flex h-8.5 w-8.5 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors shrink-0"
                 title={t("Cancelar")}

@@ -89,31 +89,24 @@ export async function getMyChatGroups(userId: string): Promise<ChatGroup[]> {
     // 2. Obtener los grupos
     const { data: groups, error: grpError } = await supabase
       .from('chat_grupos')
-      .select('*')
+      .select('*, member_totals:chat_miembros(count), latest_messages:chat_mensajes(*, profiles(nombre, avatar_url, rol))')
       .in('id', allGroupIds)
+      .order('created_at', { referencedTable: 'latest_messages', ascending: false })
+      .order('id', { referencedTable: 'latest_messages', ascending: false })
+      .limit(1, { referencedTable: 'latest_messages' })
       .order('created_at', { ascending: false });
 
     if (grpError) throw grpError;
     if (!groups) return [];
 
-    // 3. Para cada grupo, buscar miembros_count y último mensaje
-    const enhancedGroups: ChatGroup[] = await Promise.all(
-      groups.map(async (g) => {
-        const [members, last] = await Promise.all([
-          supabase.from('chat_miembros').select('*', { count: 'exact', head: true }).eq('grupo_id', g.id),
-          supabase.from('chat_mensajes').select('*, profiles(nombre, avatar_url, rol)').eq('grupo_id', g.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-        ]);
-        if (members.error) throw members.error;
-        if (last.error) throw last.error;
-
-        return {
-          ...g,
-          miembros_count: members.count ?? 1,
-          ultimo_mensaje: (last.data as ChatMessage) || null,
-          mi_rol: (roleMap.get(g.id) || (g.creado_por === effectiveUserId ? 'admin' : 'miembro')) as any,
-        };
-      })
-    );
+    // Embedded counts and a per-group message limit keep this at three requests.
+    // Each relation still uses the signed-in user's existing RLS policies.
+    const enhancedGroups: ChatGroup[] = groups.map(({ member_totals, latest_messages, ...g }) => ({
+      ...g,
+      miembros_count: member_totals[0]?.count ?? 0,
+      ultimo_mensaje: (latest_messages[0] as unknown as ChatMessage) || null,
+      mi_rol: (roleMap.get(g.id) || (g.creado_por === effectiveUserId ? 'admin' : 'miembro')) as ChatGroup['mi_rol'],
+    }));
 
     // Ordenar grupos por último mensaje o creación
     enhancedGroups.sort((a, b) => {

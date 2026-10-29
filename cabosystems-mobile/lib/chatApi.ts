@@ -45,6 +45,23 @@ export async function uploadChatMedia(
   }
 }
 
+const chatGroupsCache: Record<string, { data: ChatGroup[]; timestamp: number }> = {};
+
+export function getCachedMyChatGroups(userId: string, maxAge = Infinity): ChatGroup[] | null {
+  const cached = chatGroupsCache[userId];
+  return cached && Date.now() - cached.timestamp < maxAge ? cached.data : null;
+}
+
+export async function preloadMyChatGroups(userId: string): Promise<ChatGroup[]> {
+  const cached = getCachedMyChatGroups(userId, 20_000);
+  if (cached) return cached;
+  try {
+    return await getMyChatGroups(userId);
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Obtener todos los grupos en los que participa el usuario
  */
@@ -127,6 +144,11 @@ export async function getMyChatGroups(userId: string): Promise<ChatGroup[]> {
       const timeB = b.ultimo_mensaje?.created_at || b.created_at;
       return new Date(timeB).getTime() - new Date(timeA).getTime();
     });
+
+    chatGroupsCache[effectiveUserId] = {
+      data: enhancedGroups,
+      timestamp: Date.now(),
+    };
 
     return enhancedGroups;
   } catch (error) {

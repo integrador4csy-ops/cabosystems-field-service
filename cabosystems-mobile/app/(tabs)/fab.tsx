@@ -1,10 +1,6 @@
-import { useEffect } from 'react';
-import { router } from 'expo-router';
+import React from 'react';
+import CheckinScreen from '../checkin/[id]';
 
 export default function FabScreen() {
-  useEffect(() => {
-    router.replace('/checkin/new' as any);
-  }, []);
-
-  return null;
+  return <CheckinScreen embedded />;
 }

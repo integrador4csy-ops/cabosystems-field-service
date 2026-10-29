@@ -1,5 +1,6 @@
 import { CalendarError, isWritable, type Actor, type Calendar, type createCalendarService } from './core.ts';
 import { digest } from './crypto.ts';
+import { syncSearchCalendar } from './search-index.ts';
 import { COMPANY_ZONE, eventBody, googleOccurrences, normalizeGoogleEvent, parseIdentity, shiftDay, validDate, validEventInput, zonedInstant, type GoogleEvent } from './events-model.ts';
 
 type Service = ReturnType<typeof createCalendarService>;
@@ -11,7 +12,7 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
     catch { throw new CalendarError('No se pudo contactar con Google. Actualiza antes de volver a guardar.', 502); }
     if (!response.ok) {
       const messages: Record<number, string> = { 400: 'Google rechazó los datos del evento. Revisa las fechas y la repetición.', 401: 'Vuelve a autorizar la cuenta Google.', 403: 'La cuenta conectada no tiene permiso para esta operación en Google.', 404: 'El evento ya no existe o el calendario ya no está disponible.', 409: 'El evento ya existe. Actualiza la agenda.', 412: 'El evento cambió en Google. Actualiza antes de editar o eliminar.', 429: 'Google está limitando las consultas. Intenta de nuevo en unos momentos.' };
-      throw new GoogleError(messages[response.status] || 'Google no pudo completar la operación. Intenta de nuevo.', response.status === 401 || response.status === 403 ? 403 : response.status === 404 ? 404 : response.status === 409 || response.status === 412 ? 409 : 502);
+      throw new GoogleError(messages[response.status] || 'Google no pudo completar la operación. Intenta de nuevo.', response.status === 410 ? 410 : response.status === 401 || response.status === 403 ? 403 : response.status === 404 ? 404 : response.status === 409 || response.status === 412 ? 409 : 502);
     }
     if (response.status === 204) return {};
     return await response.json();
@@ -25,6 +26,159 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
     return { ...current, calendar, token: current.token };
   }
   return {
+    async prepareSearch(actor: Actor) {
+      const initialConnection = await service.indexedEventSession(actor);
+      try {
+      const { connection, token } = await service.eventSession(actor);
+      if (!token || !service.searchIndex) return { ready: true };
+      const index = service.searchIndex;
+      const current = new Map((await service.eventCalendars(token)).map(calendar => [calendar.id, calendar]));
+      let position = 0; let ready = true;
+      async function worker() {
+        while (position < connection.selected_calendars.length) {
+          const selected = connection.selected_calendars[position++];
+          const calendar = current.get(selected.id);
+          if (!calendar) throw new CalendarError('Un calendario seleccionado ya no está disponible. Revisa la selección.', 409);
+          if (calendar.accessRole === 'freeBusyReader') {
+            const claim = await index.claim(connection.revision, calendar);
+            if (claim.lease) {
+              try { await index.commit(connection.revision, calendar, claim.lease, 'availability-only', true, []); }
+              finally { await index.release(connection.revision, calendar.id, claim.lease); }
+            } else if (!claim.ready) ready = false;
+            continue;
+          }
+          try { await syncSearchCalendar(index, google, connection.revision, calendar, token!); }
+          catch (error) { if (error instanceof CalendarError && error.status === 409 && error.message.startsWith('Se está preparando')) { ready = false; continue; } throw error; }
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(4, connection.selected_calendars.length) }, worker));
+      await service.verifyEventSession(actor, connection.revision);
+      return { ready };
+      } catch (error) {
+        if (service.searchIndex && error instanceof CalendarError && [401,403,409].includes(error.status)) {
+          await Promise.allSettled(initialConnection.selected_calendars.map(calendar => service.searchIndex!.invalidate(initialConnection.revision, calendar.id)));
+        }
+        throw error;
+      }
+    },
+    async searchDates(actor: Actor, ids: unknown, today: unknown) {
+      if (!Array.isArray(ids) || !ids.length || ids.length > 50 || ids.some(id => typeof id !== 'string') || !validDate(today)) throw new CalendarError('Indica hasta 50 series válidas.');
+      const identities = [...new Set(ids as string[])].map(id => { try { return { id, ...parseIdentity(id) }; } catch { throw new CalendarError('La serie no es válida.'); } });
+      const { connection, token } = await service.eventSession(actor);
+      if (!token || !service.searchIndex) return { dates: [] };
+      const selected = new Set(connection.selected_calendars.map(calendar => calendar.id));
+      if (identities.some(identity => !selected.has(identity.calendarId))) throw new CalendarError('El calendario no está seleccionado para la agenda.', 403);
+      const calendars = new Map((await service.eventCalendars(token)).map(calendar => [calendar.id, calendar]));
+      const dates: { id: string; nextDate: string | null }[] = [];
+      let position = 0;
+      async function worker() {
+        while (position < identities.length) {
+          const identity = identities[position++]; const calendar = calendars.get(identity.calendarId);
+          if (!calendar || calendar.accessRole === 'freeBusyReader') throw new CalendarError('No tienes permiso para consultar esta serie.', 403);
+          const [item] = await service.searchIndex!.lookup(connection.revision, calendar.id, [identity.eventId]);
+          if (!item?.recurrence?.length) continue;
+          const params = new URLSearchParams({ timeMin: zonedInstant(today as string, '00:00'), maxResults: '1', showDeleted: 'false', timeZone: COMPANY_ZONE });
+          const pages = new Set<string>(); let nextDate: string | null = null;
+          do {
+            const data = await google(`${calendarPath(calendar.id)}/${encodeURIComponent(item.id)}/instances?${params}`, token!);
+            if (!Array.isArray(data.items)) throw new CalendarError('No se pudo consultar la próxima fecha.', 502);
+            const next = data.items.map(item => normalizeGoogleEvent(item as GoogleEvent, calendar)).find(Boolean);
+            if (next) { nextDate = next.fecha; break; }
+            const page = typeof data.nextPageToken === 'string' ? data.nextPageToken : '';
+            if (!page) break;
+            if (pages.has(page) || pages.size >= 30) throw new CalendarError('No se pudo completar la consulta de fechas.', 502);
+            pages.add(page); params.set('pageToken', page);
+          } while (true);
+          dates.push({ id: identity.id, nextDate });
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(4, identities.length) }, worker));
+      await service.verifyEventSession(actor, connection.revision);
+      return { dates };
+    },
+    async search(actor: Actor, query: unknown, today: unknown) {
+      if (typeof query !== 'string' || !query.trim() || query.length > 160 || !validDate(today)) throw new CalendarError('Indica una búsqueda válida de hasta 160 caracteres.');
+      if (service.searchIndex) {
+        const connection = await service.indexedEventSession(actor);
+        if (!connection.refresh_token_ciphertext || !connection.selected_calendars.length) return { hits: [], unavailableCalendars: 0 };
+        const calendars = await service.searchIndex.authorizedCalendars(connection.revision, connection.selected_calendars);
+        if (!calendars) return { hits: [], unavailableCalendars: 0, needsRefresh: true };
+        const readable = calendars.filter(calendar => calendar.accessRole !== 'freeBusyReader');
+        const records = readable.length ? await service.searchIndex.search(connection.revision, readable, query) : [];
+        const byId = new Map(readable.map(calendar => [calendar.id, calendar]));
+        const hits = records.flatMap(row => {
+          const calendar = byId.get(row.calendar_id);
+          if (!calendar) return [];
+          const event = normalizeGoogleEvent(row.payload, calendar);
+          if (!event) return [];
+          const series = Boolean(row.payload.recurrence?.length);
+          return [{ event: series ? { ...event, google: { ...event.google, recurring: true, editable: false } } : event, series, nextDate: null, nextDatePending: series }];
+        });
+        await service.verifyEventSession(actor, connection.revision);
+        return { hits, unavailableCalendars: calendars.length - readable.length };
+      }
+      const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const terms = normalize(query).trim().split(/\s+/);
+      const matches = (item: GoogleEvent, calendar: Calendar) => {
+        const text = normalize([item.summary, item.description, item.location, calendar.name].filter(Boolean).join(' '));
+        return terms.every(term => text.includes(term));
+      };
+      const { connection, token } = await service.eventSession(actor);
+      if (!token) return { hits: [], unavailableCalendars: 0 };
+      const calendars = new Map((await service.eventCalendars(token)).map(calendar => [calendar.id, calendar]));
+      const hits: { event: NonNullable<ReturnType<typeof normalizeGoogleEvent>>; series: boolean; nextDate: string | null }[] = [];
+      let position = 0; let unavailableCalendars = 0;
+      async function worker() {
+        while (position < connection.selected_calendars.length) {
+          const selected = connection.selected_calendars[position++];
+          const calendar = calendars.get(selected.id);
+          if (!calendar) throw new CalendarError('Un calendario seleccionado ya no está disponible. Revisa la selección.', 409);
+          // Availability-only calendars expose no searchable titles or descriptions.
+          if (calendar.accessRole === 'freeBusyReader') { unavailableCalendars++; continue; }
+          const params = new URLSearchParams({ singleEvents: 'false', showDeleted: 'false', maxResults: '2500', timeZone: COMPANY_ZONE });
+          const seen = new Set<string>();
+          let scanned = 0;
+          do {
+            // No time bounds and no Google q: matching here preserves accent-insensitive substring search.
+            const data = await google(`${calendarPath(calendar.id)}?${params}`, token!);
+            if (!Array.isArray(data.items)) throw new CalendarError('Google devolvió una lista de eventos inválida.', 502);
+            for (const item of data.items as GoogleEvent[]) {
+              if (++scanned > 75000) throw new CalendarError('Este calendario es demasiado grande para completar la búsqueda. No se muestran resultados parciales.');
+              if (item.status === 'cancelled' || !matches(item, calendar)) continue;
+              let event = normalizeGoogleEvent(item, calendar);
+              if (!event) continue;
+              const series = Boolean(item.recurrence?.length);
+              let nextDate: string | null = null;
+              if (series) {
+                // A master is never handed to the occurrence editor as an editable instance.
+                event = { ...event, google: { ...event.google, recurring: true, editable: false } };
+                const instanceParams = new URLSearchParams({ timeMin: zonedInstant(today as string, '00:00'), maxResults: '1', showDeleted: 'false', timeZone: COMPANY_ZONE });
+                const instancePages = new Set<string>();
+                do {
+                  const instances = await google(`${calendarPath(calendar.id)}/${encodeURIComponent(item.id)}/instances?${instanceParams}`, token!);
+                  if (!Array.isArray(instances.items)) throw new CalendarError('Google no pudo consultar la próxima fecha de una serie.', 502);
+                  const next = instances.items.map(item => normalizeGoogleEvent(item as GoogleEvent, calendar)).find(Boolean);
+                  if (next) { nextDate = next.fecha; break; }
+                  const page = typeof instances.nextPageToken === 'string' ? instances.nextPageToken : '';
+                  if (!page) break;
+                  if (instancePages.has(page) || instancePages.size >= 30) throw new CalendarError('No se pudo completar la consulta de la próxima fecha de una serie.', 502);
+                  instancePages.add(page); instanceParams.set('pageToken', page);
+                } while (true);
+              }
+              hits.push({ event, series, nextDate });
+              if (hits.length > 20000) throw new CalendarError('Hay demasiadas coincidencias. Escribe una búsqueda más específica. No se muestran resultados parciales.');
+            }
+            const next = typeof data.nextPageToken === 'string' ? data.nextPageToken : '';
+            if (!next) break;
+            if (seen.has(next) || seen.size >= 30) throw new CalendarError('No se pudo completar la búsqueda de todas las páginas. Intenta una búsqueda más específica.');
+            seen.add(next); params.set('pageToken', next);
+          } while (true);
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(4, connection.selected_calendars.length) }, worker));
+      await service.verifyEventSession(actor, connection.revision);
+      return { hits: [...new Map(hits.map(hit => [hit.event.id, hit])).values()], unavailableCalendars };
+    },
     async selected(actor: Actor) {
       const { connection, token } = await service.eventSession(actor);
       const current = token ? new Map((await service.eventCalendars(token)).map(calendar => [calendar.id, calendar])) : new Map<string, Calendar>();
@@ -127,6 +281,8 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
       // start/end and is sufficient to acknowledge the write before reloading.
       const normalized = normalizeGoogleEvent(event, calendar);
       if (!normalized) throw new CalendarError('Google guardó el evento. Actualiza la agenda para consultarlo.', 502);
+      // A failed cache invalidation must not report an already-completed write as failed.
+      try { await service.searchIndex?.invalidate(connection.revision, calendar.id); } catch { /* The 30-second refresh also picks up the write. */ }
       return { event: normalized };
     },
     async remove(actor: Actor, id: unknown, etag: unknown) {
@@ -143,6 +299,7 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
       if (current.locked || current.eventType && current.eventType !== 'default') throw new CalendarError('Este evento se administra en Google Calendar.', 403);
       await service.verifyEventSession(actor, connection.revision, true);
       await google(`${path}?sendUpdates=none`, token, { method: 'DELETE', headers: { 'If-Match': etag } });
+      try { await service.searchIndex?.invalidate(connection.revision, calendar.id); } catch { /* Retry through the normal incremental refresh. */ }
       return { deleted: true };
     },
   };
@@ -154,8 +311,11 @@ export function eventsHandler(service: Service, fetcher: typeof fetch = fetch) {
   return async (request: Request) => {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     if (request.method !== 'POST') return Response.json({ error: 'Método no permitido.' }, { status: 405, headers });
+    const started = performance.now(); let authenticatedAt = started;
+    const responseHeaders = () => ({ ...headers, 'Server-Timing': `auth;dur=${(authenticatedAt - started).toFixed(1)},agenda;dur=${(performance.now() - authenticatedAt).toFixed(1)}` });
     try {
       const actor = await service.requireUser(request);
+      authenticatedAt = performance.now();
       if (Number(request.headers.get('content-length') || 0) > 32000) throw new CalendarError('Solicitud demasiado grande.', 413);
       const text = await request.text();
       if (text.length > 32000) throw new CalendarError('Solicitud demasiado grande.', 413);
@@ -164,15 +324,18 @@ export function eventsHandler(service: Service, fetcher: typeof fetch = fetch) {
       if (!body || typeof body !== 'object') throw new CalendarError('Solicitud inválida.');
       let result;
       switch (body.action) {
+        case 'prepare-search': result = await events.prepareSearch(actor); break;
+        case 'search-dates': result = await events.searchDates(actor, body.ids, body.today); break;
+        case 'search': result = await events.search(actor, body.query, body.today); break;
         case 'list': result = await events.list(actor, body.from, body.to); break;
         case 'calendars': result = await events.selected(actor); break;
         case 'save': result = await events.save(actor, body); break;
         case 'delete': result = await events.remove(actor, body.id, body.etag); break;
         default: throw new CalendarError('Acción inválida.');
       }
-      return Response.json(result, { headers });
+      return Response.json(result, { headers: responseHeaders() });
     } catch (error) {
-      return Response.json({ error: error instanceof CalendarError ? error.message : 'No se pudo consultar Google Calendar. Intenta actualizar de nuevo.' }, { status: error instanceof CalendarError ? error.status : 500, headers });
+      return Response.json({ error: error instanceof CalendarError ? error.message : 'No se pudo consultar Google Calendar. Intenta actualizar de nuevo.' }, { status: error instanceof CalendarError ? error.status : 500, headers: responseHeaders() });
     }
   };
 }

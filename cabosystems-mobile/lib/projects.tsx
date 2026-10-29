@@ -1,6 +1,8 @@
-﻿import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { getMyProjects } from './api';
 import { useAuth } from './auth';
+import { Platform } from 'react-native';
+import { cacheFieldProjects, readFieldProjects } from './fieldOutboxStore';
 import type { Project } from '@/types/database';
 
 interface ProjectsContextType {
@@ -25,18 +27,35 @@ const ProjectsContext = createContext<ProjectsContextType>({
 
 export function ProjectsProvider({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
+  const owner = session?.user.id || '';
+  const ownerRef = useRef(owner);
+  ownerRef.current = owner;
+  const requestRef = useRef(0);
+  const [dataOwner, setDataOwner] = useState('');
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectIdState] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
   const mountedRef = useRef(true);
 
   const refreshProjects = useCallback(async () => {
-    if (!session) return;
+    if (!owner) return;
+    const request = ++requestRef.current;
+    const current = () => mountedRef.current && ownerRef.current === owner && requestRef.current === request;
     setLoading(true);
     try {
+      if (Platform.OS !== 'web') {
+        const cached = await readFieldProjects(owner).catch(() => []);
+        if (current() && cached.length) {
+          setProjects(cached); setDataOwner(owner);
+          setSelectedProjectIdState(previous => cached.some(project => project.id === previous) ? previous : cached[0]?.id);
+        }
+      }
+      if (!current()) return;
       const data = await getMyProjects();
-      if (!mountedRef.current) return;
+      if (!current()) return;
       setProjects(data);
+      setDataOwner(owner);
+      if (Platform.OS !== 'web') void cacheFieldProjects(owner, data).catch(() => {});
       setSelectedProjectIdState((prev) => {
         if (prev && data.some((p) => p.id === prev)) return prev;
         return data[0]?.id;
@@ -44,13 +63,14 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.warn('Error fetching projects in ProjectsProvider:', err);
     } finally {
-      if (mountedRef.current) setLoading(false);
+      if (current()) setLoading(false);
     }
-  }, [session]);
+  }, [owner]);
 
   useEffect(() => {
     mountedRef.current = true;
-    if (session) {
+    setProjects([]); setDataOwner(''); setSelectedProjectIdState(undefined);
+    if (owner) {
       refreshProjects();
     } else {
       setProjects([]);
@@ -59,9 +79,10 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mountedRef.current = false;
     };
-  }, [session, refreshProjects]);
+  }, [owner, refreshProjects]);
 
-  const selectedProject = projects.find((p) => p.id === selectedProjectId) ?? projects[0] ?? null;
+  const visibleProjects = dataOwner === owner ? projects : [];
+  const selectedProject = visibleProjects.find((p) => p.id === selectedProjectId) ?? visibleProjects[0] ?? null;
 
   const setSelectedProject = useCallback((project: Project) => {
     setSelectedProjectIdState(project.id);
@@ -71,18 +92,29 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     setSelectedProjectIdState(id);
   }, []);
 
+  const contextValue = useMemo(
+    () => ({
+      projects: visibleProjects,
+      selectedProject,
+      selectedProjectId,
+      setSelectedProject,
+      setSelectedProjectId,
+      loading,
+      refreshProjects,
+    }),
+    [
+      visibleProjects,
+      selectedProject,
+      selectedProjectId,
+      setSelectedProject,
+      setSelectedProjectId,
+      loading,
+      refreshProjects,
+    ]
+  );
+
   return (
-    <ProjectsContext.Provider
-      value={{
-        projects,
-        selectedProject,
-        selectedProjectId,
-        setSelectedProject,
-        setSelectedProjectId,
-        loading,
-        refreshProjects,
-      }}
-    >
+    <ProjectsContext.Provider value={contextValue}>
       {children}
     </ProjectsContext.Provider>
   );

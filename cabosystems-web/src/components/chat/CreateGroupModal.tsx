@@ -142,7 +142,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
       <div
         ref={dialogRef} role="dialog" aria-modal="true" aria-label={t("Crear grupo")} tabIndex={-1}
-        className="minimal-modal w-full max-w-xl rounded-2xl border border-slate-200 bg-white shadow-theme-md overflow-hidden flex flex-col max-h-[calc(100dvh-32px)]"
+        className="minimal-modal w-full max-w-xl rounded-2xl border border-slate-200 bg-white shadow-theme-md overflow-hidden flex flex-col max-h-[calc(var(--app-viewport-height)-32px)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header - TailAdmin style */}

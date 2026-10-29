@@ -10,6 +10,7 @@ export const TRANSLATIONS = {
   es: {
     // Bottom Tabs Navigation
     'nav.tasks': 'Tareas',
+    'nav.checkins': 'Checks',
     'nav.schedule': 'Agenda',
     'nav.team': 'Equipo',
     'nav.chat': 'Chat',
@@ -21,7 +22,8 @@ export const TRANSLATIONS = {
     'profile.fieldOperations': 'OPERACIÓN EN CAMPO',
     'profile.myWorkOrders': 'Mis Órdenes de Servicio',
     'profile.myWorkOrdersSub': 'Consultar tareas asignadas en villa',
-    'profile.checkinCheckout': 'Registrar Check-In / Check-Out',
+    'profile.checkinCheckout': 'Registrar Check-in / Check-out',
+    'profile.backHome': 'Volver a Tareas',
     'profile.checkinCheckoutSub': 'Captura fotográfica y coordenadas GPS',
     
     // Ajustes de Aplicación
@@ -101,6 +103,7 @@ export const TRANSLATIONS = {
   en: {
     // Bottom Tabs Navigation
     'nav.tasks': 'Tasks',
+    'nav.checkins': 'Checks',
     'nav.schedule': 'Schedule',
     'nav.team': 'Team',
     'nav.chat': 'Chat',
@@ -112,7 +115,8 @@ export const TRANSLATIONS = {
     'profile.fieldOperations': 'FIELD OPERATIONS',
     'profile.myWorkOrders': 'My Work Orders',
     'profile.myWorkOrdersSub': 'View assigned tasks in villa',
-    'profile.checkinCheckout': 'Record Check-In / Check-Out',
+    'profile.checkinCheckout': 'Record Check-in / Check-out',
+    'profile.backHome': 'Back to Tasks',
     'profile.checkinCheckoutSub': 'Photo capture and GPS coordinates',
     
     // Ajustes de Aplicación

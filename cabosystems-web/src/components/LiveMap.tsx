@@ -418,7 +418,7 @@ export const LiveMap: React.FC<LiveMapProps> = ({
           title={t("Centrar en la flota")}
           className="map-control-btn center-btn"
         >
-          <Navigation size={18} className="text-[#f78c26]" />
+          <Navigation size={18} />
         </button>
         {onRefresh && (
           <>

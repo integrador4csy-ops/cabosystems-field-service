@@ -1,18 +1,26 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator, ScrollView, AppState } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import {
   MapPin,
   ChevronRight,
   ClipboardList,
   RefreshCw,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { afterTabPaint } from '@/lib/tabPreparation';
+import { useTabStartup } from '@/lib/tabStartup';
 import { HeaderCaboSystems, useHeaderHeight } from '@/components/HeaderCaboSystems';
 import DailyFormCard from '@/components/DailyFormCard';
+import { TaskFilterSelect } from '@/components/TaskFilterSelect';
+import { matchesTaskAssignee, sortTaskTitles } from '@/lib/taskListFilters';
+import { useLanguage } from '@/lib/i18n';
 import DailyFormModal from '@/components/DailyFormModal';
 import DailyFormConfirmModal from '@/components/DailyFormConfirmModal';
-import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
+import { Colors, Spacing, BorderRadius } from '@/constants/Theme';
 import { Badge } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useProjects } from '@/lib/projects';
@@ -27,38 +35,24 @@ import {
 } from '@/lib/dailyForm';
 import type { Project } from '@/types/database';
 
-function getMazatlanDate() {
-  const text = new Intl.DateTimeFormat('es-MX', {
-    timeZone: 'America/Mazatlan',
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  }).format(new Date());
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
 const STATUS_META: Record<
   string,
   {
     color: string;
     label: string;
-    badgeColor: 'warning' | 'gray' | 'success';
   }
 > = {
   pendiente: {
-    color: Colors.textSecondary,
+    color: 'rgba(52,62,72,0.25)',
     label: 'To do',
-    badgeColor: 'gray',
   },
   en_proceso: {
     color: Colors.primary,
     label: 'Doing',
-    badgeColor: 'warning',
   },
   completada: {
-    color: Colors.success,
+    color: '#000000',
     label: 'Done',
-    badgeColor: 'success',
   },
 };
 
@@ -68,22 +62,26 @@ const TaskCard = React.memo(function TaskCard({
   onPress,
 }: {
   item: TaskWithProject;
-  onPress: () => void;
+  onPress: (id: string) => void;
 }) {
   const meta = STATUS_META[item.estatus] ?? STATUS_META.pendiente;
   const woCode = `WO-${item.id.slice(0, 6).toUpperCase()}`;
+  const handlePress = useCallback(() => {
+    onPress(item.id);
+  }, [item.id, onPress]);
 
   return (
     <Pressable
+      accessibilityRole="button"
       style={({ pressed }) => [
         styles.taskCard,
         pressed && styles.taskCardPressed,
       ]}
-      onPress={onPress}
+      onPress={handlePress}
     >
       <View style={styles.taskCardHeader}>
         <Text style={styles.woCodeText}>{woCode}</Text>
-        <Badge color={meta.badgeColor} variant="light" size="sm">
+        <Badge color="gray" variant="light" size="sm" style={{ backgroundColor: '#FFFFFF', borderColor: meta.color }} textStyle={{ color: Colors.brandSlate }}>
           {meta.label}
         </Badge>
       </View>
@@ -115,27 +113,64 @@ const TaskCard = React.memo(function TaskCard({
 
 const keyExtractor = (item: TaskWithProject) => item.id;
 const EMPTY_TASKS: TaskWithProject[] = [];
+let taskDataCache: { owner: string; items: TaskWithProject[] } = { owner: '', items: [] };
+
+export async function preloadMainTasks(userId: string): Promise<TaskWithProject[]> {
+  if (taskDataCache.owner === userId && taskDataCache.items.length) {
+    return taskDataCache.items;
+  }
+  try {
+    const tasks = await getAccessibleTasks(userId);
+    taskDataCache = { owner: userId, items: tasks };
+    return tasks;
+  } catch (e) {
+    console.warn('Preload main tasks error:', e);
+    return [];
+  }
+}
 
 export default function DashboardScreen() {
+  const { markMainReady } = useTabStartup();
+  const { language } = useLanguage();
+  const en = language === 'en';
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const headerHeight = useHeaderHeight();
   const { profile } = useAuth();
   const {
     projects,
     selectedProject,
-    selectedProjectId,
     setSelectedProject,
-    setSelectedProjectId,
     refreshProjects,
   } = useProjects();
+  const selectedProjectId = selectedProject?.id;
   const requestVersion = useRef(0);
-  const [taskData, setTaskData] = useState<{ owner: string; items: TaskWithProject[] }>({ owner: '', items: [] });
+  const lastLoadTimeRef = useRef(taskDataCache.owner === profile?.id ? Date.now() : 0);
+  const [taskData, setTaskData] = useState<{ owner: string; items: TaskWithProject[] }>(() =>
+    taskDataCache.owner === profile?.id ? taskDataCache : { owner: '', items: [] }
+  );
   const tasks = taskData.owner === profile?.id ? taskData.items : EMPTY_TASKS;
-  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (profile?.id && taskData.owner === profile.id) markMainReady();
+  }, [profile?.id, taskData.owner, markMainReady]);
+  const [loading, setLoading] = useState(() => taskDataCache.owner !== profile?.id);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'en_proceso' | 'pendiente' | 'completada'>('all');
-  const [allProjects, setAllProjects] = useState(false);
+  const [assignee, setAssignee] = useState('all');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  useEffect(() => { setAssignee('all'); }, [profile?.id]);
+  const assigneeOptions = useMemo(() => {
+    const people = new Map<string, string>();
+    for (const task of tasks) {
+      if (task.asignado_a) people.set(task.asignado_a, task.profiles?.nombre || (task.asignado_a === profile?.id ? profile.nombre : en ? 'Unavailable name' : 'Nombre no disponible'));
+    }
+    return [
+      { value: 'all', label: en ? 'Any assignee' : 'Cualquier responsable' },
+      { value: 'unassigned', label: en ? 'Unassigned' : 'Sin responsable' },
+      ...[...people].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => ({ value, label })),
+    ];
+  }, [tasks, en, profile?.id, profile?.nombre]);
 
   // Estado del Formulario Diario de Campo
   const [dailyFormCompleted, setDailyFormCompleted] = useState(false);
@@ -153,7 +188,7 @@ export default function DashboardScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      checkDailyForm();
+      return afterTabPaint(() => { void checkDailyForm(); });
     }, [checkDailyForm])
   );
 
@@ -181,36 +216,57 @@ export default function DashboardScreen() {
     async (isRefresh = false) => {
       if (!profile?.id) return;
       const version = ++requestVersion.current;
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else if (taskData.owner !== profile.id) {
+        setLoading(true);
+      }
       setError(null);
       try {
         const [, tsks] = await Promise.all([
           refreshProjects(),
           getAccessibleTasks(profile.id),
         ]);
-        if (version === requestVersion.current) setTaskData({ owner: profile.id, items: tsks });
+        if (version === requestVersion.current) {
+          taskDataCache = { owner: profile.id, items: tsks };
+          setTaskData(taskDataCache);
+          lastLoadTimeRef.current = Date.now();
+        }
       } catch (e) {
         console.error('Task load error:', e);
         if (version === requestVersion.current) setError('No se pudieron cargar las tareas');
       } finally {
+        markMainReady();
         if (version === requestVersion.current) {
           setLoading(false);
           setRefreshing(false);
         }
       }
     },
-    [profile?.id, refreshProjects]
+    [profile?.id, refreshProjects, taskData.owner, taskData.items.length, markMainReady]
   );
 
   const loadRef = useRef(load);
   loadRef.current = load;
 
   useFocusEffect(useCallback(() => {
-    void load();
-    const listener = AppState.addEventListener('change', state => { if (state === 'active') void load(true); });
-    return () => { requestVersion.current++; listener.remove(); };
-  }, [load]));
+    let cancel = () => {};
+    const now = Date.now();
+    const isStale =
+      taskData.owner !== profile?.id ||
+      now - lastLoadTimeRef.current > 25000;
+
+    if (isStale) {
+      cancel = afterTabPaint(() => { void load(); });
+    }
+    const listener = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        cancel();
+        cancel = afterTabPaint(() => { void load(true); });
+      }
+    });
+    return () => { cancel(); requestVersion.current++; listener.remove(); };
+  }, [load, taskData.owner, taskData.items.length, profile?.id]));
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -239,30 +295,51 @@ export default function DashboardScreen() {
   }, [profile?.id]);
 
   const filteredTasks = useMemo(
-    () => (!allProjects && selectedProjectId ? tasks.filter((t) => t.proyecto_id === selectedProjectId) : tasks),
-    [tasks, selectedProjectId, allProjects]
+    () => tasks.filter(task => task.proyecto_id === selectedProjectId && matchesTaskAssignee(task, assignee)),
+    [tasks, selectedProjectId, assignee]
   );
 
-  const stats = useMemo(() => ({
-    en_proceso: filteredTasks.filter((t) => t.estatus === 'en_proceso').length,
-    pendiente: filteredTasks.filter((t) => t.estatus === 'pendiente').length,
-    completada: filteredTasks.filter((t) => t.estatus === 'completada').length,
-  }), [filteredTasks]);
+  const stats = useMemo(() => {
+    let en_proceso = 0;
+    let pendiente = 0;
+    let completada = 0;
+    for (const t of filteredTasks) {
+      if (t.estatus === 'en_proceso') en_proceso++;
+      else if (t.estatus === 'pendiente') pendiente++;
+      else if (t.estatus === 'completada') completada++;
+    }
+    return { en_proceso, pendiente, completada };
+  }, [filteredTasks]);
 
   const displayedTasks = useMemo(() => {
-    if (statusFilter === 'all') return filteredTasks;
-    return filteredTasks.filter((t) => t.estatus === statusFilter);
-  }, [filteredTasks, statusFilter]);
+    const visible = statusFilter === 'all' ? filteredTasks : filteredTasks.filter((t) => t.estatus === statusFilter);
+    return sortTaskTitles(visible, sortDirection, en ? 'en' : 'es');
+  }, [filteredTasks, statusFilter, sortDirection, en]);
 
   const rawNombre = profile?.nombre || 'Técnico';
   const cleanNombre = rawNombre.includes('@') ? rawNombre.split('@')[0] : rawNombre.split(' ')[0];
   const firstName = cleanNombre.charAt(0).toUpperCase() + cleanNombre.slice(1);
 
+  const handleOpenTask = useCallback(
+    (taskId: string) => {
+      router.push(`/task/${taskId}` as any);
+    },
+    [router]
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: TaskWithProject }) => (
-      <TaskCard item={item} onPress={() => router.push(`/task/${item.id}` as any)} />
+      <TaskCard item={item} onPress={handleOpenTask} />
     ),
-    [router]
+    [handleOpenTask]
+  );
+
+  const listContentStyle = useMemo(
+    () => [
+      styles.listContent,
+      { paddingTop: headerHeight + Spacing.md, paddingBottom: insets.bottom + 110 },
+    ],
+    [headerHeight, insets.bottom]
   );
 
   const ListHeader = useMemo(
@@ -272,19 +349,27 @@ export default function DashboardScreen() {
         <View style={styles.greetingRow}>
           <View>
             <Text style={styles.greetingTitle}>Hola, {firstName}</Text>
-            <Text style={styles.greetingSubtitle}>
-              {getMazatlanDate()} · {filteredTasks.length} {filteredTasks.length === 1 ? 'orden disponible' : 'órdenes disponibles'}
-            </Text>
           </View>
-        </View>
-
-        {/* Tarjeta de Formulario Diario */}
         <DailyFormCard
+          compact
           completed={dailyFormCompleted}
           completedAt={dailyFormCompletedAt}
           onPress={handlePressDailyForm}
         />
+        </View>
 
+        <View style={styles.workFilters}>
+          <HeaderCaboSystems selectorOnly projects={projects} selectedProjectId={selectedProjectId}
+            onSelectProject={setSelectedProject} />
+          <TaskFilterSelect label={en ? 'Assignee' : 'Responsable'} value={assignee} options={assigneeOptions} onChange={setAssignee} />
+          <Pressable accessibilityRole="button"
+            accessibilityLabel={en ? `Order by title: ${sortDirection === 'asc' ? 'ascending' : 'descending'}` : `Ordenar por título: ${sortDirection === 'asc' ? 'ascendente' : 'descendente'}`}
+            accessibilityHint={en ? 'Tap to reverse order' : 'Pulsa para invertir el orden'}
+            onPress={() => setSortDirection(direction => direction === 'asc' ? 'desc' : 'asc')}
+            style={({ pressed }) => [styles.sortButton, pressed && { opacity: 0.6 }]}>
+            {sortDirection === 'asc' ? <ArrowUp size={20} color={Colors.primary} /> : <ArrowDown size={20} color={Colors.primary} />}
+          </Pressable>
+        </View>
         {/* Barra de Filtros Minimalista (Todas visibles en pantalla) */}
         <View style={styles.filterPillsContainer}>
           <Pressable
@@ -369,7 +454,7 @@ export default function DashboardScreen() {
         </View>
       </View>
     ),
-    [firstName, filteredTasks.length, dailyFormCompleted, dailyFormCompletedAt, statusFilter, stats, handlePressDailyForm]
+    [firstName, filteredTasks.length, dailyFormCompleted, dailyFormCompletedAt, statusFilter, stats, handlePressDailyForm, projects, selectedProjectId, setSelectedProject, en, assignee, assigneeOptions, sortDirection]
   );
 
   const ListEmpty = useCallback(() => {
@@ -418,21 +503,17 @@ export default function DashboardScreen() {
   return (
     <View style={styles.container}>
       <HeaderCaboSystems
+        showProjectSelector={false}
         projects={projects}
         selectedProjectId={selectedProjectId}
-        onSelectProject={(project) => { setAllProjects(false); setSelectedProject(project); }}
-        allProjectsSelected={allProjects}
-        onSelectAllProjects={() => setAllProjects(true)}
+        onSelectProject={setSelectedProject}
       />
 
       <FlashList
         data={displayedTasks}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
-        contentContainerStyle={[
-          styles.listContent,
-          { paddingTop: headerHeight + Spacing.md },
-        ]}
+        contentContainerStyle={listContentStyle}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={ListEmpty}
         refreshing={refreshing}
@@ -477,6 +558,8 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
+  workFilters: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  sortButton: { width: 44, height: 44, flexShrink: 0, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(0,0,0,0.12)', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -489,26 +572,20 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   headerContainer: {
-    marginBottom: Spacing.sm,
+    marginBottom: 16,
   },
   greetingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    marginBottom: 20,
     paddingTop: Spacing.xs,
   },
   greetingTitle: {
     fontFamily: 'Outfit_700Bold',
-    fontSize: 22,
-    color: Colors.text,
+    fontSize: 24,
+    color: '#000000',
     letterSpacing: -0.3,
-  },
-  greetingSubtitle: {
-    fontFamily: 'Outfit_400Regular',
-    fontSize: 12.5,
-    color: Colors.textSecondary,
-    marginTop: 2,
   },
   filterPillsContainer: {
     flexDirection: 'row',
@@ -521,12 +598,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 7,
+    minHeight: 44,
+    paddingVertical: 8,
     paddingHorizontal: 2,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.card,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: 'rgba(0,0,0,0.12)',
   },
   filterPillActive: {
     backgroundColor: Colors.primary,
@@ -540,52 +618,53 @@ const styles = StyleSheet.create({
   },
   filterPillTextActive: {
     fontFamily: 'Outfit_700Bold',
-    color: '#FFFFFF',
+    color: Colors.textWhite,
   },
   taskCard: {
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.sm,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
-    padding: Spacing.md,
-    gap: Spacing.xs,
-    ...Shadow.xs,
+    borderColor: 'rgba(0,0,0,0.12)',
+    padding: 16,
+    gap: 8,
   },
   taskCardPressed: {
     opacity: 0.9,
-    backgroundColor: '#FAFBFD',
+    backgroundColor: '#FFFFFF',
   },
   taskCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   woCodeText: {
     fontFamily: 'Outfit_600SemiBold',
     fontSize: 11,
-    color: Colors.textMuted,
-    letterSpacing: 0.5,
+    color: 'rgba(0,0,0,0.55)',
   },
   taskTitle: {
     fontFamily: 'Outfit_600SemiBold',
-    fontSize: 15,
-    color: Colors.text,
-    lineHeight: 21,
+    fontSize: 16,
+    color: '#000000',
+    lineHeight: 22,
   },
   taskDescription: {
     fontFamily: 'Outfit_400Regular',
     fontSize: 13,
-    color: Colors.textSecondary,
-    lineHeight: 18,
+    color: Colors.brandSlate,
+    lineHeight: 19,
   },
   taskFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: Spacing.xs,
-    paddingTop: Spacing.xs,
+    marginTop: 4,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.06)',
   },
   locationChip: {
     flexDirection: 'row',
@@ -608,7 +687,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.xs,
