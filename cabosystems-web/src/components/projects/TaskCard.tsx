@@ -11,7 +11,6 @@ import {
   Plus,
   ChevronDown,
   X,
-  ArrowRightLeft,
   UserRound,
 } from 'lucide-react';
 import type { Tarea, Subtarea } from '../../types/projects';
