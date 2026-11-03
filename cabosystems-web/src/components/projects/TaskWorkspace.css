@@ -30,7 +30,7 @@
 .task-location-context > span { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .task-location-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .task-workspace-split .workspace-work-filters { margin-left: 0; }
-.task-workspace-split .task-board-column { flex: 1 1 280px; min-width: 260px; max-width: 320px; }
+.task-workspace-split .task-board-column { flex: 1 1 0px; min-width: 260px; max-width: none; }
 @media (max-width: 900px) {
   .task-workspace.task-workspace-split { flex-direction: column; }
   .task-location-panel { flex: 0 0 auto; border-right: 0; border-bottom: 1px solid var(--color-slate-200); }
@@ -45,6 +45,44 @@
   .task-location-list button { min-height: 44px; }
   .task-location-context { padding-top: 12px; }
 }
+
+.task-progress-overlay { position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center; padding: 20px; background: rgb(15 23 42 / 48%); }
+.task-progress-dialog { width: min(100%, 560px); max-height: min(760px, calc(100vh - 40px)); overflow: auto; border-radius: 16px; padding: 20px; background: #fff; box-shadow: 0 24px 70px rgb(15 23 42 / 24%); }
+.task-progress-dialog > header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.task-progress-dialog > header h3 { min-width: 0; overflow-wrap: anywhere; color: var(--color-slate-900); font-size: 19px; font-weight: 700; line-height: 1.25; }
+.task-progress-dialog > header button { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; border-radius: 9px; color: var(--color-slate-500); }
+.task-progress-dialog > header button:hover { background: var(--color-slate-100); color: var(--color-slate-800); }
+.task-progress-action { margin: 14px 0 16px; border: 1px solid var(--color-brand-200); padding: 8px 11px; border-radius: 8px; background: var(--color-brand-50); color: var(--color-slate-700); font-size: 13px; font-weight: 600; }
+.task-progress-comment, .task-progress-photo { display: grid; gap: 7px; margin-top: 14px; color: var(--color-slate-700); font-size: 13px; font-weight: 600; }
+.task-progress-comment textarea { width: 100%; resize: vertical; min-height: 96px; border: 1px solid var(--color-slate-300); border-radius: 12px; padding: 11px 12px; color: var(--color-slate-900); font: inherit; font-size: 16px; font-weight: 400; outline: none; }
+.task-progress-comment textarea:focus { border-color: var(--color-brand-500); box-shadow: 0 0 0 3px rgb(247 140 38 / 14%); }
+.task-progress-comment small, .task-progress-photo small { justify-self: end; color: var(--color-slate-500); font-size: 11px; font-weight: 400; }
+.task-progress-photo-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.task-progress-photo-actions button, .task-progress-preview button { display: flex; min-height: 42px; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--color-slate-300); border-radius: 11px; color: var(--color-slate-700); background: #fff; font-size: 12px; font-weight: 600; }
+.task-progress-photo-actions button:hover, .task-progress-preview button:hover { border-color: var(--color-brand-400); color: var(--color-brand-700); background: var(--color-brand-50); }
+.task-progress-preview { position: relative; overflow: hidden; border: 1px solid var(--color-slate-200); border-radius: 13px; background: var(--color-slate-50); }
+.task-progress-preview img { display: block; width: 100%; max-height: 260px; object-fit: contain; }
+.task-progress-preview button { position: absolute; right: 9px; bottom: 9px; min-height: 34px; padding: 0 11px; box-shadow: 0 2px 8px rgb(15 23 42 / 12%); }
+.task-progress-error { margin-top: 12px; border-radius: 9px; padding: 9px 11px; color: #991b1b; background: #fef2f2; font-size: 12px; }
+.task-progress-dialog > footer { position: sticky; bottom: -20px; display: flex; justify-content: flex-end; gap: 9px; margin-top: 20px; border-top: 1px solid var(--color-slate-100); padding: 15px 0 20px; background: #fff; }
+.task-progress-dialog > footer button { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--color-slate-300); border-radius: 10px; padding: 0 15px; color: var(--color-slate-700); font-size: 13px; font-weight: 650; }
+.task-progress-dialog > footer .task-progress-submit { border-color: var(--color-brand-500); color: #fff; background: var(--color-brand-500); }
+.task-progress-dialog > footer button:disabled { cursor: wait; opacity: .58; }
+.task-progress-dialog button:focus-visible, .task-progress-history a:focus-visible { outline: 3px solid rgb(247 140 38 / 28%); outline-offset: 2px; }
+.task-progress-history { margin-top: 14px; border-top: 1px solid var(--color-slate-200); padding-top: 13px; }
+.task-progress-history h5 { color: var(--color-slate-800); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.task-progress-history > p { display: flex; align-items: center; gap: 7px; margin-top: 10px; color: var(--color-slate-500); font-size: 12px; }
+.task-progress-history ol { display: grid; gap: 9px; margin-top: 10px; }
+.task-progress-history li { border: 1px solid var(--color-slate-200); border-radius: 12px; padding: 10px; background: #fff; }
+.task-progress-history li > div { display: flex; justify-content: space-between; gap: 12px; color: var(--color-slate-700); font-size: 11px; }
+.task-progress-history time { color: var(--color-slate-500); }
+.task-progress-history li > p { margin-top: 4px; color: var(--color-slate-700); font-size: 12px; }
+.task-progress-history blockquote { margin-top: 7px; border-left: 1px solid var(--color-brand-400); padding-left: 8px; color: var(--color-slate-600); font-size: 12px; white-space: pre-wrap; }
+.task-progress-history > p button { min-height: 32px; margin-left: 6px; border: 1px solid var(--color-slate-300); border-radius: 8px; padding: 0 10px; color: var(--color-slate-700); background: #fff; font-weight: 650; }
+.task-progress-history a { display: inline-grid; gap: 5px; margin-top: 8px; color: var(--color-brand-700); font-size: 11px; font-weight: 650; }
+.task-progress-history a img { width: 112px; height: 74px; border-radius: 8px; object-fit: cover; }
+.task-progress-history a span { display: flex; align-items: center; gap: 5px; }
+@media (max-width: 639px) { .task-progress-overlay { align-items: end; padding: 0; } .task-progress-dialog { max-height: 92vh; border-radius: 20px 20px 0 0; padding: 18px; } .task-progress-photo-actions { grid-template-columns: 1fr; } }
 .workspace-filterbar { display: flex; align-items: flex-end; border-bottom: 1px solid var(--color-slate-200); }
 .workspace-filters { display: flex; flex: 1; min-width: 0; align-items: flex-end; flex-wrap: wrap; gap: 12px 32px; padding: 12px 16px; }
 .workspace-filter-group { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: end; gap: 12px; flex: 1 1 320px; min-width: 0; }
@@ -77,6 +115,7 @@
 .workspace-compact-filters > label { display: block; min-width: 0; }
 .workspace-compact-assignee { width: 160px; }
 .workspace-compact-status { width: 120px; }
+.workspace-compact-priority { width: 130px; }
 .workspace-sort-switch { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--color-slate-200); border-radius: 6px; background: #fff; color: var(--color-slate-600); flex-shrink: 0; }
 .workspace-sort-switch:hover { border-color: var(--color-slate-300); }
 .workspace-compact-filters .app-select-trigger { height: 30px; min-height: 30px; gap: 6px; padding: 0 8px; border-radius: 6px; font-size: 12px; }
@@ -86,6 +125,7 @@
 @media (max-width: 1100px) {
   .workspace-compact-assignee { width: 140px; }
   .workspace-compact-status { width: 110px; }
+  .workspace-compact-priority { width: 118px; }
 }
 @media (max-width: 639px) {
   .task-workspace-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 12px; padding: 0 12px 8px; }
@@ -93,6 +133,9 @@
   .workspace-toolbar-options .workspace-count { grid-column: 2; grid-row: 1; justify-self: end; }
   .workspace-compact-filters { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto auto; grid-column: 1 / -1; padding: 0; }
   .workspace-compact-filters > label { width: auto; }
+  .workspace-compact-priority { grid-column: 1 / 3; grid-row: 2; }
+  .workspace-sort-switch { grid-column: 3; grid-row: 2; }
+  .workspace-compact-reset { grid-column: 4; grid-row: 2; }
   .workspace-compact-filters .app-select-trigger, .workspace-compact-reset, .workspace-sort-switch { min-height: 36px; height: 36px; }
   .workspace-sort-switch { width: 36px; }
 }

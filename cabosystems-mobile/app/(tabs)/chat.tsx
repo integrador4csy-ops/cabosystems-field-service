@@ -1,4 +1,7 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
+import { translateCurrent as translateInterface } from '@/lib/localization';
+import { getLocale } from '@/lib/localization';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { ProfileNavButton } from '@/components/ProfileNavButton';
 import {
   View,
@@ -15,13 +18,13 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { afterTabPaint } from '@/lib/tabPreparation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import NetInfo from '@react-native-community/netinfo';
 import {
   Search,
   Plus,
   MessageSquare,
   Users,
   Video,
-  Shield,
   Sparkles,
   Camera,
   ChevronRight,
@@ -30,6 +33,7 @@ import {
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { useAuth } from '@/lib/auth';
 import { getMyChatGroups, getCachedMyChatGroups } from '@/lib/chatApi';
+import { restoreChatRooms, getSavedChatGroups, subscribeChatRooms } from '@/lib/chatRoomCache';
 import type { ChatGroup } from '@/types/database';
 
 const LOGO_DARK = require('@/assets/images/Logo-CaboSystems-Field-Service-Dark.png');
@@ -51,7 +55,7 @@ function formatChatTime(dateString: string): string {
     date.getFullYear() === now.getFullYear();
 
   if (isToday) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' });
   }
 
   const yesterday = new Date(now);
@@ -62,33 +66,33 @@ function formatChatTime(dateString: string): string {
     date.getFullYear() === yesterday.getFullYear();
 
   if (isYesterday) {
-    return 'Ayer';
+    return translateInterface("Ayer");
   }
 
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  return date.toLocaleDateString(getLocale(), { month: 'short', day: 'numeric' });
 }
 
 type ChatFilter = 'todos' | 'recientes' | 'evidencias';
 
 const LastMessagePreview = React.memo(function LastMessagePreview({ group }: { group: ChatGroup }) {
+  const { t: tr } = useInterfaceTranslation();
   const lastMsg = group.ultimo_mensaje;
   if (!lastMsg) {
     return (
-      <Text style={styles.emptyMsgText} numberOfLines={1}>
-        Sin mensajes aún · Toca para abrir
-      </Text>
+      <Text style={styles.emptyMsgText} numberOfLines={1}>{tr("Sin mensajes aún · Toca para abrir")}</Text>
     );
   }
 
-  const sender = lastMsg.profiles?.nombre?.split(' ')[0] || 'Técnico';
+  if (lastMsg.tipo === 'audio' || lastMsg.tipo === 'archivo') return <Text style={styles.lastMsgText} numberOfLines={1}>{lastMsg.tipo === 'audio' ? 'Audio' : lastMsg.media_meta?.fileName || lastMsg.contenido || tr("Documento")}</Text>;
+
+  const sender = lastMsg.profiles?.nombre?.split(' ')[0] || tr("Técnico");
 
   if (lastMsg.tipo === 'imagen') {
     return (
       <View style={styles.mediaPreviewRow}>
         <Camera size={13} color={Colors.primary} strokeWidth={2.2} />
         <Text style={styles.mediaPreviewText} numberOfLines={1}>
-          {sender}: Foto de evidencia
-        </Text>
+          {sender}{tr(": Foto de evidencia")}</Text>
       </View>
     );
   }
@@ -98,8 +102,7 @@ const LastMessagePreview = React.memo(function LastMessagePreview({ group }: { g
       <View style={styles.mediaPreviewRow}>
         <Video size={13} color={Colors.primary} strokeWidth={2.2} />
         <Text style={styles.mediaPreviewText} numberOfLines={1}>
-          {sender}: Video técnico
-        </Text>
+          {sender}{tr(": Video técnico")}</Text>
       </View>
     );
   }
@@ -109,8 +112,7 @@ const LastMessagePreview = React.memo(function LastMessagePreview({ group }: { g
       <View style={styles.mediaPreviewRow}>
         <Sparkles size={13} color={Colors.primary} strokeWidth={2.2} />
         <Text style={styles.mediaPreviewText} numberOfLines={1}>
-          {sender}: Sticker
-        </Text>
+          {sender}{tr(": Sticker")}</Text>
       </View>
     );
   }
@@ -130,6 +132,7 @@ const ChatGroupItem = React.memo(function ChatGroupItem({
   item: ChatGroup;
   onPress: (id: string) => void;
 }) {
+  const { t: tr } = useInterfaceTranslation();
   const lastMsgTime = item.ultimo_mensaje
     ? formatChatTime(item.ultimo_mensaje.created_at)
     : '';
@@ -143,6 +146,7 @@ const ChatGroupItem = React.memo(function ChatGroupItem({
 
   return (
     <Pressable
+      accessibilityRole="button" accessibilityLabel={tr('Abrir chat ') + item.nombre}
       style={({ pressed }) => [styles.groupCard, pressed && styles.groupCardPressed]}
       onPress={handlePress}
     >
@@ -163,11 +167,7 @@ const ChatGroupItem = React.memo(function ChatGroupItem({
           </View>
         )}
 
-        {isAdminOfGroup && (
-          <View style={styles.adminMiniBadge}>
-            <Shield size={9} color="#FFFFFF" strokeWidth={2.4} />
-          </View>
-        )}
+
       </View>
 
       {/* Detalles del Grupo */}
@@ -179,31 +179,29 @@ const ChatGroupItem = React.memo(function ChatGroupItem({
           {!!lastMsgTime && <Text style={styles.timeText}>{lastMsgTime}</Text>}
         </View>
 
-        {/* Badges de Atributos */}
+        <View style={styles.lastMessageContainer}><LastMessagePreview group={item} /></View>
+        {/* Group attributes */}
         <View style={styles.badgesRow}>
           {item.solo_multimedia ? (
             <View style={styles.multimediaBadge}>
               <Camera size={10.5} color={Colors.primary} strokeWidth={2.2} />
-              <Text style={styles.multimediaBadgeText}>Evidencias</Text>
+              <Text style={styles.multimediaBadgeText}>{tr("Evidencias")}</Text>
             </View>
           ) : null}
 
           <View style={styles.membersCountBadge}>
             <Users size={10.5} color={Colors.textSecondary} strokeWidth={2} />
-            <Text style={styles.membersCountText}>{item.miembros_count || 1} miembros</Text>
+            <Text style={styles.membersCountText}>{item.miembros_count || 1}{tr(" miembros")}</Text>
           </View>
 
           {isAdminOfGroup && (
             <View style={styles.roleTag}>
-              <Text style={styles.roleTagText}>Admin</Text>
+              <Text style={styles.roleTagText}>{tr("Admin")}</Text>
             </View>
           )}
         </View>
 
-        {/* Vista previa último mensaje */}
-        <View style={styles.lastMessageContainer}>
-          <LastMessagePreview group={item} />
-        </View>
+
       </View>
 
       {/* Indicador flecha derecha */}
@@ -215,6 +213,7 @@ const ChatGroupItem = React.memo(function ChatGroupItem({
 });
 
 export default function ChatTabScreen() {
+  const { t: tr } = useInterfaceTranslation();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -226,6 +225,32 @@ export default function ChatTabScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<ChatFilter>('todos');
   const lastFetchRef = useRef(cached ? Date.now() : 0);
+  const listOwner = useRef(profile?.id ?? '');
+
+  useEffect(() => {
+    const owner = profile?.id;
+    if (listOwner.current !== (owner ?? '')) {
+      listOwner.current = owner ?? '';
+      const prepared = owner ? getCachedMyChatGroups(owner) : null;
+      setGroups(prepared ?? []);
+      setLoading(!prepared);
+      lastFetchRef.current = prepared ? Date.now() : 0;
+    }
+    if (!owner) return;
+    let active = true;
+    void restoreChatRooms(owner).then(() => {
+      if (!active || listOwner.current !== owner) return;
+      const saved = getSavedChatGroups(owner);
+      if (saved.length) { setGroups(previous => previous.length ? previous : saved); setLoading(false); }
+    });
+    return () => { active = false; };
+  }, [profile?.id]);
+
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    return subscribeChatRooms(profile.id, () => { setGroups(getSavedChatGroups(profile.id!)); setLoading(false); });
+  }, [profile?.id]);
 
   const isGlobalAdmin =
     profile?.rol === 'admin' ||
@@ -234,15 +259,23 @@ export default function ChatTabScreen() {
 
   const loadGroups = async () => {
     if (!profile?.id) return;
+    const owner = profile.id;
     try {
+      const connection = await NetInfo.fetch();
+      if (listOwner.current !== owner) return;
+      if (connection.isConnected === false || connection.isInternetReachable === false) {
+        await restoreChatRooms(profile.id);
+        setGroups(getSavedChatGroups(profile.id));
+        return;
+      }
       const data = await getMyChatGroups(profile.id);
+      if (listOwner.current !== owner) return;
       setGroups(data);
       lastFetchRef.current = Date.now();
     } catch (err) {
       console.error('Error loading chat groups:', err);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (listOwner.current === owner) { setLoading(false); setRefreshing(false); }
     }
   };
 
@@ -336,7 +369,8 @@ export default function ChatTabScreen() {
         <Search size={16} color={Colors.textMuted} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Buscar canal, proyecto o mensaje..."
+          accessibilityLabel={tr("Buscar canal, proyecto o mensaje")}
+          placeholder={tr("Buscar canal, proyecto o mensaje...")}
           placeholderTextColor={Colors.textMuted}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -371,8 +405,7 @@ export default function ChatTabScreen() {
             ]}
             numberOfLines={1}
             adjustsFontSizeToFit
-          >
-            Todos ({stats.todos})
+          >{tr("Todos (")}{stats.todos})
           </Text>
         </Pressable>
 
@@ -391,8 +424,7 @@ export default function ChatTabScreen() {
             ]}
             numberOfLines={1}
             adjustsFontSizeToFit
-          >
-            Recientes ({stats.recientes})
+          >{tr("Recientes (")}{stats.recientes})
           </Text>
         </Pressable>
 
@@ -411,8 +443,7 @@ export default function ChatTabScreen() {
             ]}
             numberOfLines={1}
             adjustsFontSizeToFit
-          >
-            Evidencias ({stats.evidencias})
+          >{tr("Evidencias (")}{stats.evidencias})
           </Text>
         </Pressable>
       </View>
@@ -424,7 +455,7 @@ export default function ChatTabScreen() {
       return (
         <View style={styles.centerLoading}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Cargando canales del equipo...</Text>
+          <Text style={styles.loadingText}>{tr("Cargando canales del equipo...")}</Text>
         </View>
       );
     }
@@ -434,16 +465,16 @@ export default function ChatTabScreen() {
           <MessageSquare size={30} color={Colors.primary} strokeWidth={2.2} />
         </View>
         <Text style={styles.emptyTitle}>
-          {searchQuery ? 'Sin canales encontrados' : 'Sin grupos activos'}
+          {searchQuery ? tr("Sin canales encontrados") : tr("Sin grupos activos")}
         </Text>
         <Text style={styles.emptySubtitle}>
           {searchQuery
-            ? `No hay canales que coincidan con "${searchQuery}". Intenta con otro término.`
+            ? tr("No hay canales que coincidan con \"{value0}\". Intenta con otro término.", { value0: searchQuery })
             : filter !== 'todos'
-            ? 'No hay conversaciones activas en esta sección. Cambia de filtro para ver otros grupos.'
+            ? tr("No hay conversaciones activas en esta sección. Cambia de filtro para ver otros grupos.")
             : isGlobalAdmin
-            ? 'Crea un nuevo canal de cuadrilla para coordinar las labores y enviar reportes técnicos.'
-            : 'Tu supervisor te asignará a los canales correspondientes a tus proyectos.'}
+            ? tr("Crea un nuevo canal de cuadrilla para coordinar las labores y enviar reportes técnicos.")
+            : tr("Tu supervisor te asignará a los canales correspondientes a tus proyectos.")}
         </Text>
         {searchQuery || filter !== 'todos' ? (
           <Pressable
@@ -453,7 +484,7 @@ export default function ChatTabScreen() {
               setFilter('todos');
             }}
           >
-            <Text style={styles.resetFilterBtnText}>Ver todos los canales</Text>
+            <Text style={styles.resetFilterBtnText}>{tr("Ver todos los canales")}</Text>
           </Pressable>
         ) : isGlobalAdmin ? (
           <Pressable
@@ -461,7 +492,7 @@ export default function ChatTabScreen() {
             onPress={() => router.push('/chat/new-group' as any)}
           >
             <Plus size={15} color="#FFFFFF" strokeWidth={2.6} />
-            <Text style={styles.emptyActionText}>Crear Primer Canal</Text>
+            <Text style={styles.emptyActionText}>{tr("Crear Primer Canal")}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -488,10 +519,12 @@ export default function ChatTabScreen() {
               <Pressable
                 style={({ pressed }) => [styles.newGroupBtn, pressed && { opacity: 0.85 }]}
                 onPress={() => router.push('/chat/new-group' as any)}
+                accessibilityRole="button"
+                accessibilityLabel={tr("Crear nuevo chat")}
                 hitSlop={8}
               >
                 <Plus size={15} color="#FFFFFF" strokeWidth={2.8} />
-                <Text style={styles.newGroupBtnText}>Nuevo Chat</Text>
+                <Text style={styles.newGroupBtnText}>{tr("Nuevo")}</Text>
               </Pressable>
             ) : null}
             <ProfileNavButton />
@@ -523,15 +556,10 @@ export default function ChatTabScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: Colors.background,
+    flex: 1, backgroundColor: '#FFFFFF',
   },
   headerWrapper: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    ...Shadow.xs,
-    zIndex: 10,
+    backgroundColor: '#FFFFFF', zIndex: 10,
   },
   safeArea: {
     backgroundColor: '#FFFFFF',
@@ -552,16 +580,14 @@ const styles = StyleSheet.create({
     minHeight: 78,
   },
   logoGroup: {
-    justifyContent: 'center',
-    alignItems: 'flex-start',
+    flex: 1, minWidth: 0, justifyContent: 'center', alignItems: 'flex-start',
     transform: [{ translateY: -3 }],
   },
   logo: {
-    width: 220,
-    height: 54,
+    width: '100%', maxWidth: 220, height: 54,
   },
   logoTablet: {
-    width: 250,
+    maxWidth: 250,
     height: 60,
   },
   newGroupBtn: {
@@ -580,26 +606,14 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   listContent: {
-    paddingHorizontal: Spacing.md,
-    paddingBottom: 110,
-    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md, paddingBottom: 110, width: '100%', maxWidth: 960, alignSelf: 'center',
   },
   listHeaderContainer: {
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.xs,
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    borderRadius: BorderRadius.lg,
-    height: 44,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: Spacing.sm,
-    ...Shadow.xs,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', paddingHorizontal: 12, borderRadius: 10, height: 44, gap: 8, borderWidth: 1, borderColor: 'rgba(0,0,0,0.12)', marginBottom: Spacing.sm,
   },
   searchInput: {
     flex: 1,
@@ -643,55 +657,23 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   groupCard: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: BorderRadius.xl,
-    padding: 13,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 12,
-    alignItems: 'center',
-    ...Shadow.xs,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    minHeight: 92, paddingVertical: 18,
   },
   groupCardPressed: {
-    backgroundColor: '#FDF8F3',
-    borderColor: Colors.borderBrand,
+    opacity: 0.55,
   },
   avatarWrapper: {
     position: 'relative',
   },
   avatarImage: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    width: 44, height: 44, borderRadius: 22,
   },
   avatarPlaceholder: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#FFF7ED',
-    borderWidth: 1.2,
-    borderColor: '#FED7AA',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(52,62,72,0.06)', justifyContent: 'center', alignItems: 'center',
   },
   avatarInitials: {
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 17,
-    color: Colors.primary,
-    letterSpacing: 0.5,
-  },
-  adminMiniBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.full,
-    padding: 3.5,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
+    fontFamily: 'Outfit_600SemiBold', fontSize: 15, color: Colors.brandSlate,
   },
   groupInfo: {
     flex: 1,
@@ -703,83 +685,44 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   groupName: {
-    flex: 1,
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 15,
-    color: Colors.text,
-    marginRight: 8,
+    flex: 1, fontFamily: 'Outfit_600SemiBold', fontSize: 16, lineHeight: 22, color: '#000000', marginRight: 8,
   },
   timeText: {
-    fontFamily: 'Outfit_500Medium',
-    fontSize: 11,
-    color: Colors.textMuted,
+    fontFamily: 'Outfit_400Regular', fontSize: 11, color: Colors.brandSlate,
   },
   badgesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 5,
+    flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 12, rowGap: 4, marginTop: 6,
   },
   multimediaBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 5,
-    borderWidth: 0.8,
-    borderColor: Colors.borderBrand,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
   },
   multimediaBadgeText: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 10,
-    color: Colors.primaryDark,
+    fontFamily: 'Outfit_500Medium', fontSize: 11, color: Colors.brandSlate,
   },
   membersCountBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F9FAFB',
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#EAECF0',
+    flexDirection: 'row', alignItems: 'center', gap: 4,
   },
   membersCountText: {
-    fontFamily: 'Outfit_500Medium',
-    fontSize: 10,
-    color: Colors.textSecondary,
+    fontFamily: 'Outfit_400Regular', fontSize: 11, color: Colors.brandSlate,
   },
   roleTag: {
-    backgroundColor: '#F2F4F7',
-    paddingHorizontal: 6,
-    paddingVertical: 2.5,
-    borderRadius: 5,
+    justifyContent: 'center',
   },
   roleTagText: {
-    fontFamily: 'Outfit_500Medium',
-    fontSize: 9.5,
-    color: Colors.textSecondary,
+    fontFamily: 'Outfit_400Regular', fontSize: 11, color: Colors.brandSlate,
   },
   lastMessageContainer: {
-    marginTop: 1,
+    marginTop: 3,
   },
   lastMsgText: {
-    fontFamily: 'Outfit_400Regular',
-    fontSize: 12.5,
-    color: Colors.textSecondary,
+    fontFamily: 'Outfit_400Regular', fontSize: 13, lineHeight: 19, color: Colors.brandSlate,
   },
   lastMsgSender: {
     fontFamily: 'Outfit_600SemiBold',
     color: Colors.text,
   },
   emptyMsgText: {
-    fontFamily: 'Outfit_400Regular',
-    fontSize: 12,
-    color: Colors.textMuted,
-    fontStyle: 'italic',
+    fontFamily: 'Outfit_400Regular', fontSize: 13, lineHeight: 19, color: Colors.brandSlate,
   },
   mediaPreviewRow: {
     flexDirection: 'row',
@@ -787,9 +730,7 @@ const styles = StyleSheet.create({
     gap: 4.5,
   },
   mediaPreviewText: {
-    fontFamily: 'Outfit_500Medium',
-    fontSize: 12,
-    color: Colors.primary,
+    flexShrink: 1, fontFamily: 'Outfit_400Regular', fontSize: 13, lineHeight: 19, color: Colors.brandSlate,
   },
   arrowContainer: {
     justifyContent: 'center',
@@ -808,15 +749,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   emptyContainer: {
-    paddingVertical: 48,
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    backgroundColor: '#FFFFFF',
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginTop: Spacing.sm,
-    ...Shadow.xs,
+    paddingVertical: 48, alignItems: 'center', paddingHorizontal: Spacing.lg, marginTop: Spacing.sm,
   },
   emptyIconBox: {
     width: 58,

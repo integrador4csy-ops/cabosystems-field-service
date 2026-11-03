@@ -1,3 +1,4 @@
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React, { useState, useRef, useMemo } from 'react';
 import {
   View,
@@ -74,6 +75,7 @@ export default function DailyFormModal({
   onClose,
   onComplete,
 }: DailyFormModalProps) {
+  const { t: tr } = useInterfaceTranslation();
   const insets = useSafeAreaInsets();
   const webViewRef = useRef<any>(null);
   const [webViewFailed, setWebViewFailed] = useState(false);
@@ -156,11 +158,9 @@ export default function DailyFormModal({
             <View style={styles.headerLeft}>
               <View style={styles.badge}>
                 <ShieldCheck size={13} color={Colors.primary} strokeWidth={2.5} />
-                <Text style={styles.badgeText}>OPERACIÓN DIARIA</Text>
+                <Text style={styles.badgeText}>{tr("OPERACIÓN DIARIA")}</Text>
               </View>
-              <Text style={styles.title} numberOfLines={1}>
-                Formulario de Campo
-              </Text>
+              <Text style={styles.title} numberOfLines={1}>{tr("Formulario de Campo")}</Text>
             </View>
 
             <View style={styles.headerActions}>
@@ -198,24 +198,20 @@ export default function DailyFormModal({
               onError={() => setWebViewFailed(true)}
               renderError={() => (
                 <View style={styles.errorContainer}>
-                  <Text style={styles.errorText}>
-                    No se pudo cargar el formulario embebido.
-                  </Text>
+                  <Text style={styles.errorText}>{tr("No se pudo cargar el formulario embebido.")}</Text>
                   <Button
                     variant="primary"
                     size="md"
                     startIcon={<ExternalLink size={16} color="#FFFFFF" />}
                     onPress={handleOpenExternal}
-                  >
-                    Abrir en Navegador Seguro
-                  </Button>
+                  >{tr("Abrir en Navegador Seguro")}</Button>
                 </View>
               )}
               startInLoadingState
               renderLoading={() => (
                 <View style={styles.loadingOverlay}>
                   <ActivityIndicator size="large" color={Colors.primary} />
-                  <Text style={styles.loadingText}>Cargando formulario de Google...</Text>
+                  <Text style={styles.loadingText}>{tr("Cargando formulario de Google...")}</Text>
                 </View>
               )}
             />
@@ -225,22 +221,16 @@ export default function DailyFormModal({
                 <View style={styles.fallbackIconCircle}>
                   <ClipboardList size={32} color={Colors.primary} strokeWidth={2.2} />
                 </View>
-                <Badge color="primary" variant="light" size="sm" style={{ marginBottom: 10 }}>
-                  TURNO DE HOY
-                </Badge>
-                <Text style={styles.fallbackTitle}>Formulario Diario de Operación</Text>
-                <Text style={styles.fallbackDescription}>
-                  Abre el formulario oficial de Google en tu navegador seguro para registrar tus actividades del turno de hoy.
-                </Text>
+                <Badge color="primary" variant="light" size="sm" style={{ marginBottom: 10 }}>{tr("TURNO DE HOY")}</Badge>
+                <Text style={styles.fallbackTitle}>{tr("Formulario Diario de Operación")}</Text>
+                <Text style={styles.fallbackDescription}>{tr("Abre el formulario oficial de Google en tu navegador seguro para registrar tus actividades del turno de hoy.")}</Text>
 
                 <Button
                   variant="primary"
                   size="lg"
                   startIcon={<ExternalLink size={17} color="#FFFFFF" strokeWidth={2.2} />}
                   onPress={handleOpenExternal}
-                >
-                  ABRIR FORMULARIO
-                </Button>
+                >{tr("ABRIR FORMULARIO")}</Button>
               </View>
             </View>
           )}
@@ -250,10 +240,10 @@ export default function DailyFormModal({
         <DailyFormConfirmModal
           visible={confirmModalVisible}
           type="confirm"
-          title="¿Confirmar Envío?"
-          message="¿Ya completaste y enviaste tus respuestas en el formulario diario de Google?"
-          confirmText="SÍ, ENVIADO"
-          cancelText="AÚN NO"
+          title={tr("¿Confirmar Envío?")}
+          message={tr("¿Ya completaste y enviaste tus respuestas en el formulario diario de Google?")}
+          confirmText={tr("SÍ, ENVIADO")}
+          cancelText={tr("AÚN NO")}
           onConfirm={handleConfirmSubmit}
           onCancel={() => setConfirmModalVisible(false)}
         />
@@ -262,9 +252,9 @@ export default function DailyFormModal({
         <DailyFormConfirmModal
           visible={successModalVisible}
           type="success"
-          title="¡Formulario Registrado!"
-          message="Tu reporte diario de campo ha sido registrado exitosamente para el turno de hoy en CaboSystems."
-          confirmText="ENTENDIDO"
+          title={tr("¡Formulario Registrado!")}
+          message={tr("Tu reporte diario de campo ha sido registrado exitosamente para el turno de hoy en CaboSystems.")}
+          confirmText={tr("ENTENDIDO")}
           onConfirm={handleSuccessClose}
         />
       </View>

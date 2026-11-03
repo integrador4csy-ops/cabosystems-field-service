@@ -1,3 +1,4 @@
+import { translateCurrent } from './localization';
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { Linking, Alert } from 'react-native';
 import { Session, User } from '@supabase/supabase-js';
@@ -117,8 +118,8 @@ async function handleDeepLink(url: string) {
     if (errorDescription) {
       console.warn('Auth deep link status:', errorDescription);
       Alert.alert(
-        'Enlace Expirado o Revocado',
-        'Este enlace de invitación ya no es válido porque fue revocado o ya se utilizó. Si solicitaste un nuevo reenvío, asegúrate de abrir el correo más reciente en tu bandeja de entrada.'
+        translateCurrent("Enlace Expirado o Revocado"),
+        translateCurrent("Este enlace de invitación ya no es válido porque fue revocado o ya se utilizó. Si solicitaste un nuevo reenvío, asegúrate de abrir el correo más reciente en tu bandeja de entrada.")
       );
       return;
     }

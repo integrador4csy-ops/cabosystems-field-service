@@ -1,3 +1,4 @@
+import { translateCurrent } from './localization';
 import { Platform, Alert, Linking, AppState } from 'react-native';
 import * as Location from 'expo-location';
 import * as Battery from 'expo-battery';
@@ -22,6 +23,7 @@ let activeBatterySubscription: Battery.Subscription | null = null;
 let activeBatteryLevelSubscription: Battery.Subscription | null = null;
 let batteryTelemetryTimer: ReturnType<typeof setInterval> | null = null;
 let lastSentTimestamp = 0;
+let locationTransmissionRunning = false;
 let lastSentCoords: { latitude: number; longitude: number } | null = null;
 let lastSentBatteryLevel: number | null = null;
 let lastSentCharging: boolean | null = null;
@@ -147,6 +149,8 @@ async function transmitLocation(
   location: Location.LocationObject,
   speedKmH: number
 ) {
+  if (locationTransmissionRunning) return;
+  locationTransmissionRunning = true;
   try {
     const battery = await getBatteryTelemetry();
     const heading = location.coords.heading && location.coords.heading >= 0 ? location.coords.heading : null;
@@ -204,6 +208,8 @@ async function transmitLocation(
     }
   } catch (err) {
     console.warn('Error en transmitLocation:', err);
+  } finally {
+    locationTransmissionRunning = false;
   }
 }
 
@@ -263,11 +269,11 @@ export async function startLiveTracking(userId: string): Promise<boolean> {
     const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
     if (fgStatus !== 'granted') {
       Alert.alert(
-        'Ubicación requerida',
-        'CaboSystems necesita acceso a la ubicación para registrar tu asistencia técnica y sincronizar con la central.',
+        translateCurrent("Ubicación requerida"),
+        translateCurrent("CaboSystems necesita acceso a la ubicación para registrar tu asistencia técnica y sincronizar con la central."),
         [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Abrir Ajustes', onPress: () => Linking.openSettings() },
+          { text: translateCurrent("Cancelar"), style: 'cancel' },
+          { text: translateCurrent("Abrir Ajustes"), onPress: () => Linking.openSettings() },
         ]
       );
       return false;
@@ -352,7 +358,7 @@ export async function startLiveTracking(userId: string): Promise<boolean> {
 
     batteryTelemetryTimer = setInterval(() => {
       transmitBatteryChangeImmediate();
-    }, 2000);
+    }, 60_000);
 
     // 5. Envío inicial inmediato
     try {

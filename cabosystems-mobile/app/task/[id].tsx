@@ -1,3 +1,5 @@
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
+import { getLocale } from '@/lib/localization';
 import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
@@ -24,38 +26,38 @@ import {
   Square,
   Clock,
 } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
-import { Badge, Card, Button } from '@/components/ui';
-import { getTaskById, getTaskPermissions, updateTaskStatus, toggleSubtarea, type TaskDetail } from '@/lib/api';
+import { Colors, Spacing } from '@/constants/Theme';
+import { Button } from '@/components/ui';
+import { getTaskById, getTaskPermissions, updateTaskStatus, type TaskDetail } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { canUpdateTaskProgress } from '@/lib/taskAccess';
 import type { Subtarea } from '@/types/database';
+import { randomUUID } from 'expo-crypto';
+import { recordTaskProgress } from '@/lib/api';
+import { TaskProgressModal } from '@/components/TaskProgressModal';
+import { TaskProgressHistory } from '@/components/TaskProgressHistory';
 
 const STATUS_META: Record<
   string,
   {
     color: string;
     label: string;
-    badgeColor: 'gray' | 'primary' | 'success';
     icon: React.ComponentType<{ size: number; color: string }>;
   }
 > = {
   pendiente: {
-    color: Colors.pending,
+    color: Colors.brandSlate,
     label: 'Pendiente',
-    badgeColor: 'gray',
     icon: Clock,
   },
   en_proceso: {
-    color: Colors.inProgress,
+    color: Colors.primary,
     label: 'En Proceso',
-    badgeColor: 'primary',
     icon: Play,
   },
   completada: {
-    color: Colors.completed,
+    color: '#000000',
     label: 'Completada',
-    badgeColor: 'success',
     icon: CheckCircle2,
   },
 };
@@ -76,7 +78,7 @@ const NEXT_STATUS: Record<
 function formatDate(iso: string | null | undefined) {
   if (!iso) return '—';
   try {
-    return new Intl.DateTimeFormat('es-MX', {
+    return new Intl.DateTimeFormat(getLocale(), {
       timeZone: 'America/Mazatlan',
       day: '2-digit',
       month: 'short',
@@ -88,6 +90,7 @@ function formatDate(iso: string | null | undefined) {
 }
 
 export default function TaskDetailScreen() {
+  const { t: tr } = useInterfaceTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -95,6 +98,10 @@ export default function TaskDetailScreen() {
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+    const [pendingProgress, setPendingProgress] = useState<{
+    requestId: string;
+    subtask: Subtarea;
+  } | null>(null);
   const request = useRef(0);
   const savingLock = useRef(false);
   const canProgress = canUpdateTaskProgress(task, profile);
@@ -110,17 +117,23 @@ export default function TaskDetailScreen() {
       return current;
     });
     try {
-      const [data, permissions] = await Promise.all([getTaskById(id), getTaskPermissions(id)]);
+      const data = await getTaskById(id);
+      const permissions = await getTaskPermissions(id);
       if (sequence === request.current) setTask({ ...data, permissions });
     } catch (e) {
       if (sequence === request.current) {
+        if ((e as { code?: string })?.code === 'TASK_UNAVAILABLE') {
+          setTask(null);
+          Alert.alert(tr('No se encontró la tarea'), tr('La tarea fue eliminada o no tienes acceso para verla.'), [{ text: 'OK', onPress: () => router.back() }]);
+          return;
+        }
         console.error('Task load error:', e);
-        Alert.alert('Error', 'No se pudo cargar la tarea');
+        Alert.alert(tr("Error"), tr("No se pudo cargar la tarea"));
       }
     } finally {
       if (sequence === request.current) setLoading(false);
     }
-  }, [id]);
+  }, [id, tr]);
 
   useFocusEffect(useCallback(() => {
     void load();
@@ -131,34 +144,60 @@ export default function TaskDetailScreen() {
     if (!task || !canProgress || savingLock.current) return;
     const next = NEXT_STATUS[task.estatus];
     if (!next) return;
-    savingLock.current = true; setSaving(true);
+    savingLock.current = true;
+    setSaving(true);
     try {
       await updateTaskStatus(task.id, next.estatus);
-      setTask(current => current?.id === task.id ? { ...current, estatus: next.estatus } : current);
+      setTask((current) =>
+        current?.id === task.id ? { ...current, estatus: next.estatus } : current
+      );
     } catch (e) {
       console.error('Status update error:', e);
-      Alert.alert('Error', 'No se pudo actualizar el estatus');
+      Alert.alert(tr('Error'), tr('No se pudo actualizar el estatus'));
     } finally {
-      savingLock.current = false; setSaving(false);
+      savingLock.current = false;
+      setSaving(false);
     }
   };
 
-  const handleToggleSubtarea = async (sub: Subtarea) => {
+  const handleToggleSubtarea = (sub: Subtarea) => {
     if (!task || !canProgress || savingLock.current) return;
-    savingLock.current = true; setSaving(true);
+    setPendingProgress({ requestId: randomUUID(), subtask: sub });
+  };
+
+  const confirmProgress = async (comment: string, photoUri: string | null) => {
+    if (!task || !profile || !pendingProgress || savingLock.current) return;
+    savingLock.current = true;
+    setSaving(true);
     try {
-      await toggleSubtarea(sub.id, !sub.completada);
-      setTask(current => current?.id === task.id ? {
-        ...current,
-        subtareas: current.subtareas.map((s) =>
-          s.id === sub.id ? { ...s, completada: !s.completada } : s
-        ),
-      } : current);
-    } catch (e) {
-      console.error('Subtarea toggle error:', e);
-      Alert.alert('Error', 'No se pudo actualizar la subtarea');
+      const subtask = pendingProgress.subtask;
+      const nextCompleted = !subtask.completada;
+      await recordTaskProgress({
+        requestId: pendingProgress.requestId,
+        taskId: task.id,
+        projectId: task.proyecto_id,
+        actorId: profile.id,
+        subtaskId: subtask.id,
+        subtaskCompleted: nextCompleted,
+        comment,
+        photoUri,
+      });
+      setTask((current) => {
+        if (!current || current.id !== task.id) return current;
+        return {
+          ...current,
+          subtareas: (current.subtareas || []).map((s) =>
+            s.id === subtask.id ? { ...s, completada: nextCompleted } : s
+          ),
+        };
+      });
+      setPendingProgress(null);
+    } catch (e: any) {
+      console.error('Progress record error:', e);
+      throw e;
     } finally {
-      savingLock.current = false; setSaving(false);
+      savingLock.current = false;
+      setSaving(false);
     }
   };
 
@@ -173,7 +212,7 @@ export default function TaskDetailScreen() {
   if (!task) {
     return (
       <View style={styles.center}>
-        <Text style={styles.emptyText}>No se encontró la tarea</Text>
+        <Text style={styles.emptyText}>{tr("No se encontró la tarea")}</Text>
       </View>
     );
   }
@@ -186,6 +225,7 @@ export default function TaskDetailScreen() {
   const woCode = `WO-${task.id.slice(0, 6).toUpperCase()}`;
   const completedSubsCount = task.subtareas.filter((s) => s.completada).length;
   const totalSubsCount = task.subtareas.length;
+  const historyVersion = `${task.estatus}:${task.subtareas.map(subtask => `${subtask.id}:${subtask.completada}`).join(',')}`;
 
   return (
     <View style={styles.container}>
@@ -195,6 +235,7 @@ export default function TaskDetailScreen() {
           <Pressable
             onPress={() => router.back()}
             style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.7 }]}
+            accessibilityRole="button" accessibilityLabel={tr("Volver a tareas")}
             hitSlop={10}
           >
             <ArrowLeft size={18} color={Colors.text} />
@@ -217,7 +258,7 @@ export default function TaskDetailScreen() {
       >
         {/* Tarjeta de Título Principal */}
         <View style={styles.titleCard}>
-          <Text style={styles.category}>{development.toUpperCase()}</Text>
+          <Text style={styles.category}>{villa}{' · ' + development}</Text>
           <Text style={styles.title}>{task.titulo}</Text>
         </View>
 
@@ -226,7 +267,7 @@ export default function TaskDetailScreen() {
           <View style={styles.infoItem}>
             <View style={styles.infoLabelRow}>
               <MapPin size={13} color={Colors.textSecondary} />
-              <Text style={styles.infoLabel}>VILLA</Text>
+              <Text style={styles.infoLabel}>{tr("Villa")}</Text>
             </View>
             <Text style={styles.infoValue} numberOfLines={1}>
               {villa}
@@ -236,7 +277,7 @@ export default function TaskDetailScreen() {
           <View style={styles.infoItem}>
             <View style={styles.infoLabelRow}>
               <User size={13} color={Colors.textSecondary} />
-              <Text style={styles.infoLabel}>ASIGNADO A</Text>
+              <Text style={styles.infoLabel}>{tr("Responsable")}</Text>
             </View>
             <Text style={styles.infoValue} numberOfLines={1}>
               {task.profiles?.nombre ?? '—'}
@@ -246,7 +287,7 @@ export default function TaskDetailScreen() {
           <View style={styles.infoItem}>
             <View style={styles.infoLabelRow}>
               <Calendar size={13} color={Colors.textSecondary} />
-              <Text style={styles.infoLabel}>FECHA</Text>
+              <Text style={styles.infoLabel}>{tr("Fecha")}</Text>
             </View>
             <Text style={styles.infoValue} numberOfLines={1}>
               {formatDate(task.created_at)}
@@ -256,44 +297,38 @@ export default function TaskDetailScreen() {
           <View style={styles.infoItem}>
             <View style={styles.infoLabelRow}>
               <Clock size={13} color={Colors.textSecondary} />
-              <Text style={styles.infoLabel}>ESTADO</Text>
+              <Text style={styles.infoLabel}>{tr("Estado")}</Text>
             </View>
             <Text style={[styles.infoValue, { color: meta.color }]} numberOfLines={1}>
-              {meta.label}
+              {tr(meta.label)}
             </Text>
           </View>
         </View>
 
         {/* Tarjeta: Detalle y Especificaciones */}
-        <Card elevated={false} style={styles.sectionCard}>
+        <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionIconBox}>
               <FileText size={16} color={Colors.primary} />
             </View>
-            <Text style={styles.sectionTitle}>DETALLE Y ESPECIFICACIONES</Text>
+            <Text style={styles.sectionTitle}>{tr("Detalle y especificaciones")}</Text>
           </View>
           <Text style={styles.scopeText}>
-            {task.descripcion || 'Sin especificaciones adicionales registradas.'}
+            {task.descripcion || tr("Sin especificaciones adicionales registradas.")}
           </Text>
-        </Card>
+        </View>
 
         {/* Tarjeta: Checklist de Actividades */}
         {totalSubsCount > 0 && (
-          <Card elevated={false} style={styles.sectionCard}>
+          <View style={styles.sectionCard}>
             <View style={styles.checklistHeader}>
               <View style={styles.sectionHeaderNoMargin}>
                 <View style={styles.sectionIconBox}>
                   <ListChecks size={16} color={Colors.primary} />
                 </View>
-                <Text style={styles.sectionTitle}>CHECKLIST DE ACTIVIDADES</Text>
+                <Text style={styles.sectionTitle}>{tr("Actividades")}</Text>
               </View>
-              <Badge
-                color={completedSubsCount === totalSubsCount ? 'success' : 'primary'}
-                variant="light"
-                size="sm"
-              >
-                {`${completedSubsCount}/${totalSubsCount}`}
-              </Badge>
+              <Text style={styles.progressCount}>{completedSubsCount}/{totalSubsCount}</Text>
             </View>
 
             <View style={styles.checklistContainer}>
@@ -302,7 +337,7 @@ export default function TaskDetailScreen() {
                   key={sub.id}
                   style={({ pressed }) => [
                     styles.subtareaRow,
-                    sub.completada && styles.subtareaRowCompleted,
+
                     pressed && { opacity: 0.75 },
                   ]}
                   onPress={() => handleToggleSubtarea(sub)}
@@ -311,7 +346,7 @@ export default function TaskDetailScreen() {
                   accessibilityState={{ checked: sub.completada, disabled: !canProgress || saving }}
                 >
                   {sub.completada ? (
-                    <CheckSquare size={18} color={Colors.success} />
+                    <CheckSquare size={18} color="#000000" />
                   ) : (
                     <Square size={18} color={Colors.textSecondary} />
                   )}
@@ -326,8 +361,9 @@ export default function TaskDetailScreen() {
                 </Pressable>
               ))}
             </View>
-          </Card>
+          </View>
         )}
+        <TaskProgressHistory taskId={task.id} version={historyVersion} />
       </ScrollView>
 
       {/* Footer de Acciones Ergonómico TailAdmin */}
@@ -344,24 +380,34 @@ export default function TaskDetailScreen() {
           }
           onPress={handleStatusChange}
         >
-          {next.label}
+          {tr(next.label)}
         </Button>
-      </View> : <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}><Text style={styles.emptyText}>Solo consulta. El responsable o un administrador puede actualizar esta tarea.</Text></View>}
+      </View> : <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}><Text style={styles.emptyText}>{tr("Solo consulta. El responsable o un administrador puede actualizar esta tarea.")}</Text></View>}
+      {pendingProgress ? (
+        <TaskProgressModal
+          visible
+          title={task.titulo}
+          actionLabel={
+            pendingProgress.subtask.completada
+              ? tr('Reabrir subtarea: {value0}', { value0: pendingProgress.subtask.titulo })
+              : tr('Completar subtarea: {value0}', { value0: pendingProgress.subtask.titulo })
+          }
+          onClose={() => {
+            if (!saving) setPendingProgress(null);
+          }}
+          onConfirm={confirmProgress}
+        />
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: Colors.background,
+    flex: 1, backgroundColor: '#FFFFFF',
   },
   center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.background,
-    gap: Spacing.md,
+    flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', gap: Spacing.md,
   },
   emptyText: {
     fontFamily: 'Outfit_500Medium',
@@ -370,9 +416,6 @@ const styles = StyleSheet.create({
   },
   headerWrapper: {
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    ...Shadow.xs,
   },
   headerContent: {
     flexDirection: 'row',
@@ -383,14 +426,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   backButton: {
-    width: 34,
-    height: 34,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.background,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 44, height: 44, justifyContent: 'center', alignItems: 'center',
   },
   headerInfo: {
     flex: 1,
@@ -419,41 +455,19 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   titleCard: {
-    backgroundColor: Colors.card,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 4,
-    ...Shadow.xs,
+    gap: 8, paddingTop: 8, paddingBottom: 8,
   },
   category: {
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 11,
-    color: Colors.primary,
-    letterSpacing: 1,
+    fontFamily: 'Outfit_500Medium', fontSize: 14, lineHeight: 20, color: Colors.brandSlate,
   },
   title: {
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 20,
-    color: Colors.text,
-    lineHeight: 26,
+    fontFamily: 'Outfit_600SemiBold', fontSize: 24, lineHeight: 31, color: '#000000',
   },
   infoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
+    flexDirection: 'row', flexWrap: 'wrap', columnGap: 16, rowGap: 20, paddingVertical: 8,
   },
   infoItem: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: Colors.card,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 4,
-    ...Shadow.xs,
+    flex: 1, minWidth: '45%', gap: 4,
   },
   infoLabelRow: {
     flexDirection: 'row',
@@ -461,33 +475,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   infoLabel: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 10,
-    color: Colors.textSecondary,
-    letterSpacing: 0.8,
+    fontFamily: 'Outfit_400Regular', fontSize: 12, color: Colors.brandSlate,
   },
   infoValue: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 13,
-    color: Colors.text,
-    marginTop: 2,
+    fontFamily: 'Outfit_500Medium', fontSize: 14, lineHeight: 20, color: '#000000', marginTop: 2,
   },
   sectionCard: {
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: Spacing.md,
-    gap: Spacing.sm,
-    ...Shadow.xs,
+    gap: 12, paddingVertical: 12,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    paddingBottom: Spacing.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
   },
   sectionHeaderNoMargin: {
     flexDirection: 'row',
@@ -496,54 +493,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sectionIconBox: {
-    width: 28,
-    height: 28,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: Colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 24, height: 24, justifyContent: 'center', alignItems: 'center',
   },
   checklistHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: Spacing.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    gap: Spacing.sm,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12,
   },
   sectionTitle: {
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 11,
-    color: Colors.textSecondary,
-    letterSpacing: 1,
+    flexShrink: 1, fontFamily: 'Outfit_600SemiBold', fontSize: 15, lineHeight: 21, color: '#000000',
   },
   scopeText: {
-    fontFamily: 'Outfit_400Regular',
-    fontSize: 13,
-    color: Colors.text,
-    lineHeight: 20,
-    paddingTop: Spacing.xs,
+    fontFamily: 'Outfit_400Regular', fontSize: 14, color: Colors.brandSlate, lineHeight: 22,
   },
   checklistContainer: {
     gap: Spacing.xs,
     paddingTop: Spacing.xs,
   },
   subtareaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: 10,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#F2F4F7',
+    flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, paddingVertical: 12,
   },
-  subtareaRowCompleted: {
-    backgroundColor: '#FCFCFD',
-    borderColor: '#EAECF0',
-  },
+  progressCount: { fontFamily: 'Outfit_400Regular', fontSize: 13, color: Colors.brandSlate },
   subtareaText: {
     fontFamily: 'Outfit_500Medium',
     fontSize: 13,
@@ -555,14 +523,6 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   footer: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.sm,
-    backgroundColor: Colors.card,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    maxWidth: 960,
-    width: '100%',
-    alignSelf: 'center',
-    ...Shadow.sm,
+    paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, backgroundColor: '#FFFFFF', maxWidth: 960, width: '100%', alignSelf: 'center',
   },
 });

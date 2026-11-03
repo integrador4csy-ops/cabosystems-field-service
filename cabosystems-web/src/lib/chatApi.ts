@@ -17,6 +17,7 @@ export async function uploadChatMedia(
   customFileName?: string
 ): Promise<string> {
   try {
+    if (file.size > 50 * 1024 * 1024) throw new Error('El archivo supera 50 MB.');
     const ext = customFileName
       ? customFileName.split('.').pop()?.toLowerCase() || 'jpg'
       : (file instanceof File && file.name.split('.').pop()?.toLowerCase()) || 'jpg';
@@ -26,7 +27,7 @@ export async function uploadChatMedia(
     const { data, error } = await supabase.storage
       .from('chat-media')
       .upload(fileName, file, {
-        contentType: file.type || 'image/jpeg',
+        contentType: file.type || 'application/octet-stream',
         upsert: true,
       });
 
@@ -89,7 +90,7 @@ export async function getMyChatGroups(userId: string): Promise<ChatGroup[]> {
     // 2. Obtener los grupos
     const { data: groups, error: grpError } = await supabase
       .from('chat_grupos')
-      .select('*, member_totals:chat_miembros(count), latest_messages:chat_mensajes(*, profiles(nombre, avatar_url, rol))')
+      .select('*, proyecto:proyectos(id, desarrollo, villa), member_totals:chat_miembros(count), latest_messages:chat_mensajes(*, profiles(nombre, avatar_url, rol))')
       .in('id', allGroupIds)
       .order('created_at', { referencedTable: 'latest_messages', ascending: false })
       .order('id', { referencedTable: 'latest_messages', ascending: false })
@@ -134,7 +135,7 @@ export async function getChatGroupDetails(
 
   const { data: group, error: grpError } = await supabase
     .from('chat_grupos')
-    .select('*')
+    .select('*, proyecto:proyectos(id, desarrollo, villa)')
     .eq('id', groupId)
     .single();
 
@@ -171,6 +172,21 @@ export async function getGroupMembers(groupId: string): Promise<ChatMember[]> {
 
   if (error) throw error;
   return (data ?? []) as ChatMember[];
+}
+
+/**
+ * Obtener todos los archivos adjuntos y multimedia de un grupo
+ */
+export async function getGroupAttachments(groupId: string): Promise<ChatMessage[]> {
+  const { data, error } = await supabase
+    .from('chat_mensajes')
+    .select('*, profiles(*)')
+    .eq('grupo_id', groupId)
+    .not('media_url', 'is', null)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as ChatMessage[];
 }
 
 /**
@@ -241,6 +257,7 @@ export async function createChatGroup(params: {
   descripcion?: string;
   fotoFile?: File | null;
   solo_multimedia: boolean;
+  proyecto_id?: string | null;
   creatorId: string;
   memberIds: string[];
 }): Promise<ChatGroup> {
@@ -261,8 +278,9 @@ export async function createChatGroup(params: {
       foto_url,
       creado_por: effectiveCreatorId,
       solo_multimedia: params.solo_multimedia,
+      proyecto_id: params.proyecto_id || null,
     })
-    .select()
+    .select('*, proyecto:proyectos(id, desarrollo, villa)')
     .single();
 
   if (grpError) throw grpError;
@@ -298,12 +316,14 @@ export async function updateChatGroup(
     descripcion?: string;
     fotoFile?: File | null;
     solo_multimedia?: boolean;
+    proyecto_id?: string | null;
   }
 ): Promise<void> {
   const payload: any = {};
   if (updates.nombre !== undefined) payload.nombre = updates.nombre.trim();
   if (updates.descripcion !== undefined) payload.descripcion = updates.descripcion.trim();
   if (updates.solo_multimedia !== undefined) payload.solo_multimedia = updates.solo_multimedia;
+  if (updates.proyecto_id !== undefined) payload.proyecto_id = updates.proyecto_id || null;
 
   if (updates.fotoFile) {
     payload.foto_url = await uploadChatMedia(updates.fotoFile, 'groups');
@@ -374,12 +394,12 @@ export async function sendChatMessage(params: {
   tipo: ChatMessageType;
   contenido?: string | null;
   mediaFile?: File | Blob | null;
-  mediaMeta?: any;
+  mediaMeta?: ChatMessage['media_meta'];
   reply_to_id?: string | null;
 }): Promise<ChatMessage> {
   let media_url: string | null = null;
 
-  if (params.mediaFile && (params.tipo === 'imagen' || params.tipo === 'video')) {
+  if (params.mediaFile && ['imagen', 'video', 'archivo', 'audio'].includes(params.tipo)) {
     media_url = await uploadChatMedia(params.mediaFile, 'messages');
   }
 
@@ -471,4 +491,61 @@ export async function getAllProfilesForInvite(): Promise<Profile[]> {
 
   if (error) throw error;
   return (data ?? []) as Profile[];
+}
+
+export interface ChatGroupTaskActivityItem {
+  id: number;
+  request_id: string;
+  actor_name: string;
+  tarea_id: string;
+  tarea_titulo: string;
+  subtarea_id: string | null;
+  subtarea_titulo: string | null;
+  accion: 'estado' | 'subtarea';
+  anterior: string | null;
+  siguiente: string;
+  estado_registrado: string;
+  comentario: string | null;
+  evidencia_path: string | null;
+  evidence_url?: string | null;
+  captured_at: string;
+  accepted_at: string;
+}
+
+/**
+ * Obtener avances y tareas realizadas de la villa vinculada al grupo
+ */
+export async function getChatGroupTaskActivity(
+  groupId: string,
+  limit = 20,
+  offset = 0
+): Promise<ChatGroupTaskActivityItem[]> {
+  const { data, error } = await supabase.rpc('get_chat_group_task_activity', {
+    p_group_id: groupId,
+    p_limit: limit,
+    p_offset: offset,
+  });
+
+  if (error) {
+    console.error('Error fetching chat group task activity:', error);
+    throw error;
+  }
+
+  const items = (data || []) as ChatGroupTaskActivityItem[];
+  return Promise.all(
+    items.map(async (item) => {
+      if (!item.evidencia_path) return { ...item, evidence_url: null };
+      try {
+        const signed = await supabase.storage
+          .from('task-evidence')
+          .createSignedUrl(item.evidencia_path, 3600);
+        return {
+          ...item,
+          evidence_url: signed.error ? null : signed.data.signedUrl,
+        };
+      } catch {
+        return { ...item, evidence_url: null };
+      }
+    })
+  );
 }

@@ -9,7 +9,7 @@ import { GroupList } from './GroupList';
 import { ChatConversation } from './ChatConversation';
 import { CreateGroupModal } from './CreateGroupModal';
 import { GroupInfoDrawer } from './GroupInfoDrawer';
-import { MessageSquare, Plus } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import { useSectionResources, canSpeculate, type SectionResources } from '../../context/SectionResources';
 import { prefetchConversation } from '../../lib/chatSnapshot';
 
@@ -21,7 +21,7 @@ export async function prefetchChat(resources: SectionResources, userId: string) 
 export const ChatView: React.FC = () => {
   const { t } = useTranslation();
   const { user, adminProfile } = useAdminAuth();
-  const { targetGroupId, setTargetGroupId } = useSidebar();
+  const { targetGroupId, setTargetGroupId, chatSearchQuery, chatCreateVersion } = useSidebar();
   const currentUserId = user?.id || '';
   const resources = useSectionResources();
   const cached = resources.queries.read<ChatGroup[]>('chat-groups');
@@ -31,7 +31,6 @@ export const ChatView: React.FC = () => {
 
   const [groups, setGroups] = useState<ChatGroup[]>(cached || []);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(cached?.[0]?.id || null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(!cached);
   const [mobileConversationOpen, setMobileConversationOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -39,6 +38,13 @@ export const ChatView: React.FC = () => {
   // Modals / Drawers
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isInfoDrawerOpen, setIsInfoDrawerOpen] = useState(false);
+  const createRequest = React.useRef(chatCreateVersion);
+
+  useEffect(() => {
+    if (createRequest.current === chatCreateVersion) return;
+    createRequest.current = chatCreateVersion;
+    if (isGlobalAdmin) setIsCreateModalOpen(true);
+  }, [chatCreateVersion, isGlobalAdmin]);
 
   const loadGroups = useCallback(async (force = true) => {
     if (!currentUserId) return;
@@ -106,25 +112,23 @@ export const ChatView: React.FC = () => {
   const selectedGroup = groups.find((g) => g.id === selectedGroupId) || null;
 
   return (
-    <div className="flex h-full w-full gap-3.5 lg:gap-4.5 overflow-hidden">
-      {/* 1. Left Card: Group Conversations List (Standalone Floating Card) */}
-      <div className={`operational-panel w-full lg:w-80 xl:w-96 shrink-0 h-full overflow-hidden flex-col ${mobileConversationOpen && selectedGroup ? 'hidden lg:flex' : 'flex'}`}>
+    <div className="operational-panel flex h-full w-full overflow-hidden">
+      {/* 1. Left pane: group conversations */}
+      <div className={`w-full lg:w-80 xl:w-96 shrink-0 h-full overflow-hidden flex-col lg:border-r lg:border-slate-200 ${mobileConversationOpen && selectedGroup ? 'hidden lg:flex' : 'flex'}`}>
         {loadError && <div role="alert" className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{t(loadError)}<button type="button" onClick={() => void loadGroups()} className="ml-2 underline underline-offset-2">{t("Reintentar")}</button></div>}
         <GroupList
           groups={groups}
           selectedGroupId={selectedGroupId}
           onSelectGroup={(id) => { setSelectedGroupId(id); setMobileConversationOpen(true); }}
           onIntentGroup={id => { if (canSpeculate()) { const intent = `chat:${id}`; resources.setIntent(intent); void resources.prefetch(() => prefetchConversation(resources, id), intent); } }}
-          onOpenCreateGroup={() => setIsCreateModalOpen(true)}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
+          searchQuery={chatSearchQuery}
           isGlobalAdmin={isGlobalAdmin}
           loading={loading}
         />
       </div>
 
-      {/* 2. Right Card: Active Chat Conversation (Standalone Floating Card) */}
-      <div className={`operational-panel flex-1 min-w-0 h-full overflow-hidden flex-col ${mobileConversationOpen && selectedGroup ? 'flex' : 'hidden lg:flex'}`}>
+      {/* 2. Right pane: active conversation */}
+      <div className={`flex-1 min-w-0 h-full overflow-hidden flex-col ${mobileConversationOpen && selectedGroup ? 'flex' : 'hidden lg:flex'}`}>
         {selectedGroup ? (
           <ChatConversation
             key={selectedGroup.id}
@@ -137,23 +141,14 @@ export const ChatView: React.FC = () => {
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50/50">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-brand-500 mb-4 shadow-xs">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-brand-500 mb-4">
               <MessageSquare size={32} />
             </div>
             <h3 className="text-base font-bold text-[#343e48]">
               {t("Chat Grupal CaboSystems")}</h3>
             <p className="mt-1.5 text-xs text-slate-500 max-w-sm leading-relaxed">
               {t("Selecciona un grupo de trabajo en la columna izquierda o crea uno nuevo para coordinar instalaciones, compartir evidencias fotográficas y videos técnicos con el equipo de campo.")}</p>
-            {isGlobalAdmin && (
-              <button
-                type="button"
-                onClick={() => setIsCreateModalOpen(true)}
-                className="mt-5 flex items-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-700 px-4 py-2.5 text-xs font-bold text-white shadow-xs transition-all cursor-pointer"
-              >
-                <Plus size={15} strokeWidth={2.5} />
-                <span>{t("Crear Primer Grupo")}</span>
-              </button>
-            )}
+            {isGlobalAdmin && <p className="mt-4 text-xs font-semibold text-brand-700">{t('Usa “Nuevo grupo” en la barra superior para comenzar.')}</p>}
           </div>
         )}
       </div>

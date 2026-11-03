@@ -78,18 +78,33 @@ function AccessSettings({ development, data, c, close, changed }: { development?
 
 function VillaTeam({ villa, data, admin, c, close, saved, onDirty }: { villa: ProjectVilla; data: ProjectDirectory; admin: boolean; c: ProjectCopy; close: () => void; saved: () => Promise<void>; onDirty: (dirty: boolean) => void }) {
   const { t } = useTranslation();
-  const initial = data.members.filter(m => m.proyecto_id === villa.id).map(m => m.usuario_id);
+  const initialMembers = data.members.filter(m => m.proyecto_id === villa.id);
+  const initial = initialMembers.map(m => m.usuario_id);
   const [integrator, setIntegrator] = useState(villa.integrador_id || ''); const [technician, setTechnician] = useState(villa.tecnico_id || '');
-  const [participants, setParticipants] = useState(initial); const [personId, setPersonId] = useState(''); const [query, setQuery] = useState('');
+  const [participants, setParticipants] = useState(initial);
+  const [participantAccess, setParticipantAccess] = useState<Record<string, 'mis_tareas' | 'todas_las_tareas'>>(() => {
+    const acc: Record<string, 'mis_tareas' | 'todas_las_tareas'> = {};
+    for (const m of initialMembers) {
+      acc[m.usuario_id] = m.tipo_acceso || 'mis_tareas';
+    }
+    return acc;
+  });
+  const [personId, setPersonId] = useState(''); const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
-  const dirty = integrator !== (villa.integrador_id || '') || technician !== (villa.tecnico_id || '') || [...participants].sort().join() !== [...initial].sort().join();
+  const accessSignature = participants.map(id => `${id}:${participantAccess[id] || 'mis_tareas'}`).sort().join();
+  const initialAccessSignature = initialMembers.map(m => `${m.usuario_id}:${m.tipo_acceso || 'mis_tareas'}`).sort().join();
+  const dirty = integrator !== (villa.integrador_id || '') || technician !== (villa.tecnico_id || '') || accessSignature !== initialAccessSignature;
   useEffect(() => { onDirty(dirty); return () => onDirty(false); }, [dirty, onDirty]);
   const active = data.staff.filter(p => p.activo);
   const available = active.filter(p => !participants.includes(p.id) && p.id !== integrator && p.id !== technician && normalize(personName(p)).includes(normalize(query)));
   const labelFor = (id: string) => { const p = data.staff.find(person => person.id === id); return p ? personName(p) : c.unassigned; };
   const save = async (event: FormEvent) => {
     event.preventDefault(); if (!dirty || busy) return; setBusy(true); setError(''); setNotice('');
-    try { await saveProjectTeam(villa, integrator, technician, participants); onDirty(false); await saved(); setNotice(c.saved); }
+    try {
+      const allTasks = participants.filter(id => participantAccess[id] === 'todas_las_tareas');
+      await saveProjectTeam(villa, integrator, technician, participants, allTasks);
+      onDirty(false); await saved(); setNotice(c.saved);
+    }
     catch (err) { setError(projectError(err, c)); } finally { setBusy(false); }
   };
   return <aside className="pd-detail" aria-label={`${c.participants}: ${villa.villa}`}>
@@ -99,8 +114,77 @@ function VillaTeam({ villa, data, admin, c, close, saved, onDirty }: { villa: Pr
       {admin ? <>{[{ label: c.integrator, value: integrator, set: setIntegrator }, { label: c.technician, value: technician, set: setTechnician }].map(({ label, value, set }) => <label key={label}>{label}<AppSelect aria-label={label} value={value} disabled={busy} onChange={event => set(event.target.value)}><option value="">{c.unassigned}</option>{active.map(p => <option key={p.id} value={p.id}>{personName(p)} · {getRoleLabel(p.rol || '', t)}</option>)}{value && !active.some(p => p.id === value) && <option value={value}>{labelFor(value)}</option>}</AppSelect></label>)}</>
         : <dl className="pd-leads"><dt>{c.integrator}</dt><dd>{labelFor(integrator)}</dd><dt>{c.technician}</dt><dd>{labelFor(technician)}</dd></dl>}
       <section className="pd-participants"><h3>{c.participants} <span>{participants.length}</span></h3>
-        {participants.length ? participants.map(id => <div className="pd-person" key={id}><div><strong>{labelFor(id)}</strong><span>{getRoleLabel(data.staff.find(p => p.id === id)?.rol || '', t)}</span></div>{admin && <button type="button" className="pd-icon" aria-label={`${c.remove}: ${labelFor(id)}`} disabled={busy} onClick={() => setParticipants(previous => previous.filter(member => member !== id))}><X size={16} /></button>}</div>) : <p className="pd-muted">{c.noParticipants}</p>}
-        {admin && <div className="pd-add-person"><label>{c.peopleSearch}<input type="search" value={query} onChange={event => { setQuery(event.target.value); setPersonId(''); }} disabled={busy} /></label><div className="pd-add-row"><AppSelect aria-label={c.addParticipant} value={personId} disabled={busy} onChange={event => setPersonId(event.target.value)}><option value="">{c.addParticipant}</option>{available.map(p => <option key={p.id} value={p.id}>{personName(p)}</option>)}</AppSelect><button type="button" className="pd-icon" aria-label={c.addParticipant} disabled={busy || !personId || !available.some(p => p.id === personId)} onClick={() => { setParticipants(previous => [...previous, personId]); setPersonId(''); setQuery(''); }}><Plus size={18} /></button></div></div>}
+        {participants.length ? participants.map(id => {
+          const person = data.staff.find(p => p.id === id);
+          const isFullAccessRole = person?.rol === 'admin' || person?.rol === 'supervisor_instalacion';
+          return (
+            <div className="pd-person" key={id}>
+              <div className="pd-person-info">
+                <strong>{labelFor(id)}</strong>
+                <span>{getRoleLabel(person?.rol || '', t)}</span>
+              </div>
+              <div className="pd-person-actions">
+                {isFullAccessRole ? (
+                  <span className="pd-total-access-badge">{t('Acceso total')}</span>
+                ) : admin ? (
+                  <select
+                    className="pd-access-select"
+                    value={participantAccess[id] || 'mis_tareas'}
+                    disabled={busy}
+                    onChange={(e) => setParticipantAccess(prev => ({ ...prev, [id]: e.target.value as any }))}
+                    aria-label={`${t('Nivel de acceso')} ${labelFor(id)}`}
+                  >
+                    <option value="mis_tareas">{t('Mis tareas')}</option>
+                    <option value="todas_las_tareas">{t('Todas las tareas de la villa')}</option>
+                  </select>
+                ) : (
+                  <span className="pd-access-badge">
+                    {(participantAccess[id] || 'mis_tareas') === 'todas_las_tareas' ? t('Todas las tareas de la villa') : t('Mis tareas')}
+                  </span>
+                )}
+                {admin && (
+                  <button
+                    type="button"
+                    className="pd-remove-btn"
+                    aria-label={`${c.remove}: ${labelFor(id)}`}
+                    disabled={busy}
+                    onClick={() => {
+                      setParticipants(previous => previous.filter(member => member !== id));
+                      setParticipantAccess(prev => { const n = { ...prev }; delete n[id]; return n; });
+                    }}
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        }) : <p className="pd-muted">{c.noParticipants}</p>}
+        {admin && (
+          <div className="pd-add-person">
+            <label>{c.peopleSearch}<input type="search" value={query} onChange={event => { setQuery(event.target.value); setPersonId(''); }} disabled={busy} /></label>
+            <div className="pd-add-row">
+              <AppSelect aria-label={c.addParticipant} value={personId} disabled={busy} onChange={event => setPersonId(event.target.value)}>
+                <option value="">{c.addParticipant}</option>
+                {available.map(p => <option key={p.id} value={p.id}>{personName(p)}</option>)}
+              </AppSelect>
+              <button
+                type="button"
+                className="pd-icon"
+                aria-label={c.addParticipant}
+                disabled={busy || !personId || !available.some(p => p.id === personId)}
+                onClick={() => {
+                  setParticipants(previous => [...previous, personId]);
+                  setParticipantAccess(prev => ({ ...prev, [personId]: 'mis_tareas' }));
+                  setPersonId('');
+                  setQuery('');
+                }}
+              >
+                <Plus size={18} />
+              </button>
+            </div>
+          </div>
+        )}
       </section>
       <p className="pd-muted pd-help">{c.inheritedHelp}</p>
       {error && <p role="alert" className="pd-error">{error}<button type="button" className="pd-text-button" disabled={busy} onClick={() => { if (window.confirm(c.unsaved)) { onDirty(false); void saved(); } }}>{c.reload}</button></p>}
@@ -156,7 +240,7 @@ export function ProjectDirectoryView() {
     <div className="pd-layout">
       <aside className="pd-developments" aria-label={c.developments}>
         <header><h2>{c.developments}</h2><button type="button" className="pd-icon" aria-label={c.reload} disabled={refreshing} onClick={() => { if (canLeave()) void load(); }}><RefreshCw size={17} className={refreshing ? 'animate-spin' : ''} /></button></header>
-        {admin && <div className="pd-development-actions"><button className="pd-primary" type="button" onClick={() => { if (canLeave()) setCreation('development'); }}><Plus size={16} />{c.newDevelopment}</button><button className="pd-button" type="button" onClick={() => setAccess('global')}><Settings2 size={16} />{c.globalAccess}</button></div>}
+        {admin && <div className="pd-development-actions"><button className="pd-primary" type="button" onClick={() => { if (canLeave()) setCreation('development'); }}><Plus size={16} />{c.newDevelopment}</button></div>}
         <label className="pd-search"><Search size={16} /><input type="search" aria-label={c.searchDevelopments} placeholder={c.searchDevelopments} value={developmentSearch} onChange={event => setDevelopmentSearch(event.target.value)} /></label>
         <div className="pd-development-list">{developments.map(d => <button key={d.id} type="button" aria-pressed={d.id === developmentId} className="pd-development" onClick={() => { if (canLeave()) { setDevelopmentId(d.id); setVillaId(''); setQuery(''); } }}><Building2 size={17} /><span>{d.nombre}</span><span className="pd-count">{counts.get(d.id) || 0}</span><ChevronRight size={15} /></button>)}{!developments.length && <p className="pd-empty">{data.developments.length ? c.noMatches : c.emptyDevelopments}</p>}</div>
       </aside>

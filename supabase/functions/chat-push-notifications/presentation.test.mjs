@@ -55,3 +55,36 @@ test('empty data has fallbacks and long unicode previews fit the push payload', 
   const native = buildChatNotification({ ...base, groupId: 'x'.repeat(36), platform: 'android', nativeChatVersion: 1, groupName: '👷'.repeat(80), senderName: '👷'.repeat(60), content: '👷'.repeat(5000), groupPhotoUrl: `https://example.com/${'a'.repeat(990)}` });
   assert.ok(Buffer.byteLength(JSON.stringify(native)) < 4096);
 });
+
+test('system task progress messages format clearly with task context and deep links', () => {
+  const systemInput = {
+    groupId: 'group-1',
+    messageId: 'msg-sys-1',
+    groupName: 'Villa 12 - Cuadrilla',
+    senderName: 'Carlos López',
+    senderId: 'user-carlos',
+    messageType: 'sistema',
+    content: 'Carlos López completó la subtarea «Verificar red» en «Instalación de rack»',
+    taskId: 'task-123',
+    subtaskId: 'sub-456',
+  };
+
+  const legacy = buildChatNotification(systemInput);
+  assert.equal(legacy.title, 'Villa 12 - Cuadrilla · Avance de tarea');
+  assert.equal(legacy.body, 'Carlos López completó la subtarea «Verificar red» en «Instalación de rack»');
+  assert.equal(legacy.data.kind, 'task_activity');
+  assert.equal(legacy.data.taskId, 'task-123');
+  assert.equal(legacy.data.subtaskId, 'sub-456');
+  assert.equal(legacy.data.url, '/chat/group-1');
+
+  const native = buildChatNotification({
+    ...systemInput,
+    platform: 'android',
+    nativeChatVersion: 1,
+  });
+  assert.equal(native.data.kind, 'task_activity');
+  assert.equal(native.data.taskId, 'task-123');
+  assert.equal(native.data.subtaskId, 'sub-456');
+  assert.equal(native.data.messageText, 'Carlos López completó la subtarea «Verificar red» en «Instalación de rack»');
+  assert.equal(native.data.url, '/chat/group-1');
+});

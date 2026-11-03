@@ -8,10 +8,11 @@ import './chatActions.css';
 const EmojiPicker = lazy(() => import('./EmojiPicker'));
 const quickReactions = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
-export function MessageActions({ message, canDelete, pinned, canUnpin, onReply, onPin, onDelete, onReaction, onError }: {
+export function MessageActions({ message, canDelete, pinned, canUnpin, onReply, onPin, onDelete, onReaction, onError, triggerClassName }: {
   message: ChatMessage; canDelete: boolean; pinned: boolean; canUnpin: boolean;
   onReply: () => void; onPin: () => void; onDelete: () => void;
   onReaction: (emoji: string) => void; onError: () => void;
+  triggerClassName?: string;
 }) {
   const { t } = useTranslation();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
@@ -19,9 +20,16 @@ export function MessageActions({ message, canDelete, pinned, canUnpin, onReply, 
   const close = useCallback(() => { setAnchor(null); setPicker(false); }, []);
   const act = (action: () => void) => { close(); action(); };
   return <>
-    <button type="button" className="message-options-trigger flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:opacity-100"
-      aria-label={t('Opciones del mensaje')} aria-haspopup="dialog" aria-expanded={Boolean(anchor)}
-      onClick={(event) => { if (anchor) close(); else setAnchor(event.currentTarget); }}><ChevronDown size={17} /></button>
+    <button
+      type="button"
+      className={triggerClassName || "message-options-trigger flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 focus-visible:opacity-100 transition-colors cursor-pointer"}
+      aria-label={t('Opciones del mensaje')}
+      aria-haspopup="dialog"
+      aria-expanded={Boolean(anchor)}
+      onClick={(event) => { if (anchor) close(); else setAnchor(event.currentTarget); }}
+    >
+      <ChevronDown size={16} />
+    </button>
     {anchor && <ChatPopover anchor={anchor} onClose={close} width={picker ? 360 : 296} label={picker ? t('Seleccionar reacción') : t('Opciones del mensaje')}>
       {picker ? <Suspense fallback={<div className="p-6"><Loader2 className="animate-spin" /></div>}><EmojiPicker onSelect={(emoji) => act(() => onReaction(emoji))} onClose={close} /></Suspense> : <>
         <div className="message-quick-reactions" aria-label={t('Reacciones rápidas')}>

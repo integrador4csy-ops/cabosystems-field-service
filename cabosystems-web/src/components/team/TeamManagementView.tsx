@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Users, Clock } from 'lucide-react';
 import { useSidebar } from '../../context/SidebarContext';
 import { useTranslation } from '../../context/LanguageContext';
@@ -18,15 +18,20 @@ interface TeamManagementViewProps {
 }
 
 export function TeamManagementView({ onTeamChanged }: TeamManagementViewProps) {
-  const { activeItem, setActiveItem } = useSidebar();
+  const { activeItem, setActiveItem, teamInviteVersion } = useSidebar();
   const { t } = useTranslation();
   const [invitationRevision, setInvitationRevision] = useState(0);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const inviteRequest = useRef(teamInviteVersion);
   const sections = [
     { id: 'colaboradores', label: t('sidebar.collaborators'), icon: Users },
     { id: 'invitaciones', label: t('sidebar.invitations'), icon: Clock },
   ];
-  const openInvite = () => setIsInviteOpen(true);
+  useEffect(() => {
+    if (inviteRequest.current === teamInviteVersion) return;
+    inviteRequest.current = teamInviteVersion;
+    setIsInviteOpen(true);
+  }, [teamInviteVersion]);
 
   return (
     <section aria-label={t("Gestión de equipo")} className="team-page flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -46,10 +51,10 @@ export function TeamManagementView({ onTeamChanged }: TeamManagementViewProps) {
       </nav>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div hidden={activeItem !== 'colaboradores'}>
-          <CollaboratorsSection active={activeItem === 'colaboradores'} onOpenInvite={openInvite} onUserListChanged={onTeamChanged} />
+          <CollaboratorsSection active={activeItem === 'colaboradores'} onUserListChanged={onTeamChanged} />
         </div>
         <div hidden={activeItem !== 'invitaciones'}>
-          <InvitationsSection active={activeItem === 'invitaciones'} refreshVersion={invitationRevision} onOpenInvite={openInvite} />
+          <InvitationsSection active={activeItem === 'invitaciones'} refreshVersion={invitationRevision} />
         </div>
       </div>
       <InviteUserModal

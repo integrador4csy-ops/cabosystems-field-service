@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
+  BackHandler,
   Pressable,
   StyleSheet,
   View,
@@ -12,7 +13,9 @@ import {
   MessageSquare,
   Users,
 } from 'lucide-react-native';
-import { Tabs, useRouter, useSegments, usePathname } from 'expo-router';
+import { Tabs, useRouter, useSegments, usePathname, useFocusEffect } from 'expo-router';
+import { BottomTabBar, type BottomTabBarProps } from 'expo-router/js-tabs';
+import { orderTabBarState } from '@/lib/tabBarOrder';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Animation } from '@/constants/Theme';
 import { BOTTOM_BAR_HEIGHT, BOTTOM_BAR_MIN_INSET } from '@/constants/NavigationLayout';
@@ -23,12 +26,13 @@ import { startForegroundPolling } from '@/lib/foregroundPolling';
 import { useTranslation } from '@/lib/i18n';
 import { afterTabPaint, prepareTabs } from '@/lib/tabPreparation';
 import { TabStartupProvider, useTabStartup } from '@/lib/tabStartup';
-import { preloadMyChatGroups } from '@/lib/chatApi';
+import { startChatBackgroundSync } from '@/lib/chatBackgroundSync';
+import { restoreChatRooms } from '@/lib/chatRoomCache';
 import { preloadAgendaData } from '@/lib/agendaWindowService';
 import { preloadUsersData } from './users';
 import { ConnectedTabBarProvider, ConnectedTabBackground, ConnectedTabButton, ConnectedTabIcon, ConnectedTabLabel } from '@/components/ConnectedTabBar';
 
-export const unstable_settings = { anchor: 'index' };
+
 
 const renderTabBarBackground = () => <ConnectedTabBackground />;
 
@@ -146,7 +150,7 @@ function FloatingActionButton(props: any) {
 
 export default function TabLayout() {
   const { profile } = useAuth();
-  return <TabStartupProvider key={profile?.id || 'anonymous'}><PreparedTabLayout /></TabStartupProvider>;
+  return <TabStartupProvider owner={profile?.id || 'anonymous'}><PreparedTabLayout /></TabStartupProvider>;
 }
 
 function PreparedTabLayout() {
@@ -173,6 +177,17 @@ function PreparedTabLayout() {
   );
 
 
+  // SDK 58 queues tab-history reconciliation against stale ancestor keys when
+  // opening a stack detail. Keep tab Back behavior explicit and focus-scoped.
+  useFocusEffect(useCallback(() => {
+    if (currentTab === 'index') return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      router.navigate('/(tabs)');
+      return true;
+    });
+    return () => subscription.remove();
+  }, [currentTab, router]));
+
   useEffect(() => {
     if (!mainReady && currentTab !== 'index') return afterTabPaint(markMainReady);
   }, [mainReady, currentTab, markMainReady]);
@@ -180,16 +195,21 @@ function PreparedTabLayout() {
   useEffect(() => {
     if (!mainReady || !profile?.activo || !profile.id) return;
     const owner = profile.id;
-    let cancelled = false;
     const stop = prepareTabs([
-      async () => { await preloadAgendaData(owner); if (!cancelled) router.prefetch('/(tabs)/schedule'); },
-      async () => { await preloadMyChatGroups(owner); if (!cancelled) router.prefetch('/(tabs)/chat'); },
-      async () => { if (isAdmin) { await preloadUsersData(owner); if (!cancelled) router.prefetch('/(tabs)/users'); } },
-      () => { router.prefetch('/(tabs)/profile'); },
-      () => { if (!isAdmin) router.prefetch('/(tabs)/fab'); },
+      async () => { await preloadAgendaData(owner); },
+      async () => { await restoreChatRooms(owner); },
+      async () => { if (isAdmin) await preloadUsersData(owner); },
     ], 2);
-    return () => { cancelled = true; stop(); };
+    return stop;
   }, [mainReady, profile?.id, profile?.activo, isAdmin, router]);
+  useEffect(() => {
+    if (!mainReady || !profile?.activo || !profile.id) return;
+    return startChatBackgroundSync(profile.id);
+  }, [mainReady, profile?.id, profile?.activo]);
+  // The registry follows Expo's seeded order; the bar keeps the product's visual order.
+  const renderOrderedTabBar = useCallback((props: BottomTabBarProps) => (
+    <BottomTabBar {...props} state={orderTabBarState(props.state, tabOrder)} />
+  ), [tabOrder]);
   const bottomInset = Math.max(insets.bottom, BOTTOM_BAR_MIN_INSET);
 
   const tabBarStyle = useMemo(
@@ -220,7 +240,8 @@ function PreparedTabLayout() {
     <ConnectedTabBarProvider tabs={tabOrder} activeTab={currentTab}>
       <View style={styles.scene}>
         <Tabs
-        backBehavior="initialRoute"
+        backBehavior="none"
+        tabBar={renderOrderedTabBar}
         detachInactiveScreens
         screenLayout={renderScreenLayout}
         screenOptions={{
@@ -240,6 +261,15 @@ function PreparedTabLayout() {
         }}
       >
         <Tabs.Screen
+          name="index"
+          activityEnabled={false}
+          options={{
+            title: t('nav.tasks'),
+            tabBarIcon: TasksIcon,
+            tabBarLabel: TasksLabel,
+          }}
+        />
+        <Tabs.Screen
           name="fab"
           options={
             isAdmin
@@ -251,21 +281,12 @@ function PreparedTabLayout() {
           }
         />
         <Tabs.Screen
-          name="index"
+          name="chat"
           activityEnabled={false}
           options={{
-            title: t('nav.tasks'),
-            tabBarIcon: TasksIcon,
-            tabBarLabel: TasksLabel,
-          }}
-        />
-        <Tabs.Screen
-          name="schedule"
-          activityEnabled={false}
-          options={{
-            title: t('nav.schedule'),
-            tabBarIcon: ScheduleIcon,
-            tabBarLabel: ScheduleLabel,
+            title: t('nav.chat'),
+            tabBarIcon: ChatIcon,
+            tabBarLabel: ChatLabel,
           }}
         />
         <Tabs.Screen
@@ -279,21 +300,21 @@ function PreparedTabLayout() {
           }}
         />
         <Tabs.Screen
-          name="chat"
-          activityEnabled={false}
-          options={{
-            title: t('nav.chat'),
-            tabBarIcon: ChatIcon,
-            tabBarLabel: ChatLabel,
-          }}
-        />
-        <Tabs.Screen
           name="profile"
           options={{
             title: t('nav.profile'),
             lazy: true,
             tabBarItemStyle: { display: 'none' },
             tabBarButton: () => null,
+          }}
+        />
+        <Tabs.Screen
+          name="schedule"
+          activityEnabled={false}
+          options={{
+            title: t('nav.schedule'),
+            tabBarIcon: ScheduleIcon,
+            tabBarLabel: ScheduleLabel,
           }}
         />
       </Tabs>

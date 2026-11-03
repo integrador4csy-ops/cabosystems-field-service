@@ -1,3 +1,4 @@
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React, { useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -5,6 +6,7 @@ import { fieldOutboxSummary, retryFieldSync, subscribeFieldSync } from '@/lib/fi
 import { useTranslation } from '@/lib/i18n';
 
 export function FieldSyncStatus({ owner }: { owner: string }) {
+  const { t: tr } = useInterfaceTranslation();
   const insets = useSafeAreaInsets();
   const { language } = useTranslation(); const en = language === 'en';
   const [state, setState] = useState({ owner: '', count: 0, blocked: 0, error: null as string | null });
@@ -26,8 +28,8 @@ export function FieldSyncStatus({ owner }: { owner: string }) {
     catch { Alert.alert(en ? 'Unable to retry' : 'No se pudo reintentar', en ? 'Your saved records have not been deleted.' : 'Tus registros guardados no se han eliminado.'); }
   };
   return <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityLiveRegion="polite" style={[styles.notice, { bottom: insets.bottom + 90 }]} onPress={() => Alert.alert(title,
-    state.error || (en ? 'Saved on this device. They will be sent when the app is open and connected.' : 'Guardados en este dispositivo. Se enviarán con la app abierta y conectada.'),
-    [{ text: en ? 'Close' : 'Cerrar', style: 'cancel' }, { text: en ? 'Retry' : 'Reintentar', onPress: () => { void retry(); } }])}>
+    state.error ? tr(state.error) : (en ? 'Saved on this device. They will be sent when the app is open and connected.' : 'Guardados en este dispositivo. Se enviarán con la app abierta y conectada.'),
+    [{ text: en ? 'Close' : tr("Cerrar"), style: 'cancel' }, { text: en ? 'Retry' : tr("Reintentar"), onPress: () => { void retry(); } }])}>
     <Text style={styles.text}>{title}</Text>
   </Pressable>;
 }

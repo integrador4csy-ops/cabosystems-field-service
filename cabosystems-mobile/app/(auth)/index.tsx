@@ -1,3 +1,4 @@
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -29,6 +30,7 @@ import {
 } from '@/lib/biometrics';
 
 export default function LoginScreen() {
+  const { t: tr } = useInterfaceTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -73,7 +75,7 @@ export default function LoginScreen() {
     clearAuthError();
 
     if (!email.trim() || !password.trim()) {
-      setLocalError('Por favor ingresa tu correo y contraseña.');
+      setLocalError(tr("Por favor ingresa tu correo y contraseña."));
       return;
     }
 
@@ -103,7 +105,7 @@ export default function LoginScreen() {
     setPromptLoading(true);
     try {
       const authResult = await authenticateWithBiometrics(
-        `Registrar ${biometricStatus?.label || 'biometría'} en CaboSystems`
+        tr("Registrar {value0} en CaboSystems", { value0: tr(biometricStatus?.label || 'Biometría') })
       );
 
       if (authResult.success) {
@@ -158,12 +160,8 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.formContainer}>
-          <Text style={[styles.welcomeTitle, isCompact && styles.welcomeTitleCompact]}>
-            Iniciar Sesión
-          </Text>
-          <Text style={[styles.welcomeSubtitle, isCompact && styles.welcomeSubtitleCompact]}>
-            Accede con tus credenciales corporativas para gestionar visitas y tareas de campo.
-          </Text>
+          <Text style={[styles.welcomeTitle, isCompact && styles.welcomeTitleCompact]}>{tr("Iniciar Sesión")}</Text>
+          <Text style={[styles.welcomeSubtitle, isCompact && styles.welcomeSubtitleCompact]}>{tr("Accede con tus credenciales corporativas para gestionar visitas y tareas de campo.")}</Text>
 
           {/* Mensaje de Error */}
           {!!displayedError && (
@@ -176,20 +174,20 @@ export default function LoginScreen() {
             >
               <AlertCircle size={20} color={Colors.primary} strokeWidth={2.2} style={styles.errorIcon} />
               <View style={styles.errorTexts}>
-                <Text style={styles.errorTitle}>Error de acceso</Text>
-                <Text style={styles.errorMessage}>{displayedError}</Text>
+                <Text style={styles.errorTitle}>{tr("Error de acceso")}</Text>
+                <Text style={styles.errorMessage}>{tr(displayedError)}</Text>
               </View>
             </Pressable>
           )}
 
           {/* Input Correo */}
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Correo electrónico</Text>
+            <Text style={styles.inputLabel}>{tr("Correo electrónico")}</Text>
             <View style={styles.inputWrapper}>
               <Mail size={18} color={Colors.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
-                placeholder="ejemplo@csy.mx"
+                placeholder="name@csy.mx"
                 placeholderTextColor={Colors.textMuted}
                 value={email}
                 onChangeText={(text) => {
@@ -210,12 +208,12 @@ export default function LoginScreen() {
           {/* Input Contraseña */}
           <View style={styles.inputGroup}>
             <View style={styles.passwordLabelRow}>
-              <Text style={styles.inputLabel}>Contraseña</Text>
+              <Text style={styles.inputLabel}>{tr("Contraseña")}</Text>
               <Pressable
                 onPress={() => router.push('/(auth)/reset-password' as any)}
                 hitSlop={8}
               >
-                <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
+                <Text style={styles.forgotPasswordText}>{tr("¿Olvidaste tu contraseña?")}</Text>
               </Pressable>
             </View>
             <View style={styles.inputWrapper}>
@@ -263,7 +261,7 @@ export default function LoginScreen() {
             {loading ? (
               <ActivityIndicator size="small" color="#ffffff" />
             ) : (
-              <Text style={styles.submitButtonText}>Iniciar Sesión</Text>
+              <Text style={styles.submitButtonText}>{tr("Iniciar Sesión")}</Text>
             )}
           </Pressable>
 
@@ -279,7 +277,7 @@ export default function LoginScreen() {
                 onPress={handleBiometricLogin}
                 disabled={loading || biometricLoading}
                 hitSlop={8}
-                accessibilityLabel={`Ingresar con ${biometricStatus?.label || 'Huella'}`}
+                accessibilityLabel={tr("Ingresar con {value0}", { value0: biometricStatus?.label || 'Huella' })}
                 accessibilityRole="button"
               >
                 {biometricLoading ? (
@@ -295,11 +293,10 @@ export default function LoginScreen() {
 
           {/* Enlace para Invitación / Registro */}
           <View style={styles.inviteNoticeContainer}>
-            <Text style={styles.inviteNoticeText}>
-              ¿Recibiste una invitación por correo?{' '}
+            <Text style={styles.inviteNoticeText}>{tr("¿Recibiste una invitación por correo?")}{' '}
             </Text>
             <Pressable onPress={() => router.push('/(auth)/register' as any)}>
-              <Text style={styles.inviteNoticeLink}>Completar registro aquí</Text>
+              <Text style={styles.inviteNoticeLink}>{tr("Completar registro aquí")}</Text>
             </Pressable>
           </View>
         </View>
@@ -323,12 +320,9 @@ export default function LoginScreen() {
               )}
             </View>
 
-            <Text style={styles.modalTitle}>
-              ¿Activar {biometricStatus?.label || 'Huella Dactilar'}?
+            <Text style={styles.modalTitle}>{tr('¿Activar {value0}?', {value0: tr(biometricStatus?.label || 'Huella Dactilar')})}
             </Text>
-            <Text style={styles.modalMessage}>
-              Registra tu {biometricStatus?.label?.toLowerCase() || 'huella'} para acceder rápidamente a CaboSystems Field Service en tus próximas sesiones sin escribir tu contraseña.
-            </Text>
+            <Text style={styles.modalMessage}>{tr('Registra tu {value0} para acceder rápidamente a CaboSystems Field Service en tus próximas sesiones sin escribir tu contraseña.', {value0: tr(biometricStatus?.label || 'Huella Dactilar')})}</Text>
 
             <View style={styles.modalActionsRow}>
               <Pressable
@@ -339,7 +333,7 @@ export default function LoginScreen() {
                 onPress={handleDeclineRegisterBiometrics}
                 disabled={promptLoading}
               >
-                <Text style={styles.modalDeclineBtnText}>Ahora no</Text>
+                <Text style={styles.modalDeclineBtnText}>{tr("Ahora no")}</Text>
               </Pressable>
 
               <Pressable
@@ -354,7 +348,7 @@ export default function LoginScreen() {
                 {promptLoading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.modalAcceptBtnText}>Activar</Text>
+                  <Text style={styles.modalAcceptBtnText}>{tr("Activar")}</Text>
                 )}
               </Pressable>
             </View>

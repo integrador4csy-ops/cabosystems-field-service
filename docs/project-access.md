@@ -65,7 +65,7 @@ La pantalla web conectada se verificó con la sesión existente: listado de los 
 
 ## Visibilidad en móvil
 
-Tareas y Agenda consultan todas las tareas permitidas por RLS, conservando los filtros de villa, fecha y estado. Se eliminó el filtro exclusivo por asignación personal de estas pantallas. La consulta pagina los resultados y se actualiza al regresar a la pantalla o reactivar la app. El acceso global permite consultar; únicamente el responsable de la tarea o un administrador activo puede actualizar progreso y checklist.
+Desde la migración preparada el 2 de noviembre, la asignación directa permite consultar y avanzar únicamente esa tarea. El acceso explícito como integrante o encargado de una villa, por desarrollo o global permite consultar y avanzar todas las tareas del alcance concedido. Administradores consultan todas; supervisores consultan y editan dentro de su alcance. La base de datos aplica la misma regla a tareas, subtareas, permisos e historial, sin depender de filtros visuales. Web y móvil muestran y filtran la prioridad, y ordenan siempre alta, media y baja; el orden alfabético solo desempata dentro de cada nivel. La migración todavía no se ha aplicado al entorno remoto.
 
 Diagnóstico de solo lectura del 15 de octubre: la cuenta auxiliar con acceso global podía consultar 5 tareas en 4 villas mediante RLS, pero tenía 0 tareas asignadas directamente. El filtro anterior explicaba el listado vacío. No se modificaron permisos ni datos para corregirlo. La instalación móvil debe cargar la versión actualizada para recibir este cambio.
 

@@ -77,6 +77,8 @@ serve(async (req) => {
     const tipo = payload.tipo || 'texto';
     const contenido = payload.contenido || '';
     const mensajeId = payload.id || payload.mensaje_id;
+    const taskId = payload.task_id || payload.media_meta?.task_id || null;
+    const subtaskId = payload.subtask_id || payload.media_meta?.subtask_id || null;
 
     console.log('[chat-push] grupoId:', grupoId, '| remitenteId:', remitenteId);
 
@@ -111,6 +113,8 @@ serve(async (req) => {
       senderId: remitenteId,
       messageType: tipo,
       content: contenido,
+      taskId,
+      subtaskId,
     };
 
     // 3. Obtener tokens push de los demás miembros del grupo

@@ -9,7 +9,7 @@ import type { CompanyAgendaCopy } from '@/lib/companyAgendaCopy';
 import { AgendaDatePicker } from './AgendaDatePicker';
 
 export const CompanyAgendaTopBar = React.memo(function CompanyAgendaTopBar({ copy: c, canManage, onCreate }: { copy: CompanyAgendaCopy; canManage: boolean; onCreate: () => void }) {
-  return <HeaderCaboSystems showProjectSelector={false} rightAccessory={canManage ? <Pressable accessibilityRole="button" accessibilityLabel={c.newEvent} onPress={onCreate} style={({ pressed }) => [s.add, pressed && s.pressed]}><Plus size={23} strokeWidth={2} color={P.ink} /></Pressable> : undefined} />;
+  return <HeaderCaboSystems seamless showProjectSelector={false} rightAccessory={canManage ? <Pressable accessibilityRole="button" accessibilityLabel={c.newEvent} onPress={onCreate} style={({ pressed }) => [s.add, pressed && s.pressed]}><Plus size={23} strokeWidth={2} color={P.white} /></Pressable> : undefined} />;
 });
 
 export const CompanyAgendaControls = React.memo(function CompanyAgendaControls({ copy: c, locale, query, view, anchor, today, days, counts, heading, onSearch, onView, onDate, onMove, onToday, calendarFilter, showCalendar = true }: {

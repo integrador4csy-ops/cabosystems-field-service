@@ -11,6 +11,13 @@ async function loadModule(file) {
 
 const { dateKey, parseDateKey, shiftDate, shiftMonth, weekDates, monthWorkWeeks, isOverdue } = await loadModule('taskDates');
 const { countTaskStatuses, filterWorkspaceTasks, sortWorkspaceTasks, taskSearchLocation, taskVillaScope } = await loadModule('taskFilters');
+const { taskProgressRequestId } = await loadModule('taskProgress');
+
+test('task progress request IDs are unique RFC 4122 UUIDs for stable retries', () => {
+  const ids = Array.from({ length: 100 }, taskProgressRequestId);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.ok(ids.every(id => /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id)));
+});
 
 test('calendar days stay unchanged across timezones and daylight saving transitions', () => {
   const original = process.env.TZ;
@@ -79,6 +86,19 @@ test('ascending and descending task order follow numeric stage titles without mu
   assert.deepEqual(sortWorkspaceTasks([{ titulo: 'Wifi' }, { titulo: 'Áudio' }, { titulo: 'Cableado' }], 'asc', 'es-MX').map(task => task.titulo), ['Áudio', 'Cableado', 'Wifi']);
 });
 
+test('priority always leads the workspace order and can be filtered', () => {
+  const prioritized = [
+    { id: 'low', titulo: 'A', prioridad: 'baja' },
+    { id: 'medium', titulo: 'A', prioridad: 'media' },
+    { id: 'high-z', titulo: 'Z', prioridad: 'alta' },
+    { id: 'high-a', titulo: 'A', prioridad: 'alta' },
+  ];
+  assert.deepEqual(sortWorkspaceTasks(prioritized, 'asc', 'es-MX').map(task => task.id), ['high-a', 'high-z', 'medium', 'low']);
+  assert.deepEqual(sortWorkspaceTasks(prioritized, 'desc', 'es-MX').map(task => task.id), ['high-z', 'high-a', 'medium', 'low']);
+  const withProjects = prioritized.map((task, index) => ({ ...task, proyecto_id: 'a', asignado_a: null, estatus: index ? 'pendiente' : 'en_proceso' }));
+  assert.deepEqual(filterWorkspaceTasks(withProjects, projects, { ...filters, priority: 'alta' }).map(task => task.id), ['high-z', 'high-a']);
+});
+
 test('agenda status counts exclude undated tasks and count them only in the unscheduled view', () => {
   const mixed = [...tasks, { ...tasks[1], id: '4' }];
   assert.deepEqual(countTaskStatuses(mixed, 'scheduled'), { all: 2, pendiente: 1, en_proceso: 0, completada: 1 });
@@ -96,6 +116,7 @@ test('shared task filters compose without changing the underlying task objects',
   assert.deepEqual(ids({ project: 'b' }), ['3']);
   assert.deepEqual(ids({ assignee: 'unassigned' }), ['2']);
   assert.deepEqual(ids({ assignee: 'carlos', status: 'pendiente' }), ['1']);
+  assert.deepEqual(ids({ priority: 'alta' }), []);
   assert.deepEqual(ids({ project: 'b', status: 'pendiente' }), []);
   assert.equal(filterWorkspaceTasks(tasks, projects, filters)[0], tasks[0]);
 });

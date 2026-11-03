@@ -151,22 +151,29 @@ export function setupNotificationResponseListener(navigateFn: (path: string) => 
   }
 
   try {
+    const handleNotificationData = (data: any) => {
+      if (!data) return;
+      if (data.target === 'task' && data.taskId) {
+        navigateFn(`/task/${data.taskId}`);
+      } else if (data.groupId) {
+        navigateFn(`/chat/${data.groupId}`);
+      } else if (data.taskId) {
+        navigateFn(`/task/${data.taskId}`);
+      } else if (data.url) {
+        navigateFn(data.url);
+      }
+    };
+
     // 1. Manejar caso cuando la app se abrió desde una notificación cerrada
     NotificationsModule.getLastNotificationResponseAsync().then((response) => {
       if (response) {
-        const data = response.notification.request.content.data;
-        if (data?.groupId) {
-          navigateFn(`/chat/${data.groupId}`);
-        }
+        handleNotificationData(response.notification.request.content.data);
       }
     });
 
     // 2. Manejar eventos mientras la app estaba en segundo plano o minimizada
     const subscription = NotificationsModule.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data;
-      if (data?.groupId) {
-        navigateFn(`/chat/${data.groupId}`);
-      }
+      handleNotificationData(response.notification.request.content.data);
     });
 
     return () => {

@@ -1,3 +1,4 @@
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React from 'react';
 import { View, Text, StyleSheet, Modal, Pressable } from 'react-native';
 import { ClipboardCheck, CheckCircle2 } from 'lucide-react-native';
@@ -25,17 +26,18 @@ export default function DailyFormConfirmModal({
   onConfirm,
   onCancel,
 }: DailyFormConfirmModalProps) {
+  const { t: tr } = useInterfaceTranslation();
   const isSuccess = type === 'success';
 
   const defaultTitle = isSuccess
-    ? '¡Formulario Registrado!'
-    : '¿Completaste el Formulario?';
+    ? tr("¡Formulario Registrado!")
+    : tr("¿Completaste el Formulario?");
 
   const defaultMessage = isSuccess
-    ? 'Tu reporte diario de campo ha sido completado y registrado exitosamente en CaboSystems.'
-    : 'Si ya enviaste tus respuestas en Google Forms, confirma para registrar tu turno de campo.';
+    ? tr("Tu reporte diario de campo ha sido completado y registrado exitosamente en CaboSystems.")
+    : tr("Si ya enviaste tus respuestas en Google Forms, confirma para registrar tu turno de campo.");
 
-  const defaultConfirmText = isSuccess ? 'Entendido' : 'Confirmar';
+  const defaultConfirmText = isSuccess ? tr("Entendido") : tr("Confirmar");
 
   return (
     <Modal
@@ -91,7 +93,7 @@ export default function DailyFormConfirmModal({
                     size="md"
                     onPress={onCancel}
                   >
-                    {cancelText}
+                    {tr(cancelText)}
                   </Button>
                 </View>
               )}

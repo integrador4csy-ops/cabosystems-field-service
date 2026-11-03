@@ -26,6 +26,8 @@ export interface Tarea {
   titulo: string;
   descripcion: string | null;
   estatus: 'pendiente' | 'en_proceso' | 'completada';
+  prioridad: 'baja' | 'media' | 'alta';
+  prioridad_orden?: number;
   fecha_programada?: string | null;
   created_at?: string;
   profiles?: {

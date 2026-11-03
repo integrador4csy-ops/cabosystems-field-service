@@ -26,6 +26,27 @@
 
 .team-section .admin-modal-body > form { width: 100%; max-width: 640px; }
 
+.team-page .team-refresh-button {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-slate-200);
+  border-radius: 8px;
+  color: var(--color-slate-600);
+  background: #fff;
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.team-page .team-refresh-button:hover:not(:disabled) {
+  border-color: var(--color-slate-300);
+  background: var(--color-slate-50);
+  color: var(--color-slate-800);
+}
+
+.team-page .team-refresh-button:disabled { opacity: .55; }
+
 /* Brand accents stay on selection, identity, and the primary action. */
 .team-page nav button[aria-current="page"] {
   color: var(--color-brand-800);

@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react';
 import { GripVertical, Loader2, Search } from 'lucide-react';
 import type { Tarea } from '../../types/projects';
 import { TaskCard } from './TaskCard';
+import { updateTask } from '../../lib/projectsApi';
 import './TaskBoard.css';
 
 const columns = [
@@ -33,6 +34,7 @@ export function TaskBoard({ tasks, expandedTaskIds, onToggleExpand, onTaskUpdate
   const savingRef = useRef(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+
   const grouped = useMemo(() => {
     const term = query.trim().toLocaleLowerCase('es');
     const matching = tasks.filter((task) => !term || `${task.titulo} ${task.descripcion || ''} ${task.profiles?.nombre || ''}`.toLocaleLowerCase('es').includes(term));
@@ -44,22 +46,23 @@ export function TaskBoard({ tasks, expandedTaskIds, onToggleExpand, onTaskUpdate
     setOverStatus(null);
     const task = tasks.find((item) => item.id === id);
     if (!task || task.estatus === status || savingRef.current) return;
-    savingRef.current = true;
-    setSaving(true);
-    setError('');
-    setNotice('');
+    setError(''); setNotice('');
+    savingRef.current = true; setSaving(true);
     try {
+      await updateTask(task.id, { estatus: status });
       await onMoveTask(task, status);
-      setNotice(t("«{value0}» movida a {value1}.", { value0: task.titulo, value1: t(columns.find((column) => column.status === status)?.label || status) }));
-    } catch {
-      setError(t("No se pudo mover la tarea. Intenta de nuevo."));
+      setNotice(t("«{value0}» movida a {value1}.", { value0: task.titulo, value1: t(columns.find(column => column.status === status)?.label || status) }));
+      onTaskUpdated();
+    } catch (err: any) {
+      console.error('Error dragging task:', err);
+      setError(err?.message || t("No se pudo mover la tarea. Intenta de nuevo."));
     } finally {
-      savingRef.current = false;
-      setSaving(false);
+      savingRef.current = false; setSaving(false);
     }
   };
 
   return (
+    <>
     <div className="task-board-view">
       {showSearch && <div className="task-board-tools">
         <label className="task-board-search">
@@ -103,5 +106,6 @@ export function TaskBoard({ tasks, expandedTaskIds, onToggleExpand, onTaskUpdate
         ))}
       </div>
     </div>
+    </>
   );
 }

@@ -16,17 +16,31 @@ import {
   Search,
   Loader2,
   AlertTriangle,
+  FileText,
+  Paperclip,
+  Download,
+  Eye,
+  Play,
+  Mic,
 } from 'lucide-react';
+import { getProjects } from '../../lib/projectsApi';
+import type { Proyecto } from '../../types/projects';
 import {
   getGroupMembers,
+  getGroupAttachments,
   updateChatGroup,
   addChatGroupMembers,
   removeChatGroupMember,
   deleteChatGroup,
   getAllProfilesForInvite,
 } from '../../lib/chatApi';
-import type { ChatGroup, ChatMember } from '../../types/chat';
+import type { ChatGroup, ChatMember, ChatMessage } from '../../types/chat';
 import type { Profile } from '../../types/fleet';
+import { getDocumentInfo } from '../../lib/chatDocumentTypes';
+import { downloadRemoteFile } from '../../lib/fileDownload';
+import { DocumentPreviewModal } from './DocumentPreviewModal';
+import { ImageLightboxModal } from './ImageLightboxModal';
+import { GroupTaskActivitySection } from './GroupTaskActivitySection';
 
 interface GroupInfoDrawerProps {
   isOpen: boolean;
@@ -50,6 +64,11 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
   const { t } = useTranslation();
   const [members, setMembers] = useState<ChatMember[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [attachments, setAttachments] = useState<ChatMessage[]>([]);
+  const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [mediaFilter, setMediaFilter] = useState<'all' | 'media' | 'docs' | 'audio'>('all');
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; fileName?: string; fileSize?: number; mimeType?: string } | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; caption?: string | null } | null>(null);
 
   // Edit Group State
   const [isEditing, setIsEditing] = useState(false);
@@ -59,6 +78,8 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
   const [editPhotoFile, setEditPhotoFile] = useState<File | null>(null);
   const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [availableProjects, setAvailableProjects] = useState<Proyecto[]>([]);
+  const [editProjectId, setEditProjectId] = useState<string>('');
 
   // Add Members State
   const [isAddingMembers, setIsAddingMembers] = useState(false);
@@ -88,9 +109,27 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
       setEditSoloMulti(group.solo_multimedia);
       setEditPhotoFile(null);
       setEditPhotoPreview(group.foto_url);
+      setEditProjectId(group.proyecto_id || '');
+      if (isAdminOfGroup) {
+        getProjects().then(setAvailableProjects).catch(() => []);
+      }
       loadMembers();
+      loadAttachments();
     }
   }, [isOpen, group?.id]);
+
+  const loadAttachments = async () => {
+    if (!group) return;
+    try {
+      setLoadingAttachments(true);
+      const data = await getGroupAttachments(group.id);
+      setAttachments(data);
+    } catch (err) {
+      console.error('Error loading group attachments:', err);
+    } finally {
+      setLoadingAttachments(false);
+    }
+  };
 
   const loadMembers = async () => {
     if (!group) return;
@@ -165,6 +204,7 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
         descripcion: editDesc.trim() || undefined,
         solo_multimedia: editSoloMulti,
         fotoFile: editPhotoFile,
+        proyecto_id: editProjectId || null,
       });
 
       setIsEditing(false);
@@ -293,6 +333,26 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-[#343e48] mb-1">
+                  {t("Villa vinculada (opcional)")}</label>
+                <select
+                  value={editProjectId}
+                  onChange={(e) => setEditProjectId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-[#343e48] focus:border-[#f78c26] outline-hidden"
+                >
+                  <option value="">{t("Ninguna (Chat general)")}</option>
+                  {availableProjects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.desarrollo} · {p.villa}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500 font-medium mt-1">
+                  {t("Solo puedes vincular villas que tienes permitido consultar.")}
+                </p>
+              </div>
+
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <label className="flex items-center justify-between cursor-pointer">
                   <div className="flex items-center gap-2">
@@ -382,6 +442,193 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
               )}
             </div>
           )}
+
+          {/* Tareas realizadas de la villa vinculada */}
+          {group.proyecto_id ? (
+            <GroupTaskActivitySection
+              groupId={group.id}
+              onImageClick={(url, caption) => setLightboxImage({ url, caption })}
+            />
+          ) : null}
+
+          {/* Attachments & Media Section */}
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Paperclip size={15} className="text-brand-500" />
+                <h4 className="text-xs font-bold text-[#343e48] tracking-wider uppercase">
+                  {t("Archivos y multimedia")}
+                </h4>
+              </div>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                {attachments.length}
+              </span>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex flex-wrap gap-1 border-b border-slate-100 pb-2">
+              {[
+                { id: 'all', label: t('Todos') },
+                { id: 'media', label: t('Fotos y videos') },
+                { id: 'docs', label: t('Documentos') },
+                { id: 'audio', label: t('Audios') },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setMediaFilter(tab.id as 'all' | 'media' | 'docs' | 'audio')}
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer ${
+                    mediaFilter === tab.id
+                      ? 'bg-brand-500 text-white'
+                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Filtered Content */}
+            {loadingAttachments ? (
+              <div className="flex items-center justify-center py-6 text-slate-400">
+                <Loader2 size={20} className="animate-spin text-brand-500" />
+              </div>
+            ) : (() => {
+              const filtered = attachments.filter((att) => {
+                if (mediaFilter === 'media') return att.tipo === 'imagen' || att.tipo === 'video';
+                if (mediaFilter === 'docs') return att.tipo === 'archivo';
+                if (mediaFilter === 'audio') return att.tipo === 'audio';
+                return true;
+              });
+
+              if (filtered.length === 0) {
+                return (
+                  <p className="py-4 text-center text-xs text-slate-400">
+                    {t("No hay archivos adjuntos en este grupo")}
+                  </p>
+                );
+              }
+
+              return (
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  {/* Photo/Video Grid */}
+                  {filtered.some((a) => a.tipo === 'imagen' || a.tipo === 'video') && (mediaFilter === 'media' || mediaFilter === 'all') && (
+                    <div className="grid grid-cols-3 gap-2 pb-2">
+                      {filtered
+                        .filter((a) => a.tipo === 'imagen' || a.tipo === 'video')
+                        .map((att) => (
+                          <div
+                            key={att.id}
+                            className="group relative aspect-square overflow-hidden rounded-xl bg-slate-100 border border-slate-200 cursor-pointer"
+                            onClick={() => {
+                              if (att.tipo === 'imagen') {
+                                setLightboxImage({ url: att.media_url!, caption: att.contenido });
+                              } else {
+                                setPreviewDoc({
+                                  url: att.media_url!,
+                                  fileName: att.media_meta?.fileName || 'Video',
+                                  mimeType: att.media_meta?.mimeType || 'video/mp4',
+                                });
+                              }
+                            }}
+                          >
+                            {att.tipo === 'video' ? (
+                              <>
+                                <video src={att.media_url!} className="h-full w-full object-cover" />
+                                <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white">
+                                    <Play size={14} className="fill-white translate-x-0.5" />
+                                  </div>
+                                </div>
+                              </>
+                            ) : (
+                              <img src={att.media_url!} alt="" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  )}
+
+                  {/* Documents & Audio List */}
+                  {filtered
+                    .filter((a) => a.tipo === 'archivo' || a.tipo === 'audio')
+                    .map((att) => {
+                      if (att.tipo === 'audio') {
+                        return (
+                          <div key={att.id} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-2.5">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                              <Mic size={18} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-semibold text-slate-700">
+                                {t('Nota de voz')}
+                              </p>
+                              <p className="text-[10px] text-slate-400">
+                                {new Date(att.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <audio controls src={att.media_url!} className="max-w-[140px] h-7" />
+                          </div>
+                        );
+                      }
+
+                      const docInfo = getDocumentInfo(att.media_meta?.fileName, att.media_meta?.mimeType, att.media_url);
+                      const fileName = att.media_meta?.fileName || att.contenido || t('Documento');
+                      return (
+                        <div key={att.id} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-2.5 hover:bg-slate-100/70 transition-colors">
+                          <div
+                            className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border cursor-pointer"
+                            style={{ backgroundColor: docInfo.bgColor, borderColor: docInfo.borderColor }}
+                            onClick={() => setPreviewDoc({ url: att.media_url!, fileName, fileSize: att.media_meta?.fileSize, mimeType: att.media_meta?.mimeType })}
+                          >
+                            <FileText size={18} style={{ color: docInfo.primaryColor }} />
+                            <span
+                              className="absolute -bottom-1 px-1 py-0.2 rounded text-[6.5px] font-bold text-white uppercase"
+                              style={{ backgroundColor: docInfo.primaryColor }}
+                            >
+                              {docInfo.badgeLabel}
+                            </span>
+                          </div>
+                          <div
+                            className="min-w-0 flex-1 cursor-pointer"
+                            onClick={() => setPreviewDoc({ url: att.media_url!, fileName, fileSize: att.media_meta?.fileSize, mimeType: att.media_meta?.mimeType })}
+                          >
+                            <p className="truncate text-xs font-semibold text-[#1e293b]" title={fileName}>
+                              {fileName}
+                            </p>
+                            <p className="text-[10px] text-slate-400">
+                              {att.media_meta?.fileSize
+                                ? (att.media_meta.fileSize > 1024 * 1024
+                                    ? (att.media_meta.fileSize / (1024 * 1024)).toFixed(1) + ' MB'
+                                    : (att.media_meta.fileSize / 1024).toFixed(0) + ' KB')
+                                : docInfo.typeName}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewDoc({ url: att.media_url!, fileName, fileSize: att.media_meta?.fileSize, mimeType: att.media_meta?.mimeType })}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 hover:bg-white hover:text-brand-500 transition-colors cursor-pointer"
+                              title={t('Vista previa')}
+                            >
+                              <Eye size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void downloadRemoteFile(att.media_url!, fileName)}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 hover:bg-white hover:text-brand-500 transition-colors cursor-pointer"
+                              title={t('Descargar archivo')}
+                            >
+                              <Download size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              );
+            })()}
+          </div>
 
           {/* Members List Section */}
           <div className="space-y-3">
@@ -628,6 +875,26 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
           )}
         </div>
       </div>
+
+      {/* Document Preview Modal */}
+      {previewDoc && (
+        <DocumentPreviewModal
+          url={previewDoc.url}
+          fileName={previewDoc.fileName}
+          fileSize={previewDoc.fileSize}
+          mimeType={previewDoc.mimeType}
+          onClose={() => setPreviewDoc(null)}
+        />
+      )}
+
+      {/* Fullscreen Image Lightbox Modal */}
+      {lightboxImage && (
+        <ImageLightboxModal
+          imageUrl={lightboxImage.url}
+          caption={lightboxImage.caption}
+          onClose={() => setLightboxImage(null)}
+        />
+      )}
     </div>
   );
 };

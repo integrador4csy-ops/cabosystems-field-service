@@ -87,6 +87,18 @@ test('accessible tasks preserve their scheduled date', async () => {
   assert.equal(items[0].fecha_programada, '2026-10-15');
 });
 
+test('mobile task ordering keeps high priority first and title direction only breaks ties', () => {
+  const { sortTasksByPriority } = load('lib/taskListFilters.ts');
+  const prioritized = [
+    { id: 'low', titulo: 'A', prioridad: 'baja' },
+    { id: 'high-z', titulo: 'Z', prioridad: 'alta' },
+    { id: 'medium', titulo: 'A', prioridad: 'media' },
+    { id: 'high-a', titulo: 'A', prioridad: 'alta' },
+  ];
+  assert.deepEqual(plain(sortTasksByPriority(prioritized, 'asc', 'es').map(item => item.id)), ['high-a', 'high-z', 'medium', 'low']);
+  assert.deepEqual(plain(sortTasksByPriority(prioritized, 'desc', 'es').map(item => item.id)), ['high-z', 'high-a', 'medium', 'low']);
+});
+
 function accessibleApi(rows, failure = null) {
   const calls = [];
   const query = {
@@ -168,7 +180,7 @@ test('villa membership permissions enable progress without granting content edit
  assert.equal(canUpdateTaskProgress({...task,permissions:{user_id:'supervisor',can_progress:true,can_edit:true}},supervisor),true);
 });
 test('task permissions come from the authenticated server and fail closed on denied or missing responses', async()=>{
- let response={data:{user_id:'member',can_progress:true,can_edit:false},error:null};
+ let response={data:{user_id:'member',can_view:true,can_view_all:false,can_progress:true,can_edit:false},error:null};
  const calls=[];
  const api=load('lib/api.ts',{'./supabase':{supabase:{rpc:async(...args)=>{calls.push(args);return response;}}}});
  assert.equal((await api.getTaskPermissions('villa-task')).can_progress,true);

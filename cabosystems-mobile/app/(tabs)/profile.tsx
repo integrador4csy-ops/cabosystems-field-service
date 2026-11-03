@@ -1,3 +1,4 @@
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -20,8 +21,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Image } from 'expo-image';
 import {
-  User,
-  ArrowLeft,
   Mail,
   Briefcase,
   MapPin,
@@ -83,6 +82,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export default function ProfileScreen() {
+  const { t: tr } = useInterfaceTranslation();
   const { profile, user, session, signOut, refreshProfile } = useAuth();
   const { language, setLanguage, t } = useLanguage();
   const router = useRouter();
@@ -147,7 +147,7 @@ export default function ProfileScreen() {
       setUploadingAvatar(true);
       const publicUrl = await uploadAvatarImage(uri, user.id);
       if (!publicUrl) {
-        Alert.alert('Error', 'No se pudo subir la foto de perfil. Intenta de nuevo.');
+        Alert.alert(tr("Error"), tr("No se pudo subir la foto de perfil. Intenta de nuevo."));
         return;
       }
 
@@ -159,10 +159,10 @@ export default function ProfileScreen() {
       if (error) throw error;
 
       await refreshProfile();
-      Alert.alert('Éxito', 'Foto de perfil actualizada correctamente.');
+      Alert.alert(tr("Éxito"), tr("Foto de perfil actualizada correctamente."));
     } catch (err: any) {
       console.error('Error updating avatar:', err);
-      Alert.alert('Error', err?.message || 'Error al actualizar foto de perfil.');
+      Alert.alert(tr("Error"), tr(err?.message || tr("Error al actualizar foto de perfil.")));
     } finally {
       setUploadingAvatar(false);
     }
@@ -205,7 +205,7 @@ export default function ProfileScreen() {
   const handleToggleBiometrics = async (value: boolean) => {
     if (value) {
       if (!user?.email) {
-        Alert.alert('Error', 'No se pudo obtener la información de tu cuenta.');
+        Alert.alert(tr("Error"), tr("No se pudo obtener la información de tu cuenta."));
         return;
       }
 
@@ -215,11 +215,11 @@ export default function ProfileScreen() {
       const storedPass = await getStoredPassword();
       if (storedPass) {
         // Contraseña ya disponible: Solicitar únicamente la huella/FaceID
-        const auth = await authenticateWithBiometrics(`Confirma tu ${biometricLabel} para activar`);
+        const auth = await authenticateWithBiometrics(tr('Confirma tu {value0} para activar', {value0: tr(biometricLabel)}));
         if (auth.success) {
           await setBiometricCredentials(cleanEmail, storedPass, true);
           setBiometricsEnabled(true);
-          Alert.alert('Acceso Biométrico', `${biometricLabel} activada correctamente para inicio de sesión rápido.`);
+          Alert.alert(tr("Acceso Biométrico"), tr("{value0} activada correctamente para inicio de sesión rápido.", { value0: tr(biometricLabel) }));
         } else {
           setBiometricsEnabled(false);
         }
@@ -232,14 +232,14 @@ export default function ProfileScreen() {
     } else {
       setBiometricsEnabled(false);
       await setBiometricEnabled(false);
-      Alert.alert('Acceso Biométrico', 'Se ha desactivado el acceso biométrico.');
+      Alert.alert(tr("Acceso Biométrico"), tr("Se ha desactivado el acceso biométrico."));
     }
   };
 
   const handleConfirmBioWithPassword = async () => {
     const cleanPassword = bioConfirmPassword.trim();
     if (!cleanPassword) {
-      setBioError('Ingresa tu contraseña actual.');
+      setBioError(tr("Ingresa tu contraseña actual."));
       return;
     }
     if (!user?.email) return;
@@ -257,29 +257,29 @@ export default function ProfileScreen() {
       if (error) {
         console.warn('Supabase signInWithPassword verification error:', error);
         if (error.message.toLowerCase().includes('invalid login credentials')) {
-          setBioError('La contraseña ingresada no coincide con tu cuenta corporativa.');
+          setBioError(tr("La contraseña ingresada no coincide con tu cuenta corporativa."));
         } else if (error.message.toLowerCase().includes('rate')) {
           setBioError('Demasiados intentos. Espera unos momentos antes de reintentar.');
         } else {
-          setBioError(error.message || 'Error al validar credenciales.');
+          setBioError(error.message || tr("Error al validar credenciales."));
         }
         setBioLoading(false);
         return;
       }
 
       // 2. Solicitar confirmación del sensor biométrico
-      const auth = await authenticateWithBiometrics(`Confirma tu ${biometricLabel} para vincularla`);
+      const auth = await authenticateWithBiometrics(tr('Confirma tu {value0} para vincularla', {value0: tr(biometricLabel)}));
       if (auth.success) {
         await setBiometricCredentials(cleanEmail, cleanPassword, true);
         setBiometricsEnabled(true);
         setBioPasswordModalVisible(false);
         setBioConfirmPassword('');
-        Alert.alert('Acceso Biométrico', `${biometricLabel} vinculada y activada exitosamente.`);
+        Alert.alert(tr("Acceso Biométrico"), tr('{value0} vinculada y activada exitosamente.', {value0: tr(biometricLabel)}));
       } else {
-        setBioError(auth.error || 'No se completó la verificación biométrica.');
+        setBioError(auth.error || tr("No se completó la verificación biométrica."));
       }
     } catch (err: any) {
-      setBioError(err?.message || 'Error al vincular biometría.');
+      setBioError(err?.message || tr("Error al vincular biometría."));
     } finally {
       setBioLoading(false);
     }
@@ -288,11 +288,11 @@ export default function ProfileScreen() {
   const handleSavePassword = async () => {
     setPasswordError(null);
     if (!newPassword || newPassword.length < 6) {
-      setPasswordError('La contraseña debe tener al menos 6 caracteres.');
+      setPasswordError(tr("La contraseña debe tener al menos 6 caracteres."));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordError('Las contraseñas no coinciden.');
+      setPasswordError(tr("Las contraseñas no coinciden."));
       return;
     }
 
@@ -311,10 +311,10 @@ export default function ProfileScreen() {
         setPasswordModalVisible(false);
         setNewPassword('');
         setConfirmPassword('');
-        Alert.alert('Contraseña Actualizada', 'Tu nueva contraseña ha sido guardada exitosamente.');
+        Alert.alert(tr("Contraseña Actualizada"), tr("Tu nueva contraseña ha sido guardada exitosamente."));
       }
     } catch (err: any) {
-      setPasswordError(err?.message || 'Error al actualizar contraseña.');
+      setPasswordError(err?.message || tr("Error al actualizar contraseña."));
     } finally {
       setUpdatingPassword(false);
     }
@@ -344,9 +344,6 @@ export default function ProfileScreen() {
       <View style={styles.headerWrapper}>
         <SafeAreaView edges={['top']} style={styles.safeArea}>
           <View style={[styles.navContainer, isTablet && styles.navContainerTablet]}>
-            <Pressable accessibilityRole="button" accessibilityLabel={t('profile.backHome')} onPress={goHome} style={styles.backButton}>
-              <ArrowLeft size={22} color={Colors.brandSlate} />
-            </Pressable>
             <View style={styles.logoGroup}>
               <Image
                 source={LOGO_DARK}
@@ -357,10 +354,6 @@ export default function ProfileScreen() {
               />
             </View>
 
-            <View style={[styles.profilePill, isTablet && styles.profilePillTablet]}>
-              <User color="#FFFFFF" size={14} strokeWidth={2.5} />
-              <Text style={styles.profilePillText} numberOfLines={1}>{t('profile.title')}</Text>
-            </View>
           </View>
         </SafeAreaView>
       </View>
@@ -515,7 +508,7 @@ export default function ProfileScreen() {
                   <Fingerprint size={18} color="#FFFFFF" strokeWidth={2.2} />
                 </View>
                 <View style={styles.menuTexts}>
-                  <Text style={styles.menuTitle}>{biometricLabel}</Text>
+                  <Text style={styles.menuTitle}>{tr(biometricLabel)}</Text>
                   <Text style={styles.menuSubtitle}>
                     {biometricsEnabled ? t('profile.biometricEnabled') : t('profile.biometricDisabled')}
                   </Text>
@@ -766,8 +759,8 @@ export default function ProfileScreen() {
                   <KeyRound size={20} color="#FFFFFF" strokeWidth={2.4} />
                 </View>
                 <View>
-                  <Text style={styles.modalFormTitle}>Cambiar Contraseña</Text>
-                  <Text style={styles.modalSubtitle}>Ingresa tu nueva clave de acceso</Text>
+                  <Text style={styles.modalFormTitle}>{tr("Cambiar Contraseña")}</Text>
+                  <Text style={styles.modalSubtitle}>{tr("Ingresa tu nueva clave de acceso")}</Text>
                 </View>
               </View>
               <Pressable
@@ -782,20 +775,20 @@ export default function ProfileScreen() {
 
             {passwordError ? (
               <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{passwordError}</Text>
+                <Text style={styles.errorText}>{tr(passwordError)}</Text>
               </View>
             ) : null}
 
             {/* Nueva Contraseña */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>NUEVA CONTRASEÑA</Text>
+              <Text style={styles.fieldLabel}>{tr("NUEVA CONTRASEÑA")}</Text>
               <View style={styles.inputWrapper}>
                 <Lock size={16} color={Colors.textMuted} />
                 <TextInput
                   style={styles.modalTextInput}
                   value={newPassword}
                   onChangeText={setNewPassword}
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder={tr("Mínimo 6 caracteres")}
                   placeholderTextColor={Colors.textMuted}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
@@ -816,14 +809,14 @@ export default function ProfileScreen() {
 
             {/* Confirmar Contraseña */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>CONFIRMAR CONTRASEÑA</Text>
+              <Text style={styles.fieldLabel}>{tr("CONFIRMAR CONTRASEÑA")}</Text>
               <View style={styles.inputWrapper}>
                 <Lock size={16} color={Colors.textMuted} />
                 <TextInput
                   style={styles.modalTextInput}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
-                  placeholder="Repite la contraseña"
+                  placeholder={tr("Repite la contraseña")}
                   placeholderTextColor={Colors.textMuted}
                   secureTextEntry={!showConfirmPassword}
                   autoCapitalize="none"
@@ -848,7 +841,7 @@ export default function ProfileScreen() {
                 onPress={() => setPasswordModalVisible(false)}
                 disabled={updatingPassword}
               >
-                <Text style={styles.modalCancelBtnText}>CANCELAR</Text>
+                <Text style={styles.modalCancelBtnText}>{tr("CANCELAR")}</Text>
               </Pressable>
 
               <Pressable
@@ -859,7 +852,7 @@ export default function ProfileScreen() {
                 {updatingPassword ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.modalConfirmBtnText}>GUARDAR</Text>
+                  <Text style={styles.modalConfirmBtnText}>{tr("GUARDAR")}</Text>
                 )}
               </Pressable>
             </View>
@@ -889,10 +882,8 @@ export default function ProfileScreen() {
                   )}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.modalFormTitle}>Activar {biometricLabel}</Text>
-                  <Text style={styles.modalSubtitle}>
-                    Confirma tu contraseña para guardar el acceso seguro
-                  </Text>
+                  <Text style={styles.modalFormTitle}>{tr("Activar ")}{tr(biometricLabel)}</Text>
+                  <Text style={styles.modalSubtitle}>{tr("Confirma tu contraseña para guardar el acceso seguro")}</Text>
                 </View>
               </View>
               <Pressable
@@ -907,12 +898,12 @@ export default function ProfileScreen() {
 
             {bioError ? (
               <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{bioError}</Text>
+                <Text style={styles.errorText}>{tr(bioError)}</Text>
               </View>
             ) : null}
 
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>CONTRASEÑA ACTUAL</Text>
+              <Text style={styles.fieldLabel}>{tr("CONTRASEÑA ACTUAL")}</Text>
               <View style={styles.inputWrapper}>
                 <Lock size={16} color={Colors.textMuted} />
                 <TextInput
@@ -922,7 +913,7 @@ export default function ProfileScreen() {
                     setBioConfirmPassword(text);
                     if (bioError) setBioError(null);
                   }}
-                  placeholder="Tu contraseña de CaboSystems"
+                  placeholder={tr("Tu contraseña de CaboSystems")}
                   placeholderTextColor={Colors.textMuted}
                   secureTextEntry={!showBioPassword}
                   autoCapitalize="none"
@@ -947,7 +938,7 @@ export default function ProfileScreen() {
                 onPress={() => setBioPasswordModalVisible(false)}
                 disabled={bioLoading}
               >
-                <Text style={styles.modalCancelBtnText}>CANCELAR</Text>
+                <Text style={styles.modalCancelBtnText}>{tr("CANCELAR")}</Text>
               </Pressable>
 
               <Pressable
@@ -958,7 +949,7 @@ export default function ProfileScreen() {
                 {bioLoading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.modalConfirmBtnText}>CONFIRMAR</Text>
+                  <Text style={styles.modalConfirmBtnText}>{tr("CONFIRMAR")}</Text>
                 )}
               </Pressable>
             </View>
@@ -978,10 +969,8 @@ export default function ProfileScreen() {
             <View style={styles.modalIconCircle}>
               <HelpCircle size={28} color="#FFFFFF" strokeWidth={2.5} />
             </View>
-            <Text style={styles.modalTitle}>Soporte CaboSystems</Text>
-            <Text style={styles.modalMessage}>
-              Para asistencia técnica de acceso, fallas de sincronización o asignación de villas, contacta al centro de operaciones o a tu supervisor de turno.
-            </Text>
+            <Text style={styles.modalTitle}>{tr("Soporte CaboSystems")}</Text>
+            <Text style={styles.modalMessage}>{tr("Para asistencia técnica de acceso, fallas de sincronización o asignación de villas, contacta al centro de operaciones o a tu supervisor de turno.")}</Text>
             <Pressable
               style={({ pressed }) => [
                 styles.modalFullBtn,
@@ -989,7 +978,7 @@ export default function ProfileScreen() {
               ]}
               onPress={() => setSupportModalVisible(false)}
             >
-              <Text style={styles.modalFullBtnText}>ENTENDIDO</Text>
+              <Text style={styles.modalFullBtnText}>{tr("ENTENDIDO")}</Text>
             </Pressable>
           </View>
         </View>
@@ -999,10 +988,9 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  backButton: { width: 44, height: 44, flexShrink: 0, marginRight: 4, alignItems: 'center', justifyContent: 'center' },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#FFFFFF',
   },
   headerWrapper: {
     position: 'absolute',
@@ -1011,9 +999,7 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 100,
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    ...Shadow.xs,
+    borderBottomWidth: 0,
   },
   safeArea: {
     backgroundColor: '#FFFFFF',
@@ -1051,31 +1037,6 @@ const styles = StyleSheet.create({
     maxWidth: 250,
     height: 60,
   },
-  profilePill: {
-    flexShrink: 0,
-    maxWidth: '38%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.primary,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    ...Shadow.xs,
-  },
-  profilePillTablet: {
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-  },
-  profilePillText: {
-    flexShrink: 1,
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 13,
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
-  },
   scrollView: {
     flex: 1,
   },
@@ -1086,15 +1047,12 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   identityCard: {
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.xl,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 0,
     paddingVertical: Spacing.xl,
     paddingHorizontal: Spacing.md,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
     marginBottom: Spacing.md,
-    ...Shadow.xs,
   },
   avatarContainer: {
     position: 'relative',
@@ -1193,13 +1151,8 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.xs,
   },
   menuGroup: {
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
     marginBottom: Spacing.md,
-    ...Shadow.xs,
   },
   menuItem: {
     flexDirection: 'row',
@@ -1231,7 +1184,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   menuDivider: {
-    height: 1,
+    height: 0,
     backgroundColor: Colors.borderLight,
     marginLeft: 62,
   },

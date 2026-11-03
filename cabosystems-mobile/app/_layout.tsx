@@ -164,7 +164,7 @@ function RootLayoutNav() {
     <>
       <Stack screenOptions={{ headerShown: false, freezeOnBlur: true }}>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" activityEnabled={false} options={{ headerShown: false }} />
         <Stack.Screen name="pending" options={{ headerShown: false }} />
         <Stack.Screen name="task/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="checkin/[id]" options={{ headerShown: false, presentation: 'modal' }} />

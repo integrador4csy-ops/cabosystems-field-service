@@ -38,8 +38,8 @@ export async function createVilla(development: Development, villa: string, descr
   return data as ProjectVilla;
 }
 
-export async function saveProjectTeam(villa: ProjectVilla, integrador: string, tecnico: string, participants: string[]) {
-  const { error } = await supabase.rpc('save_project_team', { p_project_id: villa.id, p_integrador_id: integrador || null, p_tecnico_id: tecnico || null, p_participants: [...new Set(participants)], p_revision: villa.equipo_revision });
+export async function saveProjectTeam(villa: ProjectVilla, integrador: string, tecnico: string, participants: string[], allTasksParticipants: string[] = []) {
+  const { error } = await supabase.rpc('save_project_team', { p_project_id: villa.id, p_integrador_id: integrador || null, p_tecnico_id: tecnico || null, p_participants: [...new Set(participants)], p_revision: villa.equipo_revision, p_all_tasks_participants: [...new Set(allTasksParticipants)] });
   if (error) throw error;
 }
 

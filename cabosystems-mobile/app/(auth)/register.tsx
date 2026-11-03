@@ -1,3 +1,5 @@
+import { getRoleLabel } from '@/lib/localization';
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -33,6 +35,7 @@ import { uploadAvatarImage } from '@/lib/avatarUpload';
 import { supabase } from '@/lib/supabase';
 
 export default function RegisterScreen() {
+  const { t: tr } = useInterfaceTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{ token?: string; email?: string }>();
 
@@ -75,7 +78,7 @@ export default function RegisterScreen() {
 
       if (error || !data) {
         setTokenValid(false);
-        setErrorMessage('El enlace de invitación no es válido o ya fue utilizado.');
+        setErrorMessage(tr("El enlace de invitación no es válido o ya fue utilizado."));
       } else {
         setTokenValid(true);
         setEmail(data.email);
@@ -84,7 +87,7 @@ export default function RegisterScreen() {
       }
     } catch (err: any) {
       setTokenValid(false);
-      setErrorMessage(err?.message || 'Error al validar la invitación.');
+      setErrorMessage(err?.message || tr("Error al validar la invitación."));
     } finally {
       setValidatingToken(false);
     }
@@ -96,8 +99,8 @@ export default function RegisterScreen() {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
         Alert.alert(
-          'Permiso Requerido',
-          'Se necesita acceso a la galería para seleccionar tu foto de perfil.'
+          tr("Permiso Requerido"),
+          tr("Se necesita acceso a la galería para seleccionar tu foto de perfil.")
         );
         return;
       }
@@ -122,7 +125,7 @@ export default function RegisterScreen() {
     setErrorMessage(null);
 
     if (!token.trim()) {
-      setErrorMessage('Ingresa o valida el código de tu invitación.');
+      setErrorMessage(tr("Ingresa o valida el código de tu invitación."));
       return;
     }
     if (!fullName.trim()) {
@@ -130,11 +133,11 @@ export default function RegisterScreen() {
       return;
     }
     if (!password || password.length < 6) {
-      setErrorMessage('La contraseña debe tener al menos 6 caracteres.');
+      setErrorMessage(tr("La contraseña debe tener al menos 6 caracteres."));
       return;
     }
     if (password !== confirmPassword) {
-      setErrorMessage('Las contraseñas no coinciden.');
+      setErrorMessage(tr("Las contraseñas no coinciden."));
       return;
     }
 
@@ -184,19 +187,17 @@ export default function RegisterScreen() {
           hitSlop={8}
         >
           <ArrowLeft size={18} color={Colors.text} />
-          <Text style={styles.backButtonText}>Volver al Login</Text>
+          <Text style={styles.backButtonText}>{tr("Volver al Login")}</Text>
         </Pressable>
 
         <View style={styles.logoContainer}>
           <CaboLogo width={180} textColor={Colors.text} />
-          <Text style={styles.logoSubtext}>REGISTRO DE PERSONAL</Text>
+          <Text style={styles.logoSubtext}>{tr("REGISTRO DE PERSONAL")}</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.title}>Completa tu Perfil</Text>
-          <Text style={styles.subtitle}>
-            Personaliza tus datos de colaborador para el sistema de campo.
-          </Text>
+          <Text style={styles.title}>{tr("Completa tu Perfil")}</Text>
+          <Text style={styles.subtitle}>{tr("Personaliza tus datos de colaborador para el sistema de campo.")}</Text>
 
           {/* Error Message */}
           {!!errorMessage && (
@@ -209,11 +210,11 @@ export default function RegisterScreen() {
           {/* Campo para validar Token si no vino en el link */}
           {!tokenValid && (
             <View style={styles.tokenSection}>
-              <Text style={styles.inputLabel}>Código o Token de Invitación</Text>
+              <Text style={styles.inputLabel}>{tr("Código o Token de Invitación")}</Text>
               <View style={styles.tokenInputRow}>
                 <TextInput
                   style={[styles.textInput, styles.tokenInput]}
-                  placeholder="Pega aquí tu código de invitación"
+                  placeholder={tr("Pega aquí tu código de invitación")}
                   placeholderTextColor={Colors.textMuted}
                   value={token}
                   onChangeText={setToken}
@@ -227,7 +228,7 @@ export default function RegisterScreen() {
                   {validatingToken ? (
                     <ActivityIndicator size="small" color="#ffffff" />
                   ) : (
-                    <Text style={styles.validateBtnText}>Validar</Text>
+                    <Text style={styles.validateBtnText}>{tr("Validar")}</Text>
                   )}
                 </Pressable>
               </View>
@@ -241,9 +242,9 @@ export default function RegisterScreen() {
               <View style={styles.verifiedBadge}>
                 <CheckCircle size={16} color={Colors.success} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.verifiedText}>Invitación confirmada</Text>
+                  <Text style={styles.verifiedText}>{tr("Invitación confirmada")}</Text>
                   <Text style={styles.verifiedSubtext}>
-                    {email} · Rol: <Text style={{ textTransform: 'capitalize' }}>{role.replace('_', ' ')}</Text>
+                    {email}{tr(" · Rol: ")}<Text style={{ textTransform: 'capitalize' }}>{getRoleLabel(role, tr)}</Text>
                   </Text>
                 </View>
               </View>
@@ -264,19 +265,19 @@ export default function RegisterScreen() {
                 </Pressable>
                 <Pressable onPress={handlePickImage} hitSlop={6}>
                   <Text style={styles.changePhotoText}>
-                    {avatarUri ? 'Cambiar foto' : 'Elegir foto de perfil'}
+                    {avatarUri ? tr('Cambiar foto') : tr('Elegir foto de perfil')}
                   </Text>
                 </Pressable>
               </View>
 
               {/* Nombre Completo */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Nombre completo</Text>
+                <Text style={styles.inputLabel}>{tr("Nombre completo")}</Text>
                 <View style={styles.inputWrapper}>
                   <User size={18} color={Colors.textMuted} style={styles.inputIcon} />
                   <TextInput
                     style={styles.textInput}
-                    placeholder="Ej. Juan Pérez"
+                    placeholder={tr("Ej. Juan Pérez")}
                     placeholderTextColor={Colors.textMuted}
                     value={fullName}
                     onChangeText={setFullName}
@@ -288,12 +289,12 @@ export default function RegisterScreen() {
 
               {/* Contraseña */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Crea tu contraseña</Text>
+                <Text style={styles.inputLabel}>{tr("Crea tu contraseña")}</Text>
                 <View style={styles.inputWrapper}>
                   <Lock size={18} color={Colors.textMuted} style={styles.inputIcon} />
                   <TextInput
                     style={[styles.textInput, { paddingRight: 40 }]}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder={tr("Mínimo 6 caracteres")}
                     placeholderTextColor={Colors.textMuted}
                     value={password}
                     onChangeText={setPassword}
@@ -317,12 +318,12 @@ export default function RegisterScreen() {
 
               {/* Confirmar Contraseña */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Confirmar contraseña</Text>
+                <Text style={styles.inputLabel}>{tr("Confirmar contraseña")}</Text>
                 <View style={styles.inputWrapper}>
                   <Lock size={18} color={Colors.textMuted} style={styles.inputIcon} />
                   <TextInput
                     style={styles.textInput}
-                    placeholder="Repite la contraseña"
+                    placeholder={tr("Repite la contraseña")}
                     placeholderTextColor={Colors.textMuted}
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
@@ -346,7 +347,7 @@ export default function RegisterScreen() {
                 {loading ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Text style={styles.submitButtonText}>Completar Registro</Text>
+                  <Text style={styles.submitButtonText}>{tr("Completar Registro")}</Text>
                 )}
               </Pressable>
             </>
@@ -367,11 +368,9 @@ export default function RegisterScreen() {
               <CheckCircle size={38} color={Colors.primary} />
             </View>
 
-            <Text style={styles.modalTitle}>¡Registro Completado!</Text>
+            <Text style={styles.modalTitle}>{tr("¡Registro Completado!")}</Text>
 
-            <Text style={styles.modalSubtitle}>
-              Tu cuenta de colaborador en <Text style={{ fontFamily: 'Outfit_700Bold', color: Colors.text }}>CaboSystems</Text> ha sido activada exitosamente. Ya puedes gestionar tus órdenes de trabajo y visitas técnicas.
-            </Text>
+            <Text style={styles.modalSubtitle}>{tr("Tu cuenta de colaborador en ")}<Text style={{ fontFamily: 'Outfit_700Bold', color: Colors.text }}>CaboSystems</Text>{tr(" ha sido activada exitosamente. Ya puedes gestionar tus órdenes de trabajo y visitas técnicas.")}</Text>
 
             <Pressable
               style={styles.modalButton}
@@ -380,7 +379,7 @@ export default function RegisterScreen() {
                 router.replace('/(tabs)');
               }}
             >
-              <Text style={styles.modalButtonText}>Comenzar</Text>
+              <Text style={styles.modalButtonText}>{tr("Comenzar")}</Text>
             </Pressable>
           </View>
         </View>

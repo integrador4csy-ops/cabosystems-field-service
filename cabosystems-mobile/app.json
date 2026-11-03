@@ -2,7 +2,7 @@
   "expo": {
     "name": "CSY Field Service",
     "slug": "cabosystems-mobile",
-    "version": "1.2.2",
+    "version": "1.3.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "cabosystemsmobile",
@@ -11,7 +11,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.cabosystems.fieldservice",
       "infoPlist": {
-        "CADisableMinimumFrameDurationOnPhone": true
+        "CADisableMinimumFrameDurationOnPhone": true,
+        "NSMicrophoneUsageDescription": "CaboSystems needs microphone access to record and send voice notes in team chats."
       }
     },
     "android": {
@@ -21,13 +22,14 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.cabosystems.fieldservice",
-      "versionCode": 11,
+      "versionCode": 12,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "ACTIVITY_RECOGNITION",
         "CAMERA",
+        "RECORD_AUDIO",
         "RECEIVE_BOOT_COMPLETED",
         "POST_NOTIFICATIONS"
       ],
@@ -69,12 +71,14 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "CaboSystems necesita acceso continuo a la ubicación para coordinar la flota en tiempo real.",
+          "locationAlwaysAndWhenInUsePermission": "CaboSystems needs background location access to coordinate the field team in real time.",
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": false
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-audio",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true

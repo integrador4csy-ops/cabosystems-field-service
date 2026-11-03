@@ -1,6 +1,37 @@
 import { supabase } from './supabase';
 import type { Proyecto, Tarea, Subtarea } from '../types/projects';
 import type { Profile } from '../types/fleet';
+import { prepareTaskEvidence } from './taskProgress';
+
+export interface TaskProgressActivity {
+  id: number;
+  request_id: string;
+  actor_name: string;
+  tarea_id: string;
+  subtarea_id: string | null;
+  subtarea_titulo: string | null;
+  accion: 'estado' | 'subtarea';
+  anterior: string | null;
+  siguiente: string;
+  comentario: string | null;
+  evidencia_path: string | null;
+  captured_at: string;
+  accepted_at: string;
+  evidence_url?: string | null;
+}
+
+export interface RecordTaskProgressInput {
+  requestId: string;
+  taskId: string;
+  projectId: string;
+  actorId: string;
+  taskStatus?: Tarea['estatus'];
+  subtaskId?: string;
+  subtaskCompleted?: boolean;
+  comment?: string;
+  photo?: File | null;
+  capturedAt?: string;
+}
 
 /**
  * Obtener todos los proyectos (villas y desarrollos)
@@ -121,6 +152,8 @@ export async function getTasksByProject(projectId?: string): Promise<Tarea[]> {
       titulo,
       descripcion,
       estatus,
+      prioridad,
+      prioridad_orden,
       fecha_programada,
       orden_plantilla,
       created_at,
@@ -156,6 +189,8 @@ export async function getTasksByProject(projectId?: string): Promise<Tarea[]> {
     titulo: t.titulo,
     descripcion: t.descripcion,
     estatus: t.estatus,
+    prioridad: t.prioridad,
+    prioridad_orden: t.prioridad_orden,
     fecha_programada: t.fecha_programada ?? null,
     orden_plantilla: t.orden_plantilla ?? null,
     created_at: t.created_at,
@@ -176,6 +211,7 @@ export async function createTask(payload: {
   titulo: string;
   descripcion?: string;
   estatus?: 'pendiente' | 'en_proceso' | 'completada';
+  prioridad?: 'baja' | 'media' | 'alta';
   fecha_programada?: string | null;
 }): Promise<Tarea> {
   const { data, error } = await supabase
@@ -187,6 +223,7 @@ export async function createTask(payload: {
         titulo: payload.titulo.trim(),
         descripcion: payload.descripcion?.trim() || null,
         estatus: payload.estatus || 'pendiente',
+        prioridad: payload.prioridad || 'media',
         fecha_programada: payload.fecha_programada || null,
       },
     ])
@@ -297,6 +334,103 @@ export async function toggleSubtask(id: string, completada: boolean): Promise<Su
   }
 
   return data;
+}
+
+async function uploadTaskEvidence(input: RecordTaskProgressInput): Promise<string | null> {
+  if (!input.photo) return null;
+  const path = `${input.projectId}/${input.taskId}/${input.actorId}/${input.requestId}.jpg`;
+  const body = await prepareTaskEvidence(input.photo);
+  const bucket = supabase.storage.from('task-evidence');
+  const { error } = await bucket.upload(path, body, { contentType: 'image/jpeg', upsert: false });
+  if (error) {
+    const duplicate = String((error as { statusCode?: string }).statusCode) === '409' || /already exists|duplicate/i.test(error.message);
+    if (!duplicate) throw error;
+    const existing = await bucket.info(path);
+    if (existing.error) throw existing.error;
+  }
+  return path;
+}
+
+async function dispatchTaskActivityNotifications(activity: TaskProgressActivity, projectId: string, actorId: string) {
+  try {
+    const { data: groups } = await supabase
+      .from('chat_grupos')
+      .select('id, nombre')
+      .eq('proyecto_id', projectId);
+
+    if (!groups || groups.length === 0) return;
+
+    for (const group of groups) {
+      const content =
+        activity.accion === 'subtarea'
+          ? (activity.siguiente === 'true'
+              ? `${activity.actor_name} completó la subtarea «${activity.subtarea_titulo || 'Subtarea'}»`
+              : `${activity.actor_name} reabrió la subtarea «${activity.subtarea_titulo || 'Subtarea'}»`)
+          : `${activity.actor_name} cambió el estado a ${
+              activity.siguiente === 'en_proceso'
+                ? 'En Proceso'
+                : activity.siguiente === 'completada'
+                ? 'Completada'
+                : 'Pendiente'
+            }`;
+
+      supabase.functions
+        .invoke('chat-push-notifications', {
+          body: {
+            record: {
+              grupo_id: group.id,
+              remitente_id: actorId,
+              tipo: 'sistema',
+              contenido: content,
+              task_id: activity.tarea_id,
+              subtask_id: activity.subtarea_id,
+            },
+          },
+        })
+        .catch((err) => {
+          console.warn('Push notification dispatch error for task progress:', err);
+        });
+    }
+  } catch (err) {
+    console.warn('Could not dispatch task progress notifications:', err);
+  }
+}
+
+/** Upload first, then atomically commit task state and activity with one stable request ID. */
+export async function recordTaskProgress(input: RecordTaskProgressInput): Promise<TaskProgressActivity> {
+  const evidencePath = await uploadTaskEvidence(input);
+  const { data, error } = await supabase.rpc('record_task_progress', {
+    p_request_id: input.requestId,
+    p_task_id: input.taskId,
+    p_task_status: input.taskStatus ?? null,
+    p_subtask_id: input.subtaskId ?? null,
+    p_subtask_completed: input.subtaskCompleted ?? null,
+    p_comment: input.comment?.trim() || null,
+    p_evidence_path: evidencePath,
+    p_captured_at: input.capturedAt ?? new Date().toISOString(),
+  });
+  if (error) {
+    if (evidencePath) {
+      const cleanup = await supabase.storage.from('task-evidence').remove([evidencePath]);
+      if (cleanup.error) console.warn('Could not remove unreferenced task evidence:', cleanup.error);
+    }
+    throw error;
+  }
+  const activity = data as TaskProgressActivity;
+  void dispatchTaskActivityNotifications(activity, input.projectId, input.actorId);
+  return activity;
+}
+
+export async function getTaskProgressHistory(taskId: string): Promise<TaskProgressActivity[]> {
+  const { data, error } = await supabase.from('task_activity')
+    .select('id,request_id,actor_name,tarea_id,subtarea_id,subtarea_titulo,accion,anterior,siguiente,comentario,evidencia_path,captured_at,accepted_at')
+    .eq('tarea_id', taskId).order('id', { ascending: false }).limit(30);
+  if (error) throw error;
+  return Promise.all(((data || []) as TaskProgressActivity[]).map(async activity => {
+    if (!activity.evidencia_path) return { ...activity, evidence_url: null };
+    const signed = await supabase.storage.from('task-evidence').createSignedUrl(activity.evidencia_path, 3600);
+    return { ...activity, evidence_url: signed.error ? null : signed.data.signedUrl };
+  }));
 }
 
 /**

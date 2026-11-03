@@ -5,6 +5,8 @@ export interface TaskActivity {
   tarea_id: string; tarea_titulo: string; subtarea_id: string | null; subtarea_titulo: string | null;
   accion: 'estado' | 'subtarea'; anterior: string | null; siguiente: string;
   estado_registrado: string; encargado_nombre: string | null; estado_actual: string | null;
+  request_id?: string; comentario?: string | null; evidencia_path?: string | null;
+  captured_at?: string; accepted_at?: string;
   hasta_id: number;
 }
 export interface TaskReport {

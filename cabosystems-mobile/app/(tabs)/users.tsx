@@ -1,3 +1,4 @@
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { ProfileNavButton } from '@/components/ProfileNavButton';
 import {
@@ -97,6 +98,7 @@ export async function preloadUsersData(owner: string) {
 }
 
 export default function UsersScreen() {
+  const { t: tr } = useInterfaceTranslation();
   const { profile } = useAuth();
   const prepared = cachedUsersData?.owner === profile?.id ? cachedUsersData : null;
   const insets = useSafeAreaInsets();
@@ -200,7 +202,7 @@ export default function UsersScreen() {
   // 2. Enviar invitación
   const handleSendInvite = async () => {
     if (!inviteEmail.trim() || !inviteEmail.includes('@')) {
-      Alert.alert('Error', 'Ingresa un correo electrónico válido.');
+      Alert.alert(tr("Error"), tr("Ingresa un correo electrónico válido."));
       return;
     }
 
@@ -226,7 +228,7 @@ export default function UsersScreen() {
         .single();
 
       if (error) {
-        Alert.alert('Error', error.message);
+        Alert.alert(tr("Error"), tr(error.message));
         return;
       }
 
@@ -239,23 +241,23 @@ export default function UsersScreen() {
       setSelectedTab('invitaciones');
 
       Alert.alert(
-        '¡Invitación Creada!',
-        `Se ha generado la invitación para ${cleanEmail}.\n\n¿Deseas compartir el enlace de registro ahora?`,
+        tr("¡Invitación Creada!"),
+        tr("Se ha generado la invitación para {value0}.\n\n¿Deseas compartir el enlace de registro ahora?", { value0: cleanEmail }),
         [
           { text: 'Listo', style: 'cancel' },
           {
-            text: 'Compartir Enlace',
+            text: tr("Compartir Enlace"),
             onPress: () => {
               Share.share({
-                title: 'Invitación a CaboSystems Field Service',
-                message: `Hola, has sido invitado a CaboSystems Field Service con rol de ${AVAILABLE_ROLES.find((r) => r.id === inviteRole)?.label || inviteRole}. Descarga la app y regístrate aquí: ${inviteLink}`,
+                title: tr("Invitación a CaboSystems Field Service"),
+                message: tr("Hola, has sido invitado a CaboSystems Field Service con rol de {value0}. Descarga la app y regístrate aquí: {value1}", { value0: tr(AVAILABLE_ROLES.find((r) => r.id === inviteRole)?.label || inviteRole), value1: inviteLink }),
               });
             },
           },
         ]
       );
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'No se pudo enviar la invitación.');
+      Alert.alert(tr("Error"), tr(err?.message || tr("No se pudo enviar la invitación.")));
     } finally {
       setSendingInvite(false);
     }
@@ -286,7 +288,7 @@ export default function UsersScreen() {
       setUploadingEditAvatar(true);
       const publicUrl = await uploadAvatarImage(uri, selectedUser.id);
       if (!publicUrl) {
-        Alert.alert('Error', 'No se pudo subir la foto de perfil. Intenta de nuevo.');
+        Alert.alert(tr("Error"), tr("No se pudo subir la foto de perfil. Intenta de nuevo."));
         return;
       }
 
@@ -301,10 +303,10 @@ export default function UsersScreen() {
       setUsers((prev) =>
         prev.map((u) => (u.id === selectedUser.id ? { ...u, avatar_url: publicUrl } : u))
       );
-      Alert.alert('Foto Actualizada', 'La foto de perfil del colaborador ha sido guardada con éxito.');
+      Alert.alert(tr("Foto Actualizada"), tr("La foto de perfil del colaborador ha sido guardada con éxito."));
     } catch (err: any) {
       console.error('Error updating collaborator avatar:', err);
-      Alert.alert('Error', err?.message || 'Error al actualizar la foto de perfil.');
+      Alert.alert(tr("Error"), tr(err?.message || tr("Error al actualizar la foto de perfil.")));
     } finally {
       setUploadingEditAvatar(false);
     }
@@ -314,7 +316,7 @@ export default function UsersScreen() {
   const handleSaveEdit = async () => {
     if (!selectedUser) return;
     if (!editNombre.trim()) {
-      Alert.alert('Error', 'El nombre completo no puede estar vacío.');
+      Alert.alert(tr("Error"), tr("El nombre completo no puede estar vacío."));
       return;
     }
     setSavingEdit(true);
@@ -329,11 +331,11 @@ export default function UsersScreen() {
         .eq('id', selectedUser.id);
 
       if (error) {
-        Alert.alert('Error', error.message);
+        Alert.alert(tr("Error"), tr(error.message));
       } else {
         setEditModalVisible(false);
         fetchData();
-        Alert.alert('Éxito', 'Datos del colaborador actualizados correctamente.');
+        Alert.alert(tr("Éxito"), tr('Datos del colaborador actualizados correctamente.'));
       }
     } finally {
       setSavingEdit(false);
@@ -344,8 +346,8 @@ export default function UsersScreen() {
   const handleExpelUser = (user: Profile) => {
     setConfirmModal({
       visible: true,
-      title: '¿Desactivar Colaborador?',
-      message: `¿Estás seguro de que deseas desactivar a ${user.nombre}? Perderá inmediatamente el acceso al sistema.`,
+      title: tr("¿Desactivar Colaborador?"),
+      message: tr("¿Estás seguro de que deseas desactivar a {value0}? Perderá inmediatamente el acceso al sistema.", { value0: user.nombre }),
       confirmText: 'Desactivar',
       isDanger: true,
       onConfirm: async () => {
@@ -367,7 +369,7 @@ export default function UsersScreen() {
 
           fetchData();
         } catch (err: any) {
-          Alert.alert('Error', err?.message || 'No se pudo desactivar al colaborador.');
+          Alert.alert(tr("Error"), tr(err?.message || tr("No se pudo desactivar al colaborador.")));
         }
       },
     });
@@ -377,16 +379,16 @@ export default function UsersScreen() {
   const handleRevokeInvite = (invite: Invitacion) => {
     setConfirmModal({
       visible: true,
-      title: 'Cancelar Invitación',
-      message: `¿Deseas revocar la invitación enviada a ${invite.email}? El enlace quedará invalidado permanentemente.`,
-      confirmText: 'Sí, Cancelar Invitación',
+      title: tr("Cancelar Invitación"),
+      message: tr("¿Deseas revocar la invitación enviada a {value0}? El enlace quedará invalidado permanentemente.", { value0: invite.email }),
+      confirmText: tr("Sí, Cancelar Invitación"),
       isDanger: true,
       onConfirm: async () => {
         try {
           await supabase.from('invitaciones').delete().eq('id', invite.id);
           fetchData();
         } catch (err: any) {
-          Alert.alert('Error', err?.message || 'No se pudo cancelar la invitación.');
+          Alert.alert(tr("Error"), tr(err?.message || tr("No se pudo cancelar la invitación.")));
         }
       },
     });
@@ -412,7 +414,7 @@ export default function UsersScreen() {
         </View>
         <View style={styles.noAccess}>
           <Ionicons name="lock-closed-outline" size={48} color={Colors.textMuted} />
-          <Text style={styles.noAccessText}>Acceso restringido a administradores</Text>
+          <Text style={styles.noAccessText}>{tr("Acceso restringido a administradores")}</Text>
         </View>
       </View>
     );
@@ -465,30 +467,32 @@ export default function UsersScreen() {
           <Text style={styles.userName} numberOfLines={1}>
             {item.nombre}
           </Text>
-          <Text style={styles.userRole}>{roleLabel}</Text>
+          <Text style={styles.userRole}>{tr(roleLabel)}</Text>
         </View>
 
         {/* Acciones */}
         <View style={styles.cardActions}>
           <Pressable
             style={styles.actionBtnEdit}
-            onPress={() => openEditModal(item)}
+            accessibilityRole="button" accessibilityLabel={tr('Editar a ') + item.nombre}
+            onPress={event => { event.stopPropagation(); openEditModal(item); }}
             hitSlop={8}
           >
-            <Edit2 size={16} color={Colors.text} />
+            <Edit2 size={17} color={Colors.brandSlate} />
           </Pressable>
 
           <Pressable
             style={styles.actionBtnExpel}
-            onPress={() => handleExpelUser(item)}
+            accessibilityRole="button" accessibilityLabel={tr('Retirar a ') + item.nombre}
+            onPress={event => { event.stopPropagation(); handleExpelUser(item); }}
             hitSlop={8}
           >
-            <UserX size={16} color={Colors.error} />
+            <UserX size={17} color={Colors.brandSlate} />
           </Pressable>
         </View>
       </Pressable>
     );
-  }, []);
+  }, [tr]);
 
   const renderInvitation = useCallback((inv: Invitacion) => (
     <View style={styles.inviteCardTailAdmin}>
@@ -499,20 +503,20 @@ export default function UsersScreen() {
         <Text style={styles.inviteEmail} numberOfLines={1}>
           {inv.email}
         </Text>
-        <Text style={styles.inviteMeta}>
-          Rol:{' '}
+        <Text style={styles.inviteMeta}>{tr("Rol:")}{' '}
           <Text style={{ fontFamily: 'Outfit_600SemiBold', color: Colors.primary }}>
-            {AVAILABLE_ROLES.find((r) => r.id === inv.rol)?.label || inv.rol.replace('_', ' ')}
+            {tr(AVAILABLE_ROLES.find((r) => r.id === inv.rol)?.label || inv.rol.replace('_', ' '))}
           </Text>
         </Text>
       </View>
       <View style={styles.inviteActions}>
         <Pressable
           style={styles.iconBtn}
+          accessibilityRole="button" accessibilityLabel={tr("Compartir invitación de ") + inv.email}
           onPress={() => {
             const link = `cabosystemsmobile://register?token=${inv.token}&email=${encodeURIComponent(inv.email)}`;
             Share.share({
-              title: 'Enlace de Registro',
+              title: tr("Enlace de Registro"),
               message: `Completa tu registro en CaboSystems Field Service: ${link}`,
             });
           }}
@@ -522,14 +526,15 @@ export default function UsersScreen() {
         </Pressable>
         <Pressable
           style={[styles.iconBtn, styles.iconBtnDanger]}
+          accessibilityRole="button" accessibilityLabel={tr("Cancelar invitación de ") + inv.email}
           onPress={() => handleRevokeInvite(inv)}
           hitSlop={8}
         >
-          <Trash2 size={16} color={Colors.error} />
+          <Trash2 size={17} color={Colors.brandSlate} />
         </Pressable>
       </View>
     </View>
-  ), []);
+  ), [tr]);
 
   const renderTeamRow = useCallback(
     ({ item: row }: { item: TeamRow }) =>
@@ -565,7 +570,7 @@ export default function UsersScreen() {
                 hitSlop={8}
               >
                 <UserPlus size={15} color="#FFFFFF" strokeWidth={2.6} />
-                <Text style={styles.inviteNavBtnText}>Invitar</Text>
+                <Text style={styles.inviteNavBtnText}>{tr("Invitar")}</Text>
               </Pressable>
             )}
             <ProfileNavButton />
@@ -582,13 +587,14 @@ export default function UsersScreen() {
         renderItem={renderTeamRow}
         refreshControl={<RefreshControl refreshing={loadingData} onRefresh={fetchData} colors={[Colors.primary]} tintColor={Colors.primary} />}
         showsVerticalScrollIndicator={false}
-        ListHeaderComponent={<View>        {/* Encabezado Principal */}
+        ListHeaderComponent={<View>
+        {/* Encabezado Principal */}
         <View style={styles.headerArea}>
-          <Text style={styles.pageTitle}>Gestión de Personal</Text>
+          <Text style={styles.pageTitle}>{tr("Gestión de Personal")}</Text>
           <Text style={styles.pageSubtitle}>
             {selectedTab === 'colaboradores'
-              ? `${activeCollaborators.length} colaboradores activos en la plataforma`
-              : `${invitaciones.length} invitaciones pendientes de registro`}
+              ? tr('{value0} colaboradores activos en la plataforma', {value0: activeCollaborators.length})
+              : tr('{value0} invitaciones pendientes de registro', {value0: invitaciones.length})}
           </Text>
         </View>
 
@@ -614,8 +620,7 @@ export default function UsersScreen() {
                 selectedTab === 'colaboradores' && styles.filterPillTextActive,
               ]}
               numberOfLines={1}
-            >
-              Colaboradores ({activeCollaborators.length})
+            >{tr("Colaboradores (")}{activeCollaborators.length})
             </Text>
           </Pressable>
 
@@ -639,8 +644,7 @@ export default function UsersScreen() {
                 selectedTab === 'invitaciones' && styles.filterPillTextActive,
               ]}
               numberOfLines={1}
-            >
-              Invitaciones ({invitaciones.length})
+            >{tr("Invitaciones (")}{invitaciones.length})
             </Text>
           </Pressable>
         </View>
@@ -656,16 +660,14 @@ export default function UsersScreen() {
                 <View style={styles.emptyIconCircle}>
                   <Users size={32} color={Colors.primary} strokeWidth={1.8} />
                 </View>
-                <Text style={styles.emptyTitle}>No hay colaboradores registrados</Text>
-                <Text style={styles.emptySubtitle}>
-                  Comienza enviando una invitación a los técnicos para sumarlos al sistema.
-                </Text>
+                <Text style={styles.emptyTitle}>{tr("No hay colaboradores registrados")}</Text>
+                <Text style={styles.emptySubtitle}>{tr("Comienza enviando una invitación a los técnicos para sumarlos al sistema.")}</Text>
                 <Pressable
                   style={styles.emptyActionBtn}
                   onPress={() => setInviteModalVisible(true)}
                 >
                   <UserPlus size={15} color="#FFFFFF" strokeWidth={2.2} />
-                  <Text style={styles.emptyActionBtnText}>Invitar Primer Colaborador</Text>
+                  <Text style={styles.emptyActionBtnText}>{tr("Invitar Primer Colaborador")}</Text>
                 </Pressable>
               </View>
 ) : (
@@ -673,16 +675,14 @@ export default function UsersScreen() {
                 <View style={styles.emptyIconCircle}>
                   <Clock size={32} color={Colors.primary} strokeWidth={1.8} />
                 </View>
-                <Text style={styles.emptyTitle}>No hay invitaciones pendientes</Text>
-                <Text style={styles.emptySubtitle}>
-                  Todas las invitaciones enviadas han sido aceptadas o no hay registros pendientes.
-                </Text>
+                <Text style={styles.emptyTitle}>{tr("No hay invitaciones pendientes")}</Text>
+                <Text style={styles.emptySubtitle}>{tr("Todas las invitaciones enviadas han sido aceptadas o no hay registros pendientes.")}</Text>
                 <Pressable
                   style={styles.emptyActionBtn}
                   onPress={() => setInviteModalVisible(true)}
                 >
                   <UserPlus size={15} color="#FFFFFF" strokeWidth={2.2} />
-                  <Text style={styles.emptyActionBtnText}>Crear Nueva Invitación</Text>
+                  <Text style={styles.emptyActionBtnText}>{tr("Crear Nueva Invitación")}</Text>
                 </Pressable>
               </View>
 )}
@@ -708,8 +708,8 @@ export default function UsersScreen() {
                   <UserPlus size={20} color={Colors.primary} strokeWidth={2.4} />
                 </View>
                 <View>
-                  <Text style={styles.modalTitle}>Invitar Colaborador</Text>
-                  <Text style={styles.modalSubtitle}>Enlace con token de acceso seguro</Text>
+                  <Text style={styles.modalTitle}>{tr("Invitar Colaborador")}</Text>
+                  <Text style={styles.modalSubtitle}>{tr("Enlace con token de acceso seguro")}</Text>
                 </View>
               </View>
               <Pressable
@@ -726,12 +726,12 @@ export default function UsersScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
-              <Text style={styles.fieldLabel}>CORREO ELECTRÓNICO</Text>
+              <Text style={styles.fieldLabel}>{tr("CORREO ELECTRÓNICO")}</Text>
               <View style={styles.modalInputWrapper}>
                 <Mail size={16} color={Colors.textMuted} style={{ marginRight: 8 }} />
                 <TextInput
                   style={styles.modalInput}
-                  placeholder="ejemplo@cabosystems.com"
+                  placeholder="name@cabosystems.com"
                   placeholderTextColor={Colors.textMuted}
                   value={inviteEmail}
                   onChangeText={setInviteEmail}
@@ -741,7 +741,7 @@ export default function UsersScreen() {
                 />
               </View>
 
-              <Text style={[styles.fieldLabel, { marginTop: Spacing.md }]}>ROL ASIGNADO</Text>
+              <Text style={[styles.fieldLabel, { marginTop: Spacing.md }]}>{tr("ROL ASIGNADO")}</Text>
               <Pressable
                 style={styles.dropdownTrigger}
                 onPress={() => setInviteRoleDropdownOpen(!inviteRoleDropdownOpen)}
@@ -750,7 +750,7 @@ export default function UsersScreen() {
                 <View style={styles.dropdownTriggerLeft}>
                   <Briefcase size={16} color={Colors.primary} />
                   <Text style={styles.dropdownTriggerText}>
-                    {AVAILABLE_ROLES.find((r) => r.id === inviteRole)?.label || 'Seleccionar Rol'}
+                    {tr(AVAILABLE_ROLES.find((r) => r.id === inviteRole)?.label || 'Seleccionar Rol')}
                   </Text>
                 </View>
                 <ChevronDown
@@ -783,7 +783,7 @@ export default function UsersScreen() {
                               isSelected && styles.dropdownItemTextSelected,
                             ]}
                           >
-                            {r.label}
+                            {tr(r.label)}
                           </Text>
                           {isSelected && <Check size={16} color={Colors.primary} strokeWidth={2.5} />}
                         </Pressable>
@@ -807,7 +807,7 @@ export default function UsersScreen() {
                 ) : (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Send size={15} color="#FFFFFF" strokeWidth={2.2} />
-                    <Text style={styles.modalSubmitBtnText}>Generar y Enviar Invitación</Text>
+                    <Text style={styles.modalSubmitBtnText}>{tr("Generar y Enviar Invitación")}</Text>
                   </View>
                 )}
               </Pressable>
@@ -831,7 +831,7 @@ export default function UsersScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Editar Colaborador</Text>
+              <Text style={styles.modalTitle}>{tr("Editar Colaborador")}</Text>
               <Pressable
                 onPress={() => {
                   setEditModalVisible(false);
@@ -881,25 +881,25 @@ export default function UsersScreen() {
               >
                 <Camera size={13} color={Colors.primary} strokeWidth={2.2} />
                 <Text style={styles.changePhotoText}>
-                  {uploadingEditAvatar ? 'Subiendo foto...' : 'Cambiar foto de perfil'}
+                  {uploadingEditAvatar ? tr('Subiendo foto...') : tr('Cambiar foto de perfil')}
                 </Text>
               </Pressable>
             </View>
 
-            <Text style={styles.fieldLabel}>NOMBRE COMPLETO</Text>
+            <Text style={styles.fieldLabel}>{tr("NOMBRE COMPLETO")}</Text>
             <View style={styles.modalInputWrapper}>
               <User size={16} color={Colors.textMuted} style={{ marginRight: 8 }} />
               <TextInput
                 style={styles.modalInput}
                 value={editNombre}
                 onChangeText={setEditNombre}
-                placeholder="Nombre del colaborador"
+                placeholder={tr("Nombre del colaborador")}
                 placeholderTextColor={Colors.textMuted}
                 editable={!savingEdit}
               />
             </View>
 
-            <Text style={[styles.fieldLabel, { marginTop: 14 }]}>ROL ASIGNADO</Text>
+            <Text style={[styles.fieldLabel, { marginTop: 14 }]}>{tr("ROL ASIGNADO")}</Text>
             <Pressable
               style={styles.dropdownTrigger}
               onPress={() => setEditRoleDropdownOpen(!editRoleDropdownOpen)}
@@ -908,7 +908,7 @@ export default function UsersScreen() {
               <View style={styles.dropdownTriggerLeft}>
                 <Briefcase size={16} color={Colors.primary} />
                 <Text style={styles.dropdownTriggerText}>
-                  {AVAILABLE_ROLES.find((r) => r.id === editRol)?.label || 'Seleccionar Rol'}
+                  {tr(AVAILABLE_ROLES.find((r) => r.id === editRol)?.label || 'Seleccionar Rol')}
                 </Text>
               </View>
               <ChevronDown
@@ -941,7 +941,7 @@ export default function UsersScreen() {
                             isSelected && styles.dropdownItemTextSelected,
                           ]}
                         >
-                          {r.label}
+                          {tr(r.label)}
                         </Text>
                         {isSelected && <Check size={16} color={Colors.primary} strokeWidth={2.5} />}
                       </Pressable>
@@ -963,7 +963,7 @@ export default function UsersScreen() {
               {savingEdit ? (
                 <ActivityIndicator size="small" color="#ffffff" />
               ) : (
-                <Text style={styles.modalSubmitBtnText}>Guardar Cambios</Text>
+                <Text style={styles.modalSubmitBtnText}>{tr("Guardar Cambios")}</Text>
               )}
             </Pressable>
           </View>
@@ -992,7 +992,7 @@ export default function UsersScreen() {
                 disabled={confirmLoading}
                 onPress={() => setConfirmModal((prev) => ({ ...prev, visible: false }))}
               >
-                <Text style={styles.confirmBtnCancelText}>Cancelar</Text>
+                <Text style={styles.confirmBtnCancelText}>{tr("Cancelar")}</Text>
               </Pressable>
 
               <Pressable
@@ -1025,13 +1025,10 @@ export default function UsersScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#FFFFFF',
   },
   headerWrapper: {
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    ...Shadow.xs,
     zIndex: 10,
   },
   safeArea: {
@@ -1056,13 +1053,10 @@ const styles = StyleSheet.create({
     paddingRight: Spacing.xl,
   },
   logoGroup: {
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    transform: [{ translateY: -3 }],
+    flex: 1, minWidth: 0, justifyContent: 'center', alignItems: 'flex-start',
   },
   logo: {
-    width: 220,
-    height: 54,
+    width: '100%', maxWidth: 220, height: 54,
   },
   logoTablet: {
     width: 250,
@@ -1108,16 +1102,10 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.xs,
   },
   pageTitle: {
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 22,
-    color: Colors.text,
-    letterSpacing: -0.3,
+    fontFamily: 'Outfit_600SemiBold', fontSize: 18, lineHeight: 24, color: '#000000',
   },
   pageSubtitle: {
-    fontFamily: 'Outfit_400Regular',
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 2,
+    fontFamily: 'Outfit_400Regular', fontSize: 13, lineHeight: 19, color: Colors.brandSlate, marginTop: 4,
   },
   filterPillsContainer: {
     flexDirection: 'row',
@@ -1154,16 +1142,12 @@ const styles = StyleSheet.create({
   userCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Shadow.xs,
+    minHeight: 84,
+    paddingVertical: 18,
+    gap: 12,
   },
   avatarWrapper: {
-    marginRight: 12,
+    flexShrink: 0,
   },
   avatarImg: {
     width: 44,
@@ -1174,64 +1158,33 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.backgroundAlt,
   },
   avatarFallback: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.primaryLight,
-    borderWidth: 1,
-    borderColor: Colors.borderBrand,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(52,62,72,0.06)',
+    justifyContent: 'center', alignItems: 'center',
   },
   avatarText: {
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 15,
-    color: Colors.primary,
+    fontFamily: 'Outfit_600SemiBold', fontSize: 15, color: Colors.brandSlate,
   },
   userInfo: {
     flex: 1,
   },
   userName: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 14.5,
-    color: Colors.text,
-    marginBottom: 2,
+    fontFamily: 'Outfit_600SemiBold', fontSize: 16, lineHeight: 22, color: '#000000', marginBottom: 3,
   },
   userRole: {
-    fontFamily: 'Outfit_500Medium',
-    fontSize: 11.5,
-    color: Colors.textSecondary,
-    letterSpacing: 0.2,
+    fontFamily: 'Outfit_400Regular', fontSize: 13, lineHeight: 19, color: Colors.brandSlate,
   },
   cardActions: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
+    flexDirection: 'row', gap: 0, alignItems: 'center', flexShrink: 0,
   },
   actionBtnEdit: {
-    padding: 7,
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    width: 44, height: 44, alignItems: 'center', justifyContent: 'center',
   },
   actionBtnExpel: {
-    padding: 7,
-    backgroundColor: Colors.errorLight,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.errorBorder,
+    width: 44, height: 44, alignItems: 'center', justifyContent: 'center',
   },
   emptyContainer: {
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingVertical: 36,
-    paddingHorizontal: Spacing.xl,
-    alignItems: 'center',
-    marginVertical: Spacing.md,
-    ...Shadow.xs,
+    paddingVertical: 36, paddingHorizontal: Spacing.xl, alignItems: 'center', marginVertical: Spacing.md,
   },
   emptyIconCircle: {
     width: 60,
@@ -1276,50 +1229,27 @@ const styles = StyleSheet.create({
   inviteCardTailAdmin: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    minHeight: 84,
+    paddingVertical: 18,
     gap: 12,
-    ...Shadow.xs,
   },
   inviteIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: Colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.borderBrand,
+    width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(52,62,72,0.06)', justifyContent: 'center', alignItems: 'center',
   },
   inviteEmail: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 13.5,
-    color: Colors.text,
+    fontFamily: 'Outfit_600SemiBold', fontSize: 15, lineHeight: 21, color: '#000000',
   },
   inviteMeta: {
-    fontFamily: 'Outfit_400Regular',
-    fontSize: 11.5,
-    color: Colors.textSecondary,
-    marginTop: 2,
+    fontFamily: 'Outfit_400Regular', fontSize: 13, lineHeight: 19, color: Colors.brandSlate, marginTop: 3,
   },
   inviteActions: {
-    flexDirection: 'row',
-    gap: 8,
+    flexDirection: 'row', gap: 0, flexShrink: 0,
   },
   iconBtn: {
-    padding: 7,
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    width: 44, height: 44, alignItems: 'center', justifyContent: 'center',
   },
   iconBtnDanger: {
-    backgroundColor: Colors.errorLight,
-    borderColor: Colors.errorBorder,
+    backgroundColor: 'transparent',
   },
   inviteFormCard: {
     backgroundColor: Colors.card,

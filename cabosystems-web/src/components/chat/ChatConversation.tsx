@@ -1,10 +1,12 @@
+import { chatDayKey, chatDayLabel, useChatDayClock } from '../../lib/chatDay';
+import { startsSenderGroup } from '../../lib/chatMessageGrouping';
 import { useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import {
   Pin, PinOff, X,
   Users,
   ArrowLeft,
-  Info,
+  MoreVertical,
   Search,
   Video,
   Loader2,
@@ -22,6 +24,7 @@ import { ReplyPreview } from './ReplyPreview';
 import { useDialog } from '../ui/useDialog';
 import { ChatInput } from './ChatInput';
 import { ImageLightboxModal } from './ImageLightboxModal';
+import { DocumentPreviewModal } from './DocumentPreviewModal';
 import { useSectionResources } from '../../context/SectionResources';
 import { chatSnapshot } from '../../lib/chatSnapshot';
 import { createChatRefreshQueue } from '../../lib/chatRefreshQueue';
@@ -43,7 +46,8 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
   onOpenInfo,
   onGroupChanged,
 }) => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const chatNow = useChatDayClock();
   const resources = useSectionResources();
   const cached = resources.queries.read<Awaited<ReturnType<typeof chatSnapshot>>>(`conversation:${group.id}`);
   const [messages, setMessages] = useState<ChatMessage[]>(cached?.messages || []);
@@ -51,6 +55,12 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
   const [lightboxImage, setLightboxImage] = useState<{
     url: string;
     caption?: string | null;
+  } | null>(null);
+  const [previewDocument, setPreviewDocument] = useState<{
+    url: string;
+    fileName?: string | null;
+    fileSize?: number | null;
+    mimeType?: string | null;
   } | null>(null);
   const [searchInChat, setSearchInChat] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -169,8 +179,14 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
       requestAnimationFrame(() => {
         const element = document.getElementById(`chat-message-${id}`);
         element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        element?.classList.add('chat-message-highlight');
-        window.setTimeout(() => element?.classList.remove('chat-message-highlight'), 1800);
+        const bubble = element?.querySelector<HTMLElement>('[data-message-bubble]');
+        if (bubble) {
+          bubble.getAnimations().forEach((animation) => animation.cancel());
+          bubble.animate([
+            { outline: '2px solid #f78c26', outlineOffset: '4px' },
+            { outline: '2px solid #f78c2600', outlineOffset: '4px' },
+          ], { duration: 1800, easing: 'ease-out' });
+        }
       });
     } catch { setActionError(t('El mensaje original ya no está disponible.')); }
   };
@@ -189,8 +205,15 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
     <div className="flex flex-1 flex-col h-full min-w-0 bg-slate-50/40 relative">
       {/* 1. TailAdmin Header */}
       <div className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 shadow-2xs z-10">
-        <div className="flex items-center gap-3 min-w-0">
-          <button type="button" onClick={onBack} aria-label={t("Volver a los grupos")} className="lg:hidden flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"><ArrowLeft size={18} /></button>
+        <div
+          onClick={onOpenInfo}
+          className="flex items-center gap-3 min-w-0 cursor-pointer hover:opacity-90 transition-opacity"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpenInfo(); }}
+          title={t("Detalles del Grupo")}
+        >
+          <button type="button" onClick={(e) => { e.stopPropagation(); onBack(); }} aria-label={t("Volver a los grupos")} className="lg:hidden flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"><ArrowLeft size={18} /></button>
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-brand-500 font-bold text-sm shrink-0 overflow-hidden border border-orange-200/80">
             {group.foto_url ? (
               <img
@@ -263,14 +286,15 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
             </button>
           )}
 
-          {/* Info Drawer Button */}
+          {/* More Options / Info Drawer Button */}
           <button
             type="button"
             onClick={onOpenInfo}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:text-brand-500 hover:bg-orange-50 transition-colors"
-            title={t("Información y miembros del grupo")}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:text-brand-500 hover:bg-orange-50 transition-colors cursor-pointer"
+            title={t("Más opciones")}
+            aria-label={t("Más opciones")}
           >
-            <Info size={16} />
+            <MoreVertical size={17} />
           </button>
         </div>
       </div>
@@ -316,15 +340,22 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
           </div>
         ) : (
           <>
-            {filteredMessages.map((msg) => (
+            {filteredMessages.map((msg, index) => (
+              <React.Fragment key={msg.id}>
+              {(index === 0 || chatDayKey(filteredMessages[index - 1].created_at) !== chatDayKey(msg.created_at)) && (
+                <div className="flex justify-center py-3" role="separator" aria-label={chatDayLabel(msg.created_at, language, chatNow)}>
+                  <span className="rounded-lg border border-[#343e48]/15 bg-white px-3 py-1 text-xs font-medium text-[#343e48]/75">{chatDayLabel(msg.created_at, language, chatNow)}</span>
+                </div>
+              )}
               <ChatMessageItem
-                key={msg.id}
                 message={msg}
+                startsSenderGroup={startsSenderGroup(filteredMessages, index)}
                 currentUserId={currentUserId}
                 isGlobalAdmin={isGlobalAdmin || group.mi_rol === 'admin'}
                 onImageClick={(url, cap) =>
                   setLightboxImage({ url, caption: cap })
                 }
+                onDocumentClick={setPreviewDocument}
                 onToggleReaction={handleToggleReaction}
                 onDeleteMessage={setDeleteTarget}
                 onReply={setReplyTo}
@@ -334,6 +365,7 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
                 pinned={pins.some((pin) => pin.mensaje_id === msg.id)}
                 canUnpin={isGlobalAdmin || group.mi_rol === 'admin' || pins.some((pin) => pin.mensaje_id === msg.id && pin.pinned_by === currentUserId)}
               />
+              </React.Fragment>
             ))}
             <div ref={messagesEndRef} />
           </>
@@ -372,6 +404,16 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
           imageUrl={lightboxImage.url}
           caption={lightboxImage.caption}
           onClose={() => setLightboxImage(null)}
+        />
+      )}
+      {/* 5. Native Document Preview Modal */}
+      {previewDocument && (
+        <DocumentPreviewModal
+          url={previewDocument.url}
+          fileName={previewDocument.fileName}
+          fileSize={previewDocument.fileSize}
+          mimeType={previewDocument.mimeType}
+          onClose={() => setPreviewDocument(null)}
         />
       )}
     </div>

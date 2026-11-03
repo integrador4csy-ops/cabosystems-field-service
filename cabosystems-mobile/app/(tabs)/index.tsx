@@ -1,9 +1,9 @@
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator, ScrollView, AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import {
-  MapPin,
   ChevronRight,
   ClipboardList,
   RefreshCw,
@@ -16,12 +16,12 @@ import { useTabStartup } from '@/lib/tabStartup';
 import { HeaderCaboSystems, useHeaderHeight } from '@/components/HeaderCaboSystems';
 import DailyFormCard from '@/components/DailyFormCard';
 import { TaskFilterSelect } from '@/components/TaskFilterSelect';
-import { matchesTaskAssignee, sortTaskTitles } from '@/lib/taskListFilters';
+import { matchesTaskAssignee, sortTasksByPriority } from '@/lib/taskListFilters';
 import { useLanguage } from '@/lib/i18n';
 import DailyFormModal from '@/components/DailyFormModal';
 import DailyFormConfirmModal from '@/components/DailyFormConfirmModal';
 import { Colors, Spacing, BorderRadius } from '@/constants/Theme';
-import { Badge } from '@/components/ui';
+
 import { useAuth } from '@/lib/auth';
 import { useProjects } from '@/lib/projects';
 import { supabase } from '@/lib/supabase';
@@ -43,7 +43,7 @@ const STATUS_META: Record<
   }
 > = {
   pendiente: {
-    color: 'rgba(52,62,72,0.25)',
+    color: Colors.brandSlate,
     label: 'To do',
   },
   en_proceso: {
@@ -56,59 +56,33 @@ const STATUS_META: Record<
   },
 };
 
-// Tarjeta de Tarea Minimalista
-const TaskCard = React.memo(function TaskCard({
-  item,
-  onPress,
-}: {
-  item: TaskWithProject;
-  onPress: (id: string) => void;
+const PRIORITY_META = {
+  alta: { es: 'Alta', en: 'High', backgroundColor: Colors.primary, borderColor: Colors.primary, color: Colors.textWhite },
+  media: { es: 'Media', en: 'Medium', backgroundColor: Colors.brandSlate, borderColor: Colors.brandSlate, color: Colors.textWhite },
+  baja: { es: 'Baja', en: 'Low', backgroundColor: Colors.textWhite, borderColor: Colors.text, color: Colors.text },
+} as const;
+
+const TaskRow = React.memo(function TaskRow({ item, onPress, en }: {
+  item: TaskWithProject; onPress: (id: string) => void; en: boolean;
 }) {
+  const { t: tr } = useInterfaceTranslation();
   const meta = STATUS_META[item.estatus] ?? STATUS_META.pendiente;
-  const woCode = `WO-${item.id.slice(0, 6).toUpperCase()}`;
-  const handlePress = useCallback(() => {
-    onPress(item.id);
-  }, [item.id, onPress]);
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      style={({ pressed }) => [
-        styles.taskCard,
-        pressed && styles.taskCardPressed,
-      ]}
-      onPress={handlePress}
-    >
-      <View style={styles.taskCardHeader}>
-        <Text style={styles.woCodeText}>{woCode}</Text>
-        <Badge color="gray" variant="light" size="sm" style={{ backgroundColor: '#FFFFFF', borderColor: meta.color }} textStyle={{ color: Colors.brandSlate }}>
-          {meta.label}
-        </Badge>
+  const priority = PRIORITY_META[item.prioridad || 'media'];
+  const status = en ? meta.label : item.estatus === 'completada' ? tr("Completada") : item.estatus === 'en_proceso' ? tr("En proceso") : tr("Pendiente");
+  const handlePress = useCallback(() => onPress(item.id), [item.id, onPress]);
+  return <Pressable accessibilityRole="button" accessibilityLabel={`${item.titulo}, ${en ? priority.en : priority.es}, ${status}`}
+    onPress={handlePress} style={({ pressed }) => [styles.taskRow, pressed && styles.taskRowPressed]}>
+    <View style={styles.taskBody}>
+      <Text style={styles.taskTitle} numberOfLines={2}>{item.titulo}</Text>
+      {!!item.descripcion && <Text style={styles.taskDescription} numberOfLines={2}>{item.descripcion}</Text>}
+      <View style={styles.taskMeta}>
+        <Text style={styles.woCodeText}>{'WO-' + item.id.slice(0, 6).toUpperCase()}</Text>
+        <View style={[styles.priorityBadge, { backgroundColor: priority.backgroundColor, borderColor: priority.borderColor }]}><Text style={[styles.priorityText, { color: priority.color }]}>{en ? priority.en : priority.es}</Text></View>
+        <View style={styles.taskStatus}><View style={[styles.statusDot, { backgroundColor: meta.color }]} /><Text style={styles.statusText}>{status}</Text></View>
       </View>
-
-      <Text style={styles.taskTitle} numberOfLines={2}>
-        {item.titulo}
-      </Text>
-
-      {!!item.descripcion && (
-        <Text style={styles.taskDescription} numberOfLines={2}>
-          {item.descripcion}
-        </Text>
-      )}
-
-      {item.proyectos && (
-        <View style={styles.taskFooter}>
-          <View style={styles.locationChip}>
-            <MapPin size={12} color={Colors.primary} />
-            <Text style={styles.locationText} numberOfLines={1}>
-              {item.proyectos.villa || item.proyectos.unidad} · {item.proyectos.desarrollo}
-            </Text>
-          </View>
-          <ChevronRight size={15} color={Colors.textDisabled} />
-        </View>
-      )}
-    </Pressable>
-  );
+    </View>
+    <ChevronRight size={18} color={Colors.brandSlate} />
+  </Pressable>;
 });
 
 const keyExtractor = (item: TaskWithProject) => item.id;
@@ -130,6 +104,7 @@ export async function preloadMainTasks(userId: string): Promise<TaskWithProject[
 }
 
 export default function DashboardScreen() {
+  const { t: tr } = useInterfaceTranslation();
   const { markMainReady } = useTabStartup();
   const { language } = useLanguage();
   const en = language === 'en';
@@ -158,19 +133,32 @@ export default function DashboardScreen() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'en_proceso' | 'pendiente' | 'completada'>('all');
   const [assignee, setAssignee] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState<'all' | 'alta' | 'media' | 'baja'>('all');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   useEffect(() => { setAssignee('all'); }, [profile?.id]);
   const assigneeOptions = useMemo(() => {
     const people = new Map<string, string>();
     for (const task of tasks) {
-      if (task.asignado_a) people.set(task.asignado_a, task.profiles?.nombre || (task.asignado_a === profile?.id ? profile.nombre : en ? 'Unavailable name' : 'Nombre no disponible'));
+      if (task.asignado_a && task.asignado_a !== profile?.id) {
+        people.set(task.asignado_a, task.profiles?.nombre || (en ? 'Unavailable name' : tr("Nombre no disponible")));
+      }
     }
-    return [
-      { value: 'all', label: en ? 'Any assignee' : 'Cualquier responsable' },
-      { value: 'unassigned', label: en ? 'Unassigned' : 'Sin responsable' },
-      ...[...people].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => ({ value, label })),
+    const options = [
+      { value: 'all', label: en ? 'All villa tasks' : tr("Todas las tareas de la villa") },
     ];
-  }, [tasks, en, profile?.id, profile?.nombre]);
+    if (profile?.id) {
+      options.push({ value: profile.id, label: en ? 'My tasks' : tr("Mis tareas") });
+    }
+    options.push({ value: 'unassigned', label: en ? 'Unassigned' : tr("Sin responsable") });
+    options.push(...[...people].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => ({ value, label })));
+    return options;
+  }, [tasks, en, profile?.id, profile?.nombre, tr]);
+  const priorityOptions = useMemo(() => [
+    { value: 'all', label: en ? 'All priorities' : 'Todas las prioridades' },
+    { value: 'alta', label: en ? 'High priority' : 'Prioridad alta' },
+    { value: 'media', label: en ? 'Medium priority' : 'Prioridad media' },
+    { value: 'baja', label: en ? 'Low priority' : 'Prioridad baja' },
+  ], [en]);
 
   // Estado del Formulario Diario de Campo
   const [dailyFormCompleted, setDailyFormCompleted] = useState(false);
@@ -234,7 +222,7 @@ export default function DashboardScreen() {
         }
       } catch (e) {
         console.error('Task load error:', e);
-        if (version === requestVersion.current) setError('No se pudieron cargar las tareas');
+        if (version === requestVersion.current) setError(tr("No se pudieron cargar las tareas"));
       } finally {
         markMainReady();
         if (version === requestVersion.current) {
@@ -243,7 +231,7 @@ export default function DashboardScreen() {
         }
       }
     },
-    [profile?.id, refreshProjects, taskData.owner, taskData.items.length, markMainReady]
+    [profile?.id, refreshProjects, taskData.owner, taskData.items.length, markMainReady, tr]
   );
 
   const loadRef = useRef(load);
@@ -295,8 +283,8 @@ export default function DashboardScreen() {
   }, [profile?.id]);
 
   const filteredTasks = useMemo(
-    () => tasks.filter(task => task.proyecto_id === selectedProjectId && matchesTaskAssignee(task, assignee)),
-    [tasks, selectedProjectId, assignee]
+    () => tasks.filter(task => task.proyecto_id === selectedProjectId && matchesTaskAssignee(task, assignee) && (priorityFilter === 'all' || task.prioridad === priorityFilter)),
+    [tasks, selectedProjectId, assignee, priorityFilter]
   );
 
   const stats = useMemo(() => {
@@ -313,10 +301,10 @@ export default function DashboardScreen() {
 
   const displayedTasks = useMemo(() => {
     const visible = statusFilter === 'all' ? filteredTasks : filteredTasks.filter((t) => t.estatus === statusFilter);
-    return sortTaskTitles(visible, sortDirection, en ? 'en' : 'es');
+    return sortTasksByPriority(visible, sortDirection, en ? 'en' : 'es');
   }, [filteredTasks, statusFilter, sortDirection, en]);
 
-  const rawNombre = profile?.nombre || 'Técnico';
+  const rawNombre = profile?.nombre || tr("Técnico");
   const cleanNombre = rawNombre.includes('@') ? rawNombre.split('@')[0] : rawNombre.split(' ')[0];
   const firstName = cleanNombre.charAt(0).toUpperCase() + cleanNombre.slice(1);
 
@@ -329,9 +317,9 @@ export default function DashboardScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: TaskWithProject }) => (
-      <TaskCard item={item} onPress={handleOpenTask} />
+      <TaskRow item={item} onPress={handleOpenTask} en={en} />
     ),
-    [handleOpenTask]
+    [handleOpenTask, en]
   );
 
   const listContentStyle = useMemo(
@@ -348,7 +336,7 @@ export default function DashboardScreen() {
         {/* Saludo Minimalista */}
         <View style={styles.greetingRow}>
           <View>
-            <Text style={styles.greetingTitle}>Hola, {firstName}</Text>
+            <Text style={styles.greetingTitle}>{tr("Hola, ")}{firstName}</Text>
           </View>
         <DailyFormCard
           compact
@@ -361,10 +349,13 @@ export default function DashboardScreen() {
         <View style={styles.workFilters}>
           <HeaderCaboSystems selectorOnly projects={projects} selectedProjectId={selectedProjectId}
             onSelectProject={setSelectedProject} />
-          <TaskFilterSelect label={en ? 'Assignee' : 'Responsable'} value={assignee} options={assigneeOptions} onChange={setAssignee} />
+          <TaskFilterSelect label={en ? 'Priority' : 'Prioridad'} value={priorityFilter} options={priorityOptions} onChange={value => setPriorityFilter(value as typeof priorityFilter)} />
+        </View>
+        <View style={styles.secondaryFilters}>
+          <TaskFilterSelect label={en ? 'Assignee' : tr("Responsable")} value={assignee} options={assigneeOptions} onChange={setAssignee} />
           <Pressable accessibilityRole="button"
-            accessibilityLabel={en ? `Order by title: ${sortDirection === 'asc' ? 'ascending' : 'descending'}` : `Ordenar por título: ${sortDirection === 'asc' ? 'ascendente' : 'descendente'}`}
-            accessibilityHint={en ? 'Tap to reverse order' : 'Pulsa para invertir el orden'}
+            accessibilityLabel={en ? `Priority order, titles ${sortDirection === 'asc' ? 'ascending' : 'descending'}` : `Prioridad primero, títulos en orden ${sortDirection === 'asc' ? 'ascendente' : 'descendente'}`}
+            accessibilityHint={en ? 'Tap to reverse title order within each priority' : 'Pulsa para invertir los títulos dentro de cada prioridad'}
             onPress={() => setSortDirection(direction => direction === 'asc' ? 'desc' : 'asc')}
             style={({ pressed }) => [styles.sortButton, pressed && { opacity: 0.6 }]}>
             {sortDirection === 'asc' ? <ArrowUp size={20} color={Colors.primary} /> : <ArrowDown size={20} color={Colors.primary} />}
@@ -388,7 +379,7 @@ export default function DashboardScreen() {
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              All ({filteredTasks.length})
+              {en ? 'All' : tr("Todas")} ({filteredTasks.length})
             </Text>
           </Pressable>
 
@@ -408,7 +399,7 @@ export default function DashboardScreen() {
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              To do ({stats.pendiente})
+              {en ? 'To do' : tr("Pendientes")} ({stats.pendiente})
             </Text>
           </Pressable>
 
@@ -428,7 +419,7 @@ export default function DashboardScreen() {
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              Doing ({stats.en_proceso})
+              {en ? 'Doing' : tr("En proceso")} ({stats.en_proceso})
             </Text>
           </Pressable>
 
@@ -448,16 +439,24 @@ export default function DashboardScreen() {
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              Done ({stats.completada})
+              {en ? 'Done' : tr("Completadas")} ({stats.completada})
             </Text>
           </Pressable>
         </View>
+        {selectedProject ? <View style={styles.projectHeading}>
+          <Text accessibilityRole="header" style={styles.projectTitle} numberOfLines={1}>
+            {selectedProject.villa || selectedProject.unidad || (en ? 'No villa' : tr("Sin villa"))}
+            {!!selectedProject.desarrollo && <Text style={styles.projectDevelopment}>{' · ' + selectedProject.desarrollo}</Text>}
+          </Text>
+          <Text style={styles.projectCount}>{displayedTasks.length} {en ? (displayedTasks.length === 1 ? 'task' : 'tasks') : (displayedTasks.length === 1 ? 'tarea' : 'tareas')}</Text>
+        </View> : null}
       </View>
     ),
-    [firstName, filteredTasks.length, dailyFormCompleted, dailyFormCompletedAt, statusFilter, stats, handlePressDailyForm, projects, selectedProjectId, setSelectedProject, en, assignee, assigneeOptions, sortDirection]
+    [selectedProject, displayedTasks.length, firstName, filteredTasks.length, dailyFormCompleted, dailyFormCompletedAt, statusFilter, stats, handlePressDailyForm, projects, selectedProjectId, setSelectedProject, en, assignee, assigneeOptions, priorityFilter, priorityOptions, sortDirection, tr]
   );
 
   const ListEmpty = useCallback(() => {
+  const { t: tr } = useInterfaceTranslation();
     if (loading && tasks.length === 0) {
       return (
         <View style={styles.emptyContainer}>
@@ -471,21 +470,21 @@ export default function DashboardScreen() {
           <ClipboardList size={32} color={Colors.textSecondary} />
         </View>
         <Text style={styles.emptyTitle}>
-          {error ? 'Error de Sincronización' : 'Sin órdenes en esta vista'}
+          {error ? tr("Error de Sincronización") : tr("Sin órdenes en esta vista")}
         </Text>
         <Text style={styles.emptySubtitle}>
           {error
-            ? 'No se pudo conectar con el servidor. Revisa tu conexión.'
-            : statusFilter !== 'all'
-            ? 'No hay tareas con este estatus en la villa seleccionada.'
-            : 'Aquí aparecen las tareas de la villa seleccionada a las que tienes acceso.'}
+            ? tr("No se pudo conectar con el servidor. Revisa tu conexión.")
+            : statusFilter !== 'all' || priorityFilter !== 'all'
+            ? (en ? 'No tasks match these status and priority filters.' : 'No hay tareas con este estado y prioridad en la villa seleccionada.')
+            : tr("Aquí aparecen las tareas de la villa seleccionada a las que tienes acceso.")}
         </Text>
-        {statusFilter !== 'all' ? (
+        {statusFilter !== 'all' || priorityFilter !== 'all' ? (
           <Pressable
             style={({ pressed }) => [styles.resetFilterBtn, pressed && { opacity: 0.8 }]}
-            onPress={() => setStatusFilter('all')}
+            onPress={() => { setStatusFilter('all'); setPriorityFilter('all'); }}
           >
-            <Text style={styles.resetFilterText}>Ver todas las órdenes</Text>
+            <Text style={styles.resetFilterText}>{tr("Ver todas las órdenes")}</Text>
           </Pressable>
         ) : (
           <Pressable
@@ -493,16 +492,17 @@ export default function DashboardScreen() {
             onPress={() => load()}
           >
             <RefreshCw size={14} color={Colors.textWhite} />
-            <Text style={styles.retryText}>Reintentar</Text>
+            <Text style={styles.retryText}>{tr("Reintentar")}</Text>
           </Pressable>
         )}
       </View>
     );
-  }, [loading, tasks.length, error, statusFilter, load]);
+  }, [loading, tasks.length, error, statusFilter, priorityFilter, load, tr, en]);
 
   return (
     <View style={styles.container}>
       <HeaderCaboSystems
+        seamless
         showProjectSelector={false}
         projects={projects}
         selectedProjectId={selectedProjectId}
@@ -532,10 +532,10 @@ export default function DashboardScreen() {
       <DailyFormConfirmModal
         visible={confirmModalVisible}
         type="confirm"
-        title="¿Confirmar Envío?"
-        message="¿Ya completaste y enviaste tus respuestas en el formulario diario de Google?"
-        confirmText="SÍ, ENVIADO"
-        cancelText="AÚN NO"
+        title={tr("¿Confirmar Envío?")}
+        message={tr("¿Ya completaste y enviaste tus respuestas en el formulario diario de Google?")}
+        confirmText={tr("SÍ, ENVIADO")}
+        cancelText={tr("AÚN NO")}
         onConfirm={async () => {
           setConfirmModalVisible(false);
           await handleDailyFormCompleted();
@@ -548,9 +548,9 @@ export default function DashboardScreen() {
       <DailyFormConfirmModal
         visible={successModalVisible}
         type="success"
-        title="¡Formulario Registrado!"
-        message="Tu reporte diario de campo ha sido registrado exitosamente para el turno de hoy en CaboSystems."
-        confirmText="ENTENDIDO"
+        title={tr("¡Formulario Registrado!")}
+        message={tr("Tu reporte diario de campo ha sido registrado exitosamente para el turno de hoy en CaboSystems.")}
+        confirmText={tr("ENTENDIDO")}
         onConfirm={() => setSuccessModalVisible(false)}
       />
     </View>
@@ -559,10 +559,11 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   workFilters: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  secondaryFilters: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   sortButton: { width: 44, height: 44, flexShrink: 0, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(0,0,0,0.12)', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#FFFFFF',
   },
   listContent: {
     paddingHorizontal: Spacing.md,
@@ -572,7 +573,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   headerContainer: {
-    marginBottom: 16,
+    marginBottom: 0,
   },
   greetingRow: {
     flexDirection: 'row',
@@ -620,63 +621,22 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_700Bold',
     color: Colors.textWhite,
   },
-  taskCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderCurve: 'continuous',
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.12)',
-    padding: 16,
-    gap: 8,
-  },
-  taskCardPressed: {
-    opacity: 0.9,
-    backgroundColor: '#FFFFFF',
-  },
-  taskCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  woCodeText: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 11,
-    color: 'rgba(0,0,0,0.55)',
-  },
-  taskTitle: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 16,
-    color: '#000000',
-    lineHeight: 22,
-  },
-  taskDescription: {
-    fontFamily: 'Outfit_400Regular',
-    fontSize: 13,
-    color: Colors.brandSlate,
-    lineHeight: 19,
-  },
-  taskFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.06)',
-  },
-  locationChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    flex: 1,
-  },
-  locationText: {
-    fontFamily: 'Outfit_500Medium',
-    fontSize: 11.5,
-    color: Colors.textSecondary,
-  },
+  projectHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingTop: 16, paddingBottom: 4 },
+  projectTitle: { flex: 1, fontFamily: 'Outfit_600SemiBold', fontSize: 15, lineHeight: 21, color: '#000000' },
+  projectDevelopment: { fontFamily: 'Outfit_400Regular', color: Colors.brandSlate },
+  projectCount: { fontFamily: 'Outfit_400Regular', fontSize: 13, color: Colors.brandSlate },
+  taskRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 20, minHeight: 88 },
+  taskRowPressed: { opacity: 0.55 },
+  taskBody: { flex: 1, gap: 6 },
+  taskTitle: { fontFamily: 'Outfit_600SemiBold', fontSize: 17, lineHeight: 23, color: '#000000' },
+  taskDescription: { fontFamily: 'Outfit_400Regular', fontSize: 14, lineHeight: 20, color: Colors.brandSlate },
+  taskMeta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 16, rowGap: 6, marginTop: 4 },
+  woCodeText: { fontFamily: 'Outfit_400Regular', fontSize: 12, color: Colors.brandSlate },
+  taskStatus: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  priorityBadge: { minHeight: 22, justifyContent: 'center', borderWidth: 1, borderRadius: BorderRadius.full, paddingHorizontal: 8 },
+  priorityText: { fontFamily: 'Outfit_600SemiBold', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.3 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { fontFamily: 'Outfit_500Medium', fontSize: 12, color: Colors.brandSlate },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',

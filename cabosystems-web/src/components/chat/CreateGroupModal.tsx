@@ -13,8 +13,10 @@ import {
   Loader2,
 } from 'lucide-react';
 import { createChatGroup, getAllProfilesForInvite } from '../../lib/chatApi';
+import { getProjects } from '../../lib/projectsApi';
 import type { Profile } from '../../types/fleet';
 import type { ChatGroup } from '../../types/chat';
+import type { Proyecto } from '../../types/projects';
 
 interface CreateGroupModalProps {
   isOpen: boolean;
@@ -35,6 +37,8 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   const [soloMultimedia, setSoloMultimedia] = useState(false);
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
+  const [availableProjects, setAvailableProjects] = useState<Proyecto[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
@@ -52,6 +56,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
       setSoloMultimedia(false);
       setFotoFile(null);
       setFotoPreview(null);
+      setSelectedProjectId('');
       setSelectedMemberIds([]);
       setSearchQuery('');
       setErrorMsg(null);
@@ -62,9 +67,13 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   const loadProfiles = async () => {
     try {
       setLoadingProfiles(true);
-      const data = await getAllProfilesForInvite();
+      const [profilesData, projectsData] = await Promise.all([
+        getAllProfilesForInvite(),
+        getProjects().catch(() => []),
+      ]);
       // Filter out creator from selection list since creator is auto-added
-      setProfiles(data.filter((p) => p.id !== creatorId));
+      setProfiles(profilesData.filter((p) => p.id !== creatorId));
+      setAvailableProjects(projectsData);
     } catch (err) {
       console.error('Error loading profiles:', err);
     } finally {
@@ -112,6 +121,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
         descripcion: descripcion.trim() || undefined,
         fotoFile,
         solo_multimedia: soloMultimedia,
+        proyecto_id: selectedProjectId || null,
         creatorId,
         memberIds: selectedMemberIds,
       });
@@ -233,6 +243,28 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                 />
               </div>
             </div>
+          </div>
+
+          {/* Villa Vinculada Opcional */}
+          <div>
+            <label className="block text-xs font-semibold text-[#343e48] mb-1">
+              {t("Villa vinculada (opcional)")}
+            </label>
+            <select
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-[#343e48] focus:border-[#f78c26] focus:ring-2 focus:ring-orange-100 outline-hidden transition-all"
+            >
+              <option value="">{t("Ninguna (Chat general)")}</option>
+              {availableProjects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.desarrollo} · {p.villa}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-slate-500 font-medium mt-1">
+              {t("Solo puedes vincular villas que tienes permitido consultar.")}
+            </p>
           </div>
 
           {/* Modo Solo Multimedia Switch */}

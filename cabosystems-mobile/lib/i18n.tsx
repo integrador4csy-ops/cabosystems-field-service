@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-export type SupportedLanguage = 'es' | 'en';
+import { DEFAULT_LANGUAGE, setCurrentLanguage, translateText, type SupportedLanguage, type TranslationParams } from './localization';
+export type { SupportedLanguage } from './localization';
 
 const LANGUAGE_STORAGE_KEY = 'csy_app_language';
 
@@ -33,9 +34,9 @@ export const TRANSLATIONS = {
     'profile.selectLanguageTitle': 'Seleccionar Idioma',
     'profile.selectLanguageSub': 'Elige el idioma en el que deseas visualizar la aplicación',
     'profile.langEs': 'Español',
-    'profile.langEsDesc': 'Español latinoamericano predeterminado',
+    'profile.langEsDesc': 'Español latinoamericano',
     'profile.langEn': 'English',
-    'profile.langEnDesc': 'English interface and terminology',
+    'profile.langEnDesc': 'English · Idioma predeterminado',
 
     // Soporte y Seguridad
     'profile.supportSecurity': 'SOPORTE Y SEGURIDAD',
@@ -126,9 +127,9 @@ export const TRANSLATIONS = {
     'profile.selectLanguageTitle': 'Select Language',
     'profile.selectLanguageSub': 'Choose your preferred language for the application',
     'profile.langEs': 'Español',
-    'profile.langEsDesc': 'Default Latin American Spanish',
+    'profile.langEsDesc': 'Latin American Spanish',
     'profile.langEn': 'English',
-    'profile.langEnDesc': 'English interface and terminology',
+    'profile.langEnDesc': 'English · Default language',
 
     // Soporte y Seguridad
     'profile.supportSecurity': 'SUPPORT & SECURITY',
@@ -200,23 +201,27 @@ export type TranslationKey = keyof typeof TRANSLATIONS.es;
 interface LanguageContextType {
   language: SupportedLanguage;
   setLanguage: (lang: SupportedLanguage) => Promise<void>;
-  t: (key: TranslationKey | string) => string;
+  t: (key: TranslationKey | string, params?: TranslationParams) => string;
   isSpanish: boolean;
   isEnglish: boolean;
 }
 
 const LanguageContext = createContext<LanguageContextType>({
-  language: 'es',
+  language: DEFAULT_LANGUAGE,
   setLanguage: async () => {},
-  t: (key) => key,
-  isSpanish: true,
-  isEnglish: false,
+  t: (key, params) => translateText(DEFAULT_LANGUAGE, (TRANSLATIONS.en as Record<string, string>)[key] ?? key, params),
+  isSpanish: false,
+  isEnglish: true,
 });
 
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [language, setLanguageState] = useState<SupportedLanguage>('es');
+  const [language, setLanguageState] = useState<SupportedLanguage>(DEFAULT_LANGUAGE);
+  const selectionRevision = useRef(0);
+  const saveQueue = useRef(Promise.resolve());
 
   useEffect(() => {
+    const revision = selectionRevision.current;
+    let active = true;
     async function loadSavedLanguage() {
       try {
         let savedLang: string | null = null;
@@ -226,7 +231,8 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
           savedLang = await SecureStore.getItemAsync(LANGUAGE_STORAGE_KEY);
         }
 
-        if (savedLang === 'en' || savedLang === 'es') {
+        if (active && revision === selectionRevision.current && (savedLang === 'en' || savedLang === 'es')) {
+          setCurrentLanguage(savedLang);
           setLanguageState(savedLang);
         }
       } catch (err) {
@@ -234,35 +240,38 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
     }
     loadSavedLanguage();
+    return () => { active = false; };
   }, []);
 
-  const setLanguage = async (newLang: SupportedLanguage) => {
+  const setLanguage = useCallback(async (newLang: SupportedLanguage) => {
     try {
+      selectionRevision.current++;
+      setCurrentLanguage(newLang);
       setLanguageState(newLang);
-      if (Platform.OS === 'web') {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(LANGUAGE_STORAGE_KEY, newLang);
+      saveQueue.current = saveQueue.current.catch(() => {}).then(async () => {
+        if (Platform.OS === 'web') {
+          if (typeof localStorage !== 'undefined') localStorage.setItem(LANGUAGE_STORAGE_KEY, newLang);
+        } else {
+          await SecureStore.setItemAsync(LANGUAGE_STORAGE_KEY, newLang);
         }
-      } else {
-        await SecureStore.setItemAsync(LANGUAGE_STORAGE_KEY, newLang);
-      }
+      });
+      await saveQueue.current;
     } catch (err) {
       console.warn('Error saving language preference:', err);
     }
-  };
+  }, []);
 
-  const t = (key: TranslationKey | string): string => {
+  const t = useCallback((key: TranslationKey | string, params?: TranslationParams): string => {
     const dict = TRANSLATIONS[language] as Record<string, string>;
     if (dict && dict[key]) {
-      return dict[key];
+      return translateText(language, dict[key], params);
     }
-    // Fallback to Spanish dictionary
-    const fallback = TRANSLATIONS.es as Record<string, string>;
+    const fallback = TRANSLATIONS.en as Record<string, string>;
     if (fallback[key]) {
-      return fallback[key];
+      return translateText(language, fallback[key], params);
     }
-    return key;
-  };
+    return translateText(language, key, params);
+  }, [language]);
 
   return (
     <LanguageContext.Provider

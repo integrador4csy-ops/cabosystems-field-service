@@ -1,3 +1,4 @@
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React from 'react';
 import {
   View,
@@ -26,6 +27,7 @@ export default function BackgroundLocationModal({
   onClose,
   onOpenSettings,
 }: BackgroundLocationModalProps) {
+  const { t: tr } = useInterfaceTranslation();
   const handleConfigureNow = async () => {
     try {
       await SecureStore.setItemAsync(BG_LOC_DISMISSED_KEY, Date.now().toString());
@@ -61,10 +63,8 @@ export default function BackgroundLocationModal({
           </View>
 
           {/* Title & Description */}
-          <Text style={styles.modalTitle}>Ubicación en Segundo Plano</Text>
-          <Text style={styles.modalSubtitle}>
-            Para que el radar de <Text style={styles.boldText}>CaboSystems</Text> sincronice tu asistencia técnica en tiempo real cuando tu teléfono esté bloqueado o la app minimizada:
-          </Text>
+          <Text style={styles.modalTitle}>{tr("Ubicación en Segundo Plano")}</Text>
+          <Text style={styles.modalSubtitle}>{tr("Para que el radar de ")}<Text style={styles.boldText}>CaboSystems</Text>{tr(" sincronice tu asistencia técnica en tiempo real cuando tu teléfono esté bloqueado o la app minimizada:")}</Text>
 
           {/* Step by Step Guide */}
           <View style={styles.stepsContainer}>
@@ -72,8 +72,7 @@ export default function BackgroundLocationModal({
               <View style={styles.stepNumberBadge}>
                 <Text style={styles.stepNumberText}>1</Text>
               </View>
-              <Text style={styles.stepText}>
-                Toca en <Text style={styles.stepHighlight}>"Configurar ahora"</Text>
+              <Text style={styles.stepText}>{tr("Toca en ")}<Text style={styles.stepHighlight}>{tr("\"Configurar ahora\"")}</Text>
               </Text>
             </View>
 
@@ -81,8 +80,7 @@ export default function BackgroundLocationModal({
               <View style={styles.stepNumberBadge}>
                 <Text style={styles.stepNumberText}>2</Text>
               </View>
-              <Text style={styles.stepText}>
-                Entra a <Text style={styles.stepHighlight}>Permisos</Text> ➔ <Text style={styles.stepHighlight}>Ubicación</Text>
+              <Text style={styles.stepText}>{tr("Entra a ")}<Text style={styles.stepHighlight}>{tr("Permisos")}</Text> ➔ <Text style={styles.stepHighlight}>{tr("Ubicación")}</Text>
               </Text>
             </View>
 
@@ -90,8 +88,7 @@ export default function BackgroundLocationModal({
               <View style={styles.stepNumberBadge}>
                 <Text style={styles.stepNumberText}>3</Text>
               </View>
-              <Text style={styles.stepText}>
-                Selecciona <Text style={styles.stepHighlight}>"Permitir todo el tiempo"</Text>
+              <Text style={styles.stepText}>{tr("Selecciona ")}<Text style={styles.stepHighlight}>{tr("\"Permitir todo el tiempo\"")}</Text>
               </Text>
             </View>
           </View>
@@ -106,7 +103,7 @@ export default function BackgroundLocationModal({
               onPress={handleConfigureNow}
             >
               <Settings2 size={18} color="#FFFFFF" strokeWidth={2.2} style={{ marginRight: 8 }} />
-              <Text style={styles.primaryBtnText}>CONFIGURAR AHORA</Text>
+              <Text style={styles.primaryBtnText}>{tr("CONFIGURAR AHORA")}</Text>
             </Pressable>
 
             <Pressable
@@ -116,7 +113,7 @@ export default function BackgroundLocationModal({
               ]}
               onPress={handleDismissLater}
             >
-              <Text style={styles.secondaryBtnText}>MÁS TARDE</Text>
+              <Text style={styles.secondaryBtnText}>{tr("MÁS TARDE")}</Text>
             </Pressable>
           </View>
         </View>

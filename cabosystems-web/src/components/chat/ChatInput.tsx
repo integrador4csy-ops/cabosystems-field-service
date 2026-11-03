@@ -5,12 +5,13 @@ import React, { lazy, Suspense, useCallback, useEffect, useState, useRef } from 
 const EmojiPicker = lazy(() => import('./EmojiPicker'));
 import {
   Send,
-  Camera,
+  Mic, Square, Paperclip, FileText,
   Video,
   Smile,
   X,
   Loader2,
 } from 'lucide-react';
+import { useVoiceNote } from '../../lib/useVoiceNote';
 import { sendChatMessage } from '../../lib/chatApi';
 import type { ChatMessage, ChatMessageType } from '../../types/chat';
 
@@ -35,6 +36,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 }) => {
   const { t } = useTranslation();
   const [text, setText] = useState('');
+  const sendLock = useRef(false);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<ChatMessageType>('texto');
@@ -42,6 +44,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
   const closePicker = useCallback(() => setEmojiAnchor(null), []);
   const [sendError, setSendError] = useState(false);
+  const [recordError, setRecordError] = useState(false);
+  const [audioDuration, setAudioDuration] = useState<number | undefined>();
+  const voice = useVoiceNote((file, duration) => { setMediaFile(file); setMediaType('audio'); setAudioDuration(duration); }, () => setRecordError(true));
+  useEffect(() => { voice.cancel(); setMediaFile(null); setText(''); setRecordError(false); setSendError(false); }, [groupId, currentUserId, voice.cancel]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -64,25 +70,24 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     const isVideo = file.type.startsWith('video/');
     const isImage = file.type.startsWith('image/');
 
-    if (!isVideo && !isImage) {
-      alert(t("Por favor selecciona una imagen (JPG, PNG) o un video (MP4)."));
-      return;
-    }
+    if (file.size > 50 * 1024 * 1024) { alert(t('El archivo supera 50 MB.')); return; }
 
     setMediaFile(file);
-    setMediaType(isVideo ? 'video' : 'imagen');
+    setAudioDuration(undefined);
+    setMediaType(isVideo ? 'video' : isImage ? 'imagen' : file.type.startsWith('audio/') ? 'audio' : 'archivo');
   };
 
   const removeMedia = () => {
     setMediaFile(null);
     setMediaPreview(null);
     setMediaType('texto');
+    setAudioDuration(undefined);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (sending) return;
+    if (sendLock.current || sending || voice.recording || voice.starting) return;
 
     if (!text.trim() && !mediaFile) return;
 
@@ -93,6 +98,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
 
     try {
+      sendLock.current = true;
       setSending(true);
       setSendError(false);
       await sendChatMessage({
@@ -101,6 +107,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         tipo: mediaFile ? mediaType : 'texto',
         contenido: text.trim() || undefined,
         mediaFile,
+        mediaMeta: mediaFile ? { fileName: mediaFile.name, fileSize: mediaFile.size, mimeType: mediaFile.type, duration: audioDuration } : undefined,
         reply_to_id: replyTo?.id,
       });
 
@@ -116,6 +123,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       console.error('Error sending message:', err);
       setSendError(true);
     } finally {
+      sendLock.current = false;
       setSending(false);
     }
   };
@@ -142,6 +150,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <ReplyPreview message={replyTo} currentUserId={currentUserId} />
         <button type="button" onClick={onCancelReply} aria-label={t('Cancelar respuesta')} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"><X size={18} /></button>
       </div>}
+      {recordError && <p role="alert" className="mb-2 text-xs text-red-600">{t('No se pudo grabar. Permite el micrófono y abre la página mediante HTTPS o localhost.')}</p>}
       {sendError && <p role="alert" className="mb-2 text-xs text-red-600">{t('No se pudo enviar el mensaje. Intenta de nuevo.')}</p>}
       {/* Solo Multimedia Info Banner if active */}
       {soloMultimedia && (
@@ -161,7 +170,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       {mediaPreview && (
         <div className="mb-2 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-2.5 animate-in fade-in">
           <div className="relative h-16 w-16 rounded-xl border border-slate-200 bg-black overflow-hidden flex items-center justify-center shrink-0">
-            {mediaType === 'video' ? (
+            {mediaType === 'archivo' ? <FileText size={28} className="text-white" /> : mediaType === 'audio' ? <Mic size={28} className="text-white" /> : mediaType === 'video' ? (
               <video
                 src={mediaPreview}
                 className="h-full w-full object-cover"
@@ -180,9 +189,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             </p>
             <p className="text-[11px] text-slate-400">
               {((mediaFile?.size || 0) / (1024 * 1024)).toFixed(2)} MB ·{' '}
-              {mediaType === 'video' ? t("Video técnico") : t("Foto de evidencia")}
+              {mediaType === 'audio' ? t('Nota de voz') : mediaType === 'archivo' ? t('Documento') : mediaType === 'video' ? t('Video técnico') : t('Foto de evidencia')}
             </p>
           </div>
+          {mediaType === 'audio' && <audio controls src={mediaPreview} className="max-w-[180px]" aria-label={t('Escuchar nota de voz')} />}
           <button
             type="button"
             onClick={removeMedia}
@@ -193,13 +203,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
       )}
 
+      {voice.recording && <div className="mb-2 flex items-center justify-between text-sm text-[#343e48]"><span>{t('Grabando')} {Math.floor(voice.elapsed / 60)}:{String(Math.floor(voice.elapsed % 60)).padStart(2, '0')}</span><button type="button" onClick={voice.cancel} aria-label={t('Descartar grabación')}><X size={20} /></button></div>}
       {/* Input Bar Form */}
       <form onSubmit={handleSend} className="flex items-end gap-2">
         {/* Hidden File Input */}
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*,video/*"
+          accept="*/*"
           onChange={handleFileChange}
           className="hidden"
         />
@@ -209,9 +220,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 hover:text-brand-500 hover:border-orange-200 hover:bg-orange-50 transition-all shrink-0 cursor-pointer"
-          title={t("Adjuntar foto o video de evidencia")}
+          title={t("Adjuntar archivo, foto o video")}
+          disabled={sending || voice.recording}
         >
-          <Camera size={18} />
+          <Paperclip size={18} />
         </button>
 
         {/* Emoji Button with Popover */}
@@ -219,7 +231,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           <button
             type="button"
             onClick={(event) => emojiAnchor ? closePicker() : setEmojiAnchor(event.currentTarget)}
-            disabled={isTextBlocked || sending}
+            disabled={isTextBlocked || sending || voice.recording}
             aria-expanded={Boolean(emojiAnchor)}
             aria-haspopup="dialog"
             className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 hover:text-brand-500 hover:border-orange-200 hover:bg-orange-50 transition-all cursor-pointer"
@@ -240,7 +252,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             aria-label={t("Mensaje para el grupo")}
             ref={textareaRef}
             rows={1}
-            disabled={isTextBlocked || sending}
+            disabled={isTextBlocked || sending || voice.recording}
             value={text}
             onChange={(e) => {
               setText(e.target.value);
@@ -254,7 +266,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 ? t("Solo multimedia activo. Adjunta una foto o video arriba.")
                 : t("Escribe un mensaje técnico... (Enter para enviar)")
             }
-            className={`w-full resize-none rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-xs font-medium text-[#343e48] placeholder-slate-400 focus:border-[#f78c26] focus:bg-white focus:ring-2 focus:ring-orange-100 outline-hidden transition-all max-h-24 ${
+            className={`block h-10 min-h-10 w-full resize-none rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-[9px] text-xs leading-5 font-medium text-[#343e48] placeholder-slate-400 focus:border-[#f78c26] focus:bg-white focus:ring-2 focus:ring-orange-100 outline-hidden transition-all max-h-[100px] ${
               isTextBlocked ? 'opacity-60 cursor-not-allowed' : ''
             }`}
           />
@@ -262,15 +274,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         {/* Send Button */}
         <button
-          type="submit"
-          disabled={sending || (!text.trim() && !mediaFile) || (isTextBlocked && !mediaFile)}
+          type="button"
+          onClick={() => { if (voice.recording) voice.stop(); else if (text.trim() || mediaFile) void handleSend(); else { setRecordError(false); void voice.start(); } }}
+          disabled={sending || voice.starting || (isTextBlocked && Boolean(text.trim()) && !mediaFile)}
           className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500 hover:bg-brand-700 text-white shadow-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0 cursor-pointer"
-          title={t("Enviar mensaje")}
+          title={voice.recording ? t("Detener grabación") : text.trim() || mediaFile ? t("Enviar mensaje") : t("Grabar nota de voz")}
+          aria-label={voice.recording ? t("Detener grabación") : text.trim() || mediaFile ? t("Enviar mensaje") : t("Grabar nota de voz")}
         >
           {sending ? (
             <Loader2 size={16} className="animate-spin" />
           ) : (
-            <Send size={16} />
+            voice.recording ? <Square size={16} /> : text.trim() || mediaFile ? <Send size={16} /> : <Mic size={18} />
           )}
         </button>
       </form>

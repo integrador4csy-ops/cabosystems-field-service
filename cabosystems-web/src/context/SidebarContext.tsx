@@ -3,6 +3,16 @@ import { useSessionPreference } from '../hooks/useSessionPreference';
 import { isNavigationItem, isStringPreference } from '../lib/sessionPreferences';
 
 interface SidebarContextType {
+  targetTaskId: string | null;
+  setTargetTaskId: (id: string | null) => void;
+  chatSearchQuery: string;
+  setChatSearchQuery: (query: string) => void;
+  chatCreateVersion: number;
+  requestCreateChatGroup: () => void;
+  teamSearchQuery: string;
+  setTeamSearchQuery: (query: string) => void;
+  teamInviteVersion: number;
+  requestCreateTeamInvite: () => void;
   agendaSearchQuery: string;
   setAgendaSearchQuery: (query: string) => void;
   agendaCreateVersion: number;
@@ -43,14 +53,29 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [activeItem, setActiveItem] = useSessionPreference('csy_active_section', 'radar', isNavigationItem);
   const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
   const [targetGroupId, setTargetGroupId] = useState<string | null>(null);
+  const [targetTaskId, setTargetTaskId] = useState<string | null>(null);
   const [taskSearchQuery, setTaskSearchQuery] = useSessionPreference('csy_task_search', '', isStringPreference);
   const [taskCreateVersion, setTaskCreateVersion] = useState(0);
   const [agendaSearchQuery, setAgendaSearchQuery] = useSessionPreference('csy_company_agenda_search', '', isStringPreference);
   const [agendaCreateVersion, setAgendaCreateVersion] = useState(0);
+  const [chatSearchQuery, setChatSearchQuery] = useSessionPreference('csy_chat_search', '', isStringPreference);
+  const [chatCreateVersion, setChatCreateVersion] = useState(0);
+  const [teamSearchQuery, setTeamSearchQuery] = useSessionPreference('csy_team_search', '', isStringPreference);
+  const [teamInviteVersion, setTeamInviteVersion] = useState(0);
 
   return (
     <SidebarContext.Provider
       value={{
+        targetTaskId,
+        setTargetTaskId,
+        chatSearchQuery,
+        setChatSearchQuery,
+        chatCreateVersion,
+        requestCreateChatGroup: () => setChatCreateVersion((version) => version + 1),
+        teamSearchQuery,
+        setTeamSearchQuery,
+        teamInviteVersion,
+        requestCreateTeamInvite: () => setTeamInviteVersion((version) => version + 1),
         agendaSearchQuery,
         setAgendaSearchQuery,
         agendaCreateVersion,

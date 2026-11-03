@@ -1,3 +1,5 @@
+import { getRoleLabel } from '@/lib/localization';
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -27,9 +29,12 @@ import {
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { useAuth } from '@/lib/auth';
 import { createChatGroup, getAllProfilesForInvite } from '@/lib/chatApi';
-import type { Profile } from '@/types/database';
+import { getMyProjects } from '@/lib/api';
+import { TaskFilterSelect } from '@/components/TaskFilterSelect';
+import type { Profile, Project } from '@/types/database';
 
 export default function NewGroupScreen() {
+  const { t: tr } = useInterfaceTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
@@ -39,6 +44,8 @@ export default function NewGroupScreen() {
   const [fotoUri, setFotoUri] = useState<string | null>(null);
   const [soloMultimedia, setSoloMultimedia] = useState(false);
 
+  const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [availableProfiles, setAvailableProfiles] = useState<Profile[]>([]);
   const [selectedProfileIds, setSelectedProfileIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,13 +55,16 @@ export default function NewGroupScreen() {
   useEffect(() => {
     // Permitir a admins y supervisores, o en modo desarrollo para pruebas del equipo
     if (profile && profile.rol !== 'admin' && profile.rol !== 'supervisor_instalacion' && !__DEV__) {
-      Alert.alert('Acceso Restringido', 'Solo los administradores pueden crear grupos de trabajo.');
+      Alert.alert(tr('Acceso Restringido'), tr("Solo los administradores pueden crear grupos de trabajo."));
       router.back();
     }
   }, [profile]);
 
   useEffect(() => {
     loadProfiles();
+    getMyProjects()
+      .then(setAvailableProjects)
+      .catch((err) => console.error('Error loading projects for new group:', err));
   }, []);
 
   const loadProfiles = async () => {
@@ -89,7 +99,7 @@ export default function NewGroupScreen() {
 
   const handleCreateGroup = async () => {
     if (!nombre.trim()) {
-      Alert.alert('Nombre requerido', 'Por favor ingresa un nombre para el grupo de trabajo.');
+      Alert.alert(tr("Nombre requerido"), tr("Por favor ingresa un nombre para el grupo de trabajo."));
       return;
     }
 
@@ -102,11 +112,12 @@ export default function NewGroupScreen() {
         descripcion,
         fotoUri,
         solo_multimedia: soloMultimedia,
+        proyecto_id: selectedProjectId || null,
         creatorId: profile.id,
         memberIds: selectedProfileIds,
       });
 
-      Alert.alert('Grupo Creado', 'El grupo fue creado exitosamente.', [
+      Alert.alert(tr('Grupo Creado'), tr("El grupo fue creado exitosamente."), [
         {
           text: 'Entrar al Chat',
           onPress: () => router.replace(('/chat/' + newGroup.id) as any),
@@ -114,7 +125,7 @@ export default function NewGroupScreen() {
       ]);
     } catch (err: any) {
       console.error('Error creating group:', err);
-      Alert.alert('Error', err?.message || 'Ocurrió un error al crear el grupo.');
+      Alert.alert(tr("Error"), tr(err?.message || tr("Ocurrió un error al crear el grupo.")));
     } finally {
       setCreating(false);
     }
@@ -122,7 +133,7 @@ export default function NewGroupScreen() {
 
   const filteredProfiles = availableProfiles.filter((p) => {
     const q = searchQuery.toLowerCase();
-    return p.nombre?.toLowerCase().includes(q) || p.rol?.toLowerCase().includes(q);
+    return p.nombre?.toLowerCase().includes(q) || p.rol?.toLowerCase().includes(q) || getRoleLabel(p.rol, tr).toLowerCase().includes(q);
   });
 
   return (
@@ -138,7 +149,7 @@ export default function NewGroupScreen() {
             <ArrowLeft size={22} color={Colors.text} />
           </Pressable>
 
-          <Text style={styles.headerTitle}>NUEVO GRUPO</Text>
+          <Text style={styles.headerTitle}>{tr("NUEVO GRUPO")}</Text>
 
           <Pressable
             onPress={handleCreateGroup}
@@ -152,7 +163,7 @@ export default function NewGroupScreen() {
             {creating ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text style={styles.createActionText}>Crear</Text>
+              <Text style={styles.createActionText}>{tr("Crear")}</Text>
             )}
           </Pressable>
         </View>
@@ -177,7 +188,7 @@ export default function NewGroupScreen() {
                 ) : (
                   <View style={styles.photoPlaceholder}>
                     <Camera size={26} color={Colors.primary} />
-                    <Text style={styles.photoText}>FOTO</Text>
+                    <Text style={styles.photoText}>{tr("FOTO")}</Text>
                   </View>
                 )}
               </Pressable>
@@ -185,7 +196,7 @@ export default function NewGroupScreen() {
               <View style={styles.inputsColumn}>
                 <TextInput
                   style={styles.nameInput}
-                  placeholder="Nombre del grupo..."
+                  placeholder={tr("Nombre del grupo...")}
                   placeholderTextColor={Colors.textMuted}
                   value={nombre}
                   onChangeText={setNombre}
@@ -193,7 +204,7 @@ export default function NewGroupScreen() {
                 />
                 <TextInput
                   style={styles.descInput}
-                  placeholder="Descripción u objetivo del grupo..."
+                  placeholder={tr("Descripción u objetivo del grupo...")}
                   placeholderTextColor={Colors.textMuted}
                   value={descripcion}
                   onChangeText={setDescripcion}
@@ -202,16 +213,34 @@ export default function NewGroupScreen() {
               </View>
             </View>
 
+            {/* Villa vinculada (opcional) */}
+            <View style={styles.villaSection}>
+              <Text style={styles.villaLabel}>{tr("Villa vinculada (opcional)")}</Text>
+              <TaskFilterSelect
+                label={tr("Villa vinculada")}
+                value={selectedProjectId || ''}
+                options={[
+                  { value: '', label: tr("Ninguna (Chat general)") },
+                  ...availableProjects.map((p) => ({
+                    value: p.id,
+                    label: `${p.desarrollo} · ${p.villa || p.unidad}`,
+                  })),
+                ]}
+                onChange={(val) => setSelectedProjectId(val ? val : null)}
+              />
+              <Text style={styles.villaHint}>
+                {tr("Solo puedes vincular villas que tienes permitido consultar.")}
+              </Text>
+            </View>
+
             {/* Switch de Solo Multimedia */}
             <View style={styles.switchBox}>
               <View style={styles.switchInfo}>
                 <View style={styles.switchLabelRow}>
                   <Video size={16} color={Colors.primary} />
-                  <Text style={styles.switchLabel}>Modo Solo Multimedia</Text>
+                  <Text style={styles.switchLabel}>{tr("Modo Solo Multimedia")}</Text>
                 </View>
-                <Text style={styles.switchDesc}>
-                  Los técnicos solo podrán enviar fotos y videos (bloquea mensajes de texto).
-                </Text>
+                <Text style={styles.switchDesc}>{tr("Los técnicos solo podrán enviar fotos y videos (bloquea mensajes de texto).")}</Text>
               </View>
               <Switch
                 value={soloMultimedia}
@@ -226,8 +255,7 @@ export default function NewGroupScreen() {
           <View style={styles.membersSection}>
             <View style={styles.sectionHeader}>
               <Users size={16} color={Colors.primary} />
-              <Text style={styles.sectionTitle}>
-                INVITAR MIEMBROS ({selectedProfileIds.length})
+              <Text style={styles.sectionTitle}>{tr("INVITAR MIEMBROS (")}{selectedProfileIds.length})
               </Text>
             </View>
 
@@ -236,7 +264,7 @@ export default function NewGroupScreen() {
               <Search size={16} color={Colors.textSecondary} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Buscar por nombre o rol..."
+                placeholder={tr("Buscar por nombre o rol...")}
                 placeholderTextColor={Colors.textMuted}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -247,11 +275,11 @@ export default function NewGroupScreen() {
             {loadingProfiles ? (
               <View style={styles.loadingBox}>
                 <ActivityIndicator size="small" color={Colors.primary} />
-                <Text style={styles.loadingText}>Cargando equipo técnico...</Text>
+                <Text style={styles.loadingText}>{tr("Cargando equipo técnico...")}</Text>
               </View>
             ) : filteredProfiles.length === 0 ? (
               <View style={styles.emptyBox}>
-                <Text style={styles.emptyText}>No se encontraron usuarios</Text>
+                <Text style={styles.emptyText}>{tr("No se encontraron usuarios")}</Text>
               </View>
             ) : (
               <View style={styles.profilesList}>
@@ -275,10 +303,10 @@ export default function NewGroupScreen() {
 
                       <View style={styles.profileDetails}>
                         <Text style={styles.profileName} numberOfLines={1}>
-                          {p.nombre || 'Sin nombre'}
+                          {p.nombre || tr("Sin nombre")}
                         </Text>
                         <Text style={styles.profileRole} numberOfLines={1}>
-                          {p.rol ? p.rol.toUpperCase().replace(/_/g, ' ') : 'TÉCNICO'}
+                          {getRoleLabel(p.rol, tr).toUpperCase()}
                         </Text>
                       </View>
 
@@ -298,6 +326,54 @@ export default function NewGroupScreen() {
 }
 
 const styles = StyleSheet.create({
+  villaSection: {
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+  },
+  villaHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginBottom: 4,
+  },
+  villaLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  villaDesc: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.sm,
+  },
+  villaChipsList: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+    paddingVertical: 4,
+  },
+  villaChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs + 2,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  villaChipActive: {
+    backgroundColor: 'rgba(247, 140, 38, 0.12)',
+    borderColor: Colors.primary,
+  },
+  villaChipText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  villaChipTextActive: {
+    color: Colors.primary,
+    fontWeight: '700',
+  },
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
@@ -409,6 +485,23 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     borderWidth: 1,
     borderColor: '#E4E7EC',
+  },
+  villaSection: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderColor: '#E4E7EC',
+    gap: 6,
+  },
+  villaLabel: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 13,
+    color: Colors.text,
+  },
+  villaHint: {
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 11,
+    color: Colors.textSecondary,
   },
   switchBox: {
     flexDirection: 'row',

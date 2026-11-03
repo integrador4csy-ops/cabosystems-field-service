@@ -1,3 +1,4 @@
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal, ScrollView, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +10,7 @@ import type { Project } from '@/types/database';
 import { ProfileNavButton } from './ProfileNavButton';
 
 interface HeaderProps {
+  seamless?: boolean;
   selectorOnly?: boolean;
   showProjectSelector?: boolean;
   rightAccessory?: React.ReactNode;
@@ -31,6 +33,7 @@ export function useHeaderHeight() {
 }
 
 export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
+  seamless = false,
   selectorOnly = false,
   showProjectSelector = true,
   rightAccessory,
@@ -40,6 +43,7 @@ export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
   allProjectsSelected = false,
   onSelectAllProjects,
 }: HeaderProps = {}) {
+  const { t: tr } = useInterfaceTranslation();
   const context = useProjects();
   const projects = propProjects ?? context.projects;
   const selectedProjectId = propSelectedProjectId ?? context.selectedProjectId;
@@ -60,10 +64,10 @@ export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
   }, [projects]);
 
   const selected = allProjectsSelected ? undefined : projects.find((p) => p.id === selectedProjectId) ?? projects[0];
-  const displayCode = allProjectsSelected ? 'Todas las villas' : selected?.villa || selected?.unidad || 'Sin villa';
+  const displayCode = allProjectsSelected ? tr("Todas las villas") : selected?.villa || selected?.unidad || tr("Sin villa");
 
   return (
-    <View style={selectorOnly ? styles.selectorOnlyWrapper : styles.headerWrapper}>
+    <View style={selectorOnly ? styles.selectorOnlyWrapper : [styles.headerWrapper, seamless && styles.headerSeamless]}>
       <SafeAreaView edges={selectorOnly ? [] : ['top']} style={selectorOnly ? styles.selectorOnlySafeArea : styles.safeArea}>
         <View style={[styles.container, isTablet && styles.containerTablet, selectorOnly && styles.selectorOnlyContainer]}>
           {/* Logo Minimalista CSY en Modo Claro */}
@@ -91,7 +95,7 @@ export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
               ]}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel={`Filtrar por villa: ${displayCode}`}
+              accessibilityLabel={tr('Filtrar por villa: {value0}', {value0: displayCode})}
               accessibilityState={{ expanded: visible }}
               onPress={() => setVisible(true)}
             >
@@ -129,8 +133,8 @@ export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalTitle}>Ubicación Activa</Text>
-                <Text style={styles.modalSubtitle}>Selecciona el desarrollo o villa a operar</Text>
+                <Text style={styles.modalTitle}>{tr("Ubicación Activa")}</Text>
+                <Text style={styles.modalSubtitle}>{tr("Selecciona el desarrollo o villa a operar")}</Text>
               </View>
               <Pressable
                 onPress={() => setVisible(false)}
@@ -148,7 +152,7 @@ export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
                 style={[styles.unitRow, allProjectsSelected && styles.unitRowSelected]}
                 onPress={() => { onSelectAllProjects(); setVisible(false); }}
               >
-                <Text style={[styles.unitCode, allProjectsSelected && styles.unitCodeSelected]}>Todas las villas</Text>
+                <Text style={[styles.unitCode, allProjectsSelected && styles.unitCodeSelected]}>{tr("Todas las villas")}</Text>
                 {allProjectsSelected ? <Check color="#FFFFFF" size={16} /> : null}
               </Pressable> : null}
               {grouped.map(([desarrollo, units]) => (
@@ -205,6 +209,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
     ...Shadow.xs,
+  },
+  headerSeamless: {
+    borderBottomWidth: 0,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+    boxShadow: 'none',
   },
   safeArea: {
     backgroundColor: '#FFFFFF',

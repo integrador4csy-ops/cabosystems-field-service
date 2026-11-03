@@ -4,6 +4,7 @@ import { ArrowDownWideNarrow, ArrowUpNarrowWide, ChevronRight, Columns3, Downloa
 import { useSessionPreference } from '../../hooks/useSessionPreference';
 import { isStringPreference } from '../../lib/sessionPreferences';
 import { useTranslation } from '../../context/LanguageContext';
+import { useSidebar } from '../../context/SidebarContext';
 import { dateKey } from '../../lib/taskDates';
 import { countTaskStatuses, filterWorkspaceTasks, sortWorkspaceTasks, taskVillaScope } from '../../lib/taskFilters';
 import type { Proyecto, Tarea } from '../../types/projects';
@@ -28,6 +29,13 @@ const statusOptions = [
   { value: 'completada', label: 'Completadas' },
 ] as const;
 
+const priorityOptions = [
+  { value: 'all', label: 'Todas las prioridades' },
+  { value: 'alta', label: 'Alta' },
+  { value: 'media', label: 'Media' },
+  { value: 'baja', label: 'Baja' },
+] as const;
+
 interface TaskWorkspaceProps {
   mode: 'tasks' | 'agenda';
   projects: Proyecto[];
@@ -44,6 +52,7 @@ interface TaskWorkspaceProps {
 
 export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, searchQuery, createVersion, onReload, onMoveTask, onDeleteProject }: TaskWorkspaceProps) {
   const { t, locale } = useTranslation();
+  const { targetTaskId, setTargetTaskId } = useSidebar();
   const { isAdmin, user } = useAdminAuth();
   const [reportOpen, setReportOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
@@ -54,6 +63,7 @@ export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, se
   const [projectId, setProjectId] = useSessionPreference('csy_task_project', 'all', isStringPreference);
   const [assignee, setAssignee] = useSessionPreference('csy_task_assignee', 'all', isStringPreference);
   const [status, setStatus] = useSessionPreference('csy_task_status', 'all', (value): value is string => statusOptions.some((option) => option.value === value));
+  const [priority, setPriority] = useSessionPreference('csy_task_priority', 'all', (value): value is string => priorityOptions.some((option) => option.value === value));
   const [view, setView] = useState<'board' | 'list'>(() => { try { return localStorage.getItem('csy_task_view') === 'list' ? 'list' : 'board'; } catch { return 'board'; } });
   const [expanded, setExpanded] = useState(new Set<string>());
   const [catalogOpen, setCatalogOpen] = useState(false);
@@ -75,8 +85,8 @@ export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, se
   // A removed project no longer constrains the view after a realtime update.
   const effectiveProject = projects.some((project) => project.id === projectId) ? projectId : 'all';
   const globalSearch = mode === 'tasks' && Boolean(searchQuery.trim());
-  const activeFilterCount = [mode === 'tasks' ? 'all' : development, mode === 'tasks' ? 'all' : effectiveProject, assignee, status].filter((value) => value !== 'all').length;
-  const matchingTasks = useMemo(() => filterWorkspaceTasks(tasks, projects, { query: searchQuery, development: mode === 'tasks' ? 'all' : development, project: mode === 'tasks' ? 'all' : effectiveProject, assignee, status: 'all' }), [tasks, projects, searchQuery, development, effectiveProject, assignee, mode]);
+  const activeFilterCount = [mode === 'tasks' ? 'all' : development, mode === 'tasks' ? 'all' : effectiveProject, assignee, status, priority].filter((value) => value !== 'all').length;
+  const matchingTasks = useMemo(() => filterWorkspaceTasks(tasks, projects, { query: searchQuery, development: mode === 'tasks' ? 'all' : development, project: mode === 'tasks' ? 'all' : effectiveProject, assignee, status: 'all', priority }), [tasks, projects, searchQuery, development, effectiveProject, assignee, priority, mode]);
   const selectedVilla = useMemo(() => mode === 'tasks' ? taskVillaScope(projects, matchingTasks, searchQuery, effectiveProject) : undefined, [mode, projects, matchingTasks, searchQuery, effectiveProject]);
   const scopedTasks = useMemo(() => mode === 'tasks' ? matchingTasks.filter(task => task.proyecto_id === selectedVilla?.id) : matchingTasks, [mode, matchingTasks, selectedVilla]);
   const visible = useMemo(() => {
@@ -85,6 +95,22 @@ export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, se
   }, [scopedTasks, status, mode, sortOrder, locale]);
   const statusCounts = useMemo(() => countTaskStatuses(scopedTasks, mode === 'agenda' ? agendaView === 'unscheduled' ? 'unscheduled' : 'scheduled' : 'all'), [scopedTasks, mode, agendaView]);
   const modalProject = projects.find((project) => project.id === taskToEdit?.proyecto_id) || selectedVilla || projects.find((project) => project.id === effectiveProject) || availableProjects[0] || projects[0];
+
+  useEffect(() => {
+    if (!targetTaskId || loading) return;
+    const target = tasks.find(task => task.id === targetTaskId);
+    if (!target) { setActionError(t('No se pudo abrir la tarea. Puede haber sido eliminada o no tienes acceso.')); setTargetTaskId(null); return; }
+    setProjectId(target.proyecto_id);
+    setAssignee('all'); setStatus('all'); setPriority('all'); setView('list');
+    setExpanded(previous => new Set([...previous, target.id]));
+    const timer = setTimeout(() => {
+      const element = document.getElementById(`task-card-${target.id}`);
+      element?.scrollIntoView({ block: 'center', behavior: 'auto' });
+      element?.focus({ preventScroll: true });
+      setTargetTaskId(null);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [targetTaskId, loading, tasks, setTargetTaskId, setProjectId, setAssignee, setStatus, setPriority, t]);
 
   useEffect(() => {
     if (seenCreateVersion.current === createVersion || loading) return;
@@ -112,6 +138,7 @@ export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, se
     setProjectId(selectedVilla?.id ?? 'all');
     setAssignee('all');
     setStatus('all');
+    setPriority('all');
   };
   const changeView = (next: 'board' | 'list') => { setView(next); try { localStorage.setItem('csy_task_view', next); } catch { /* Storage is optional. */ } };
   const refresh = async () => {
@@ -127,7 +154,16 @@ export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, se
     try { await onDeleteProject(project); } catch { setActionError('No se pudo eliminar la villa. Intenta de nuevo.'); } finally { setDeletingId(null); }
   };
 
-  const assigneeSelect = <AppSelect aria-label={t('Responsable')} value={assignee} onChange={(event) => setAssignee(event.target.value)}><option value="all">{t('Cualquier responsable')}</option><option value="unassigned">{t('Sin asignar')}</option>{staff.map((person) => <option key={person.id} value={person.id}>{person.nombre || person.full_name || person.email}</option>)}</AppSelect>;
+  const assigneeSelect = (
+    <AppSelect aria-label={t('Responsable')} value={assignee} onChange={(event) => setAssignee(event.target.value)}>
+      <option value="all">{t('Todas las tareas de la villa')}</option>
+      {user?.id && <option value={user.id}>{t('Mis tareas')}</option>}
+      <option value="unassigned">{t('Sin asignar')}</option>
+      {staff.filter((person) => person.id !== user?.id).map((person) => (
+        <option key={person.id} value={person.id}>{person.nombre || person.full_name || person.email}</option>
+      ))}
+    </AppSelect>
+  );
   const assigneeControl = <label>{t('Responsable')}{assigneeSelect}</label>;
   const templateApplied = () => {
     setTemplateOpen(false);
@@ -161,6 +197,7 @@ export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, se
       <div className="workspace-filter-group workspace-work-filters">
       {mode === 'agenda' && assigneeControl}
       <label>{t('Estado')}<AppSelect aria-label={t('Estado')} value={status} onChange={(event) => setStatus(event.target.value)}>{statusOptions.map((option) => <option key={option.value} value={option.value}>{t(option.label)} ({statusCounts[option.value]})</option>)}</AppSelect></label>
+      <label>{t('Prioridad')}<AppSelect aria-label={t('Prioridad')} value={priority} onChange={(event) => setPriority(event.target.value)}>{priorityOptions.map((option) => <option key={option.value} value={option.value}>{t(option.label)}</option>)}</AppSelect></label>
       </div>
       {mode === 'agenda' && activeFilterCount > 0 && <button type="button" className="workspace-clear-filters" onClick={clearFilters}>{t('Limpiar filtros')}</button>}
     </div><div className="workspace-tools"><button type="button" className="workspace-button workspace-mobile-filter-toggle" aria-expanded={mobileFiltersOpen} aria-controls={filterId} onClick={() => setMobileFiltersOpen((previous) => !previous)}><SlidersHorizontal size={15} aria-hidden="true" />{t('Filtros')}{activeFilterCount > 0 && <span>{activeFilterCount}</span>}</button></div></div>}
@@ -172,7 +209,8 @@ export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, se
         <div className="workspace-compact-filters">
           <label className="workspace-compact-assignee"><span className="sr-only">{t('Responsable')}</span>{assigneeSelect}</label>
           <label className="workspace-compact-status"><span className="sr-only">{t('Estado')}</span><AppSelect aria-label={t('Estado')} title={t('Estado')} value={status} onChange={event => setStatus(event.target.value)}>{statusOptions.map(option => <option key={option.value} value={option.value}>{t(option.label)} ({statusCounts[option.value]})</option>)}</AppSelect></label>
-          <button type="button" role="switch" aria-checked={sortOrder === 'desc'} aria-label={t('Orden descendente')} title={t(sortOrder === 'asc' ? 'Ascendente' : 'Descendente')} className="workspace-sort-switch" onClick={() => setSortOrder(previous => previous === 'asc' ? 'desc' : 'asc')}>
+          <label className="workspace-compact-priority"><span className="sr-only">{t('Prioridad')}</span><AppSelect aria-label={t('Prioridad')} title={t('Prioridad')} value={priority} onChange={event => setPriority(event.target.value)}>{priorityOptions.map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}</AppSelect></label>
+          <button type="button" role="switch" aria-checked={sortOrder === 'desc'} aria-label={t('Orden de títulos dentro de cada prioridad')} title={t(sortOrder === 'asc' ? 'Títulos ascendentes dentro de cada prioridad' : 'Títulos descendentes dentro de cada prioridad')} className="workspace-sort-switch" onClick={() => setSortOrder(previous => previous === 'asc' ? 'desc' : 'asc')}>
             {sortOrder === 'asc' ? <ArrowUpNarrowWide size={16} aria-hidden="true"/> : <ArrowDownWideNarrow size={16} aria-hidden="true"/>}
           </button>
           {activeFilterCount > 0 && <button type="button" className="workspace-compact-reset" onClick={clearFilters} aria-label={t('Limpiar filtros')} title={t('Limpiar filtros')}><RotateCcw size={14} aria-hidden="true"/></button>}

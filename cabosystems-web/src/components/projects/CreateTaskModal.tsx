@@ -44,6 +44,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const [descripcion, setDescripcion] = useState('');
   const [asignadoA, setAsignadoA] = useState('');
   const [estatus, setEstatus] = useState<'pendiente' | 'en_proceso' | 'completada'>('pendiente');
+  const [prioridad, setPrioridad] = useState<'baja' | 'media' | 'alta'>('media');
   const [projectId, setProjectId] = useState(project.id);
   const [scheduledDate, setScheduledDate] = useState('');
   const selectedProject = projects?.find((item) => item.id === projectId) || project;
@@ -59,6 +60,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       setDescripcion(taskToEdit.descripcion || '');
       setAsignadoA(taskToEdit.asignado_a || '');
       setEstatus(taskToEdit.estatus);
+      setPrioridad(taskToEdit.prioridad || 'media');
       setInitialSubtasks([]);
     } else {
       setProjectId(project.id);
@@ -67,6 +69,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       setDescripcion('');
       setAsignadoA('');
       setEstatus('pendiente');
+      setPrioridad('media');
       setInitialSubtasks(['']);
     }
     setError(null);
@@ -108,6 +111,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           descripcion: descripcion.trim() || null,
           asignado_a: assigneeId,
           estatus,
+          prioridad,
           fecha_programada: scheduledDate || null,
         });
       } else {
@@ -117,6 +121,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           titulo: titulo.trim(),
           descripcion: descripcion.trim() || undefined,
           estatus,
+          prioridad,
           fecha_programada: scheduledDate || null,
         });
 
@@ -240,6 +245,15 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-700" htmlFor="task-priority">{t('Prioridad')}</label>
+            <AppSelect id="task-priority" aria-label={t('Prioridad')} value={prioridad} onChange={(event) => setPrioridad(event.target.value as typeof prioridad)} className="h-11">
+              <option value="alta">{t('Alta')}</option>
+              <option value="media">{t('Media')}</option>
+              <option value="baja">{t('Baja')}</option>
+            </AppSelect>
           </div>
 
           {/* Descripción */}

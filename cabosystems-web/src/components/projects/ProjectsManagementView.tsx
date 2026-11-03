@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { deleteProject, getAssignableStaff, getProjects, getTasksByProject, updateTask } from '../../lib/projectsApi';
+import { deleteProject, getAssignableStaff, getProjects, getTasksByProject } from '../../lib/projectsApi';
 import { useSidebar } from '../../context/SidebarContext';
 import type { Proyecto, Tarea } from '../../types/projects';
 import type { Profile } from '../../types/fleet';
@@ -37,7 +37,8 @@ export function ProjectsManagementView({ mode = 'tasks' }: { mode?: 'tasks' | 'a
       setStaff(nextStaff);
       hasLoaded.current = true;
       setError(null);
-    } catch {
+    } catch (err) {
+      console.error('Error loading task snapshot:', err);
       if (version === requestVersion.current) setError('No se pudieron cargar las tareas. Intenta de nuevo.');
     } finally {
       if (version === requestVersion.current) { setLoading(false); resources.markReady(); }
@@ -57,9 +58,8 @@ export function ProjectsManagementView({ mode = 'tasks' }: { mode?: 'tasks' | 'a
   }, [loadData]);
 
   const moveTask = async (task: Tarea, status: Tarea['estatus']) => {
-    const updated = await updateTask(task.id, { estatus: status });
     resources.queries.invalidate('tasks');
-    setTasks((previous) => previous.map((item) => item.id === task.id ? { ...item, ...updated, subtareas: item.subtareas } : item));
+    setTasks((previous) => previous.map((item) => item.id === task.id ? { ...item, estatus: status } : item));
   };
 
   const removeProject = async (project: Proyecto) => {

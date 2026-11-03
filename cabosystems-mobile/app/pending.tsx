@@ -1,3 +1,4 @@
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import { useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -6,6 +7,7 @@ import { Colors, Spacing, BorderRadius } from '@/constants/Theme';
 import { useAuth } from '@/lib/auth';
 
 export default function PendingScreen() {
+  const { t: tr } = useInterfaceTranslation();
   const { user } = useAuth();
   const router = useRouter();
 
@@ -21,16 +23,14 @@ export default function PendingScreen() {
           <ShieldCheck size={50} color={Colors.primary} strokeWidth={2.2} />
         </View>
 
-        <Text style={styles.title}>Acceso Autorizado</Text>
-        <Text style={styles.subtitle}>
-          Tu cuenta de CaboSystems está activa. Redirigiendo a tu panel de tareas...
-        </Text>
+        <Text style={styles.title}>{tr("Acceso Autorizado")}</Text>
+        <Text style={styles.subtitle}>{tr("Tu cuenta de CaboSystems está activa. Redirigiendo a tu panel de tareas...")}</Text>
 
         <Pressable
           style={({ pressed }) => [styles.continueButton, pressed && { opacity: 0.88 }]}
           onPress={() => router.replace('/(tabs)')}
         >
-          <Text style={styles.continueText}>Entrar a Tareas</Text>
+          <Text style={styles.continueText}>{tr("Entrar a Tareas")}</Text>
           <ArrowRight size={18} color="#FFFFFF" />
         </Pressable>
       </View>

@@ -8,7 +8,6 @@ import { supabase } from '../../lib/supabase';
 import type { Invitacion } from '../../types/admin';
 import {
   Clock,
-  UserPlus,
   Mail,
   Trash2,
   X,
@@ -22,13 +21,11 @@ import '../AdminUsersModal.css';
 interface InvitationsSectionProps {
   active: boolean;
   refreshVersion?: number;
-  onOpenInvite?: () => void;
 }
 
 export const InvitationsSection: React.FC<InvitationsSectionProps> = ({
   active,
   refreshVersion = 0,
-  onOpenInvite,
 }) => {
   const { t, locale } = useTranslation();
   const resources = useSectionResources();
@@ -180,17 +177,6 @@ export const InvitationsSection: React.FC<InvitationsSectionProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {onOpenInvite && (
-              <button
-                className="team-invite-button flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors"
-                onClick={() => {
-                  onOpenInvite();
-                }}
-              >
-                <UserPlus size={14} />
-                <span>{t("+ Nueva Invitación")}</span>
-              </button>
-            )}
             <button
               className="refresh-btn"
               onClick={() => void loadData()}

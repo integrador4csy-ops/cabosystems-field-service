@@ -1,6 +1,6 @@
 import type { Profile } from './fleet';
 
-export type ChatMessageType = 'texto' | 'imagen' | 'video' | 'sticker';
+export type ChatMessageType = 'texto' | 'imagen' | 'video' | 'sticker' | 'archivo' | 'audio' | 'sistema';
 export type ChatMemberRole = 'admin' | 'miembro';
 
 export interface ChatReaction {
@@ -12,6 +12,31 @@ export interface ChatReaction {
   profiles?: { nombre: string } | null;
 }
 
+export interface ChatMessageMediaMeta {
+  width?: number;
+  height?: number;
+  duration?: number;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
+  system_type?: string;
+  task_activity_id?: string;
+  request_id?: string;
+  task_id?: string;
+  task_title?: string;
+  project_id?: string;
+  desarrollo?: string;
+  villa?: string;
+  subtask_id?: string;
+  subtask_title?: string;
+  action?: string;
+  anterior?: string;
+  siguiente?: string;
+  estado?: string;
+  comentario?: string;
+  evidencia_path?: string;
+}
+
 export interface ChatMessage {
   id: string;
   grupo_id: string;
@@ -20,13 +45,7 @@ export interface ChatMessage {
   contenido: string | null;
   media_url: string | null;
   media_thumbnail_url: string | null;
-  media_meta?: {
-    width?: number;
-    height?: number;
-    duration?: number;
-    fileName?: string;
-    fileSize?: number;
-  } | null;
+  media_meta?: ChatMessageMediaMeta | null;
   created_at: string;
   profiles?: Profile | null;
   reacciones?: ChatReaction[];
@@ -49,8 +68,14 @@ export interface ChatGroup {
   foto_url: string | null;
   creado_por: string;
   solo_multimedia: boolean;
+  proyecto_id?: string | null;
   created_at: string;
   // Campos computados / joins
+  proyecto?: {
+    id: string;
+    desarrollo: string;
+    villa: string;
+  } | null;
   miembros_count?: number;
   ultimo_mensaje?: ChatMessage | null;
   mi_rol?: ChatMemberRole;

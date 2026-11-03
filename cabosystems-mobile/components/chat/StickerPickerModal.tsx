@@ -1,3 +1,4 @@
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -29,6 +30,7 @@ export default function StickerPickerModal({
   onSelectSticker,
   userId,
 }: StickerPickerModalProps) {
+  const { t: tr } = useInterfaceTranslation();
   const [stickers, setStickers] = useState<ChatSticker[]>([]);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
@@ -65,10 +67,10 @@ export default function StickerPickerModal({
 
       const newSticker = await uploadSticker(userId, file.uri, file.name);
       setStickers((prev) => [newSticker, ...prev]);
-      Alert.alert('¡Sticker importado!', 'El sticker de WhatsApp se ha guardado en tu colección.');
+      Alert.alert(tr("¡Sticker importado!"), tr("El sticker de WhatsApp se ha guardado en tu colección."));
     } catch (err: any) {
       console.error('Error importing sticker:', err);
-      Alert.alert('Error', 'No se pudo importar el sticker. Asegúrate de que sea formato .webp.');
+      Alert.alert(tr("Error"), tr("No se pudo importar el sticker. Asegúrate de que sea formato .webp."));
     } finally {
       setImporting(false);
     }
@@ -82,7 +84,7 @@ export default function StickerPickerModal({
           <View style={styles.header}>
             <View style={styles.titleRow}>
               <Sparkles size={18} color={Colors.primary} />
-              <Text style={styles.title}>Stickers de WhatsApp</Text>
+              <Text style={styles.title}>{tr("Stickers de WhatsApp")}</Text>
             </View>
             <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={10}>
               <X size={20} color={Colors.textSecondary} />
@@ -100,7 +102,7 @@ export default function StickerPickerModal({
             ) : (
               <>
                 <FolderDown size={18} color="#ffffff" />
-                <Text style={styles.importBtnText}>Importar Sticker de WhatsApp (.webp)</Text>
+                <Text style={styles.importBtnText}>{tr("Importar Sticker de WhatsApp (.webp)")}</Text>
               </>
             )}
           </Pressable>
@@ -109,15 +111,13 @@ export default function StickerPickerModal({
           {loading ? (
             <View style={styles.centerBox}>
               <ActivityIndicator size="large" color={Colors.primary} />
-              <Text style={styles.loadingText}>Cargando colección...</Text>
+              <Text style={styles.loadingText}>{tr("Cargando colección...")}</Text>
             </View>
           ) : stickers.length === 0 ? (
             <View style={styles.emptyBox}>
               <Sparkles size={36} color={Colors.textMuted} />
-              <Text style={styles.emptyTitle}>Sin stickers guardados</Text>
-              <Text style={styles.emptySubtitle}>
-                Importa tus stickers favoritos de WhatsApp (archivos .webp) para usarlos en el chat de CaboSystems.
-              </Text>
+              <Text style={styles.emptyTitle}>{tr("Sin stickers guardados")}</Text>
+              <Text style={styles.emptySubtitle}>{tr("Importa tus stickers favoritos de WhatsApp (archivos .webp) para usarlos en el chat de CaboSystems.")}</Text>
             </View>
           ) : (
             <ScrollView contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false}>

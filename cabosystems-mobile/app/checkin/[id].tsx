@@ -1,3 +1,5 @@
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
+import { getLocale } from '@/lib/localization';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
@@ -99,6 +101,7 @@ interface CameraSectionProps {
 }
 
 function FallbackCameraSection({ onCapture }: { onCapture: (uri: string) => void }) {
+  const { t: tr } = useInterfaceTranslation();
   const fileInputRef = useRef<any>(null);
 
   const handleFileChange = (e: any) => {
@@ -134,10 +137,10 @@ function FallbackCameraSection({ onCapture }: { onCapture: (uri: string) => void
         ctx.fillText('CABOSYSTEMS FIELD EVIDENCE', 40, 60);
         ctx.fillStyle = '#f78c26';
         ctx.font = '14px sans-serif';
-        ctx.fillText(`FECHA: ${new Date().toLocaleString()}`, 40, 90);
+        ctx.fillText(tr("FECHA: {value0}", { value0: new Date().toLocaleString() }), 40, 90);
         ctx.fillStyle = '#ffffff';
         ctx.font = '14px sans-serif';
-        ctx.fillText('ESTADO: TELEMETRÍA Y COORDENADAS VALID️ADAS', 40, 120);
+        ctx.fillText(tr("ESTADO: TELEMETRÍA Y COORDENADAS VALID️ADAS"), 40, 120);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
         onCapture(dataUrl);
         return;
@@ -162,11 +165,11 @@ function FallbackCameraSection({ onCapture }: { onCapture: (uri: string) => void
       )}
 
       <CameraIcon size={38} color={Colors.primary} />
-      <Text style={styles.fallbackCaptureTitle}>Captura de Evidencia Fotográfica</Text>
+      <Text style={styles.fallbackCaptureTitle}>{tr("Captura de Evidencia Fotográfica")}</Text>
       <Text style={styles.fallbackCaptureSubtitle}>
         {Platform.OS === 'web'
-          ? 'Toma una foto con tu cámara web/móvil o selecciona una evidencia de prueba.'
-          : 'Módulo nativo no disponible en este cliente. Selecciona una evidencia de campo para continuar:'}
+          ? tr("Toma una foto con tu cámara web/móvil o selecciona una evidencia de prueba.")
+          : tr("Módulo nativo no disponible en este cliente. Selecciona una evidencia de campo para continuar:")}
       </Text>
 
       {Platform.OS === 'web' && (
@@ -179,7 +182,7 @@ function FallbackCameraSection({ onCapture }: { onCapture: (uri: string) => void
           }}
         >
           <Upload size={16} color={Colors.textWhite} />
-          <Text style={styles.webButtonText}>Tomar / Subir Foto Local</Text>
+          <Text style={styles.webButtonText}>{tr("Tomar / Subir Foto Local")}</Text>
         </Pressable>
       )}
 
@@ -194,7 +197,7 @@ function FallbackCameraSection({ onCapture }: { onCapture: (uri: string) => void
             >
               <Icon size={18} color={Colors.primary} />
               <Text style={styles.presetText} numberOfLines={1}>
-                {preset.label}
+                {tr(preset.label)}
               </Text>
             </Pressable>
           );
@@ -206,7 +209,7 @@ function FallbackCameraSection({ onCapture }: { onCapture: (uri: string) => void
         onPress={handleGenerateSamplePhoto}
       >
         <Sparkles size={14} color={Colors.textWhite} />
-        <Text style={styles.sampleButtonText}>Generar Evidencia Telemetría CSY</Text>
+        <Text style={styles.sampleButtonText}>{tr("Generar Evidencia Telemetría CSY")}</Text>
       </Pressable>
     </View>
   );
@@ -233,6 +236,7 @@ function NativeCameraViewInner({
   fullscreen?: boolean;
   onExpand?: () => void;
 }) {
+  const { t: tr } = useInterfaceTranslation();
   const [permission, requestPermission] = useCameraPermissions ? useCameraPermissions() : [null, null];
 
   const handleCapture = async () => {
@@ -244,7 +248,7 @@ function NativeCameraViewInner({
       }
     } catch (err: any) {
       console.error('Error capturing photo:', err);
-      Alert.alert('Error', 'No se pudo capturar la fotografía');
+      Alert.alert(tr("Error"), tr("No se pudo capturar la fotografía"));
     }
   };
 
@@ -260,15 +264,13 @@ function NativeCameraViewInner({
     return (
       <View style={styles.permissionContainer}>
         <CameraIcon size={48} color={Colors.primary} />
-        <Text style={styles.permissionTitle}>Permiso de Cámara Requerido</Text>
-        <Text style={styles.permissionSubtitle}>
-          Es necesario capturar evidencia fotográfica para registrar el evento en sitio.
-        </Text>
+        <Text style={styles.permissionTitle}>{tr("Permiso de Cámara Requerido")}</Text>
+        <Text style={styles.permissionSubtitle}>{tr("Es necesario capturar evidencia fotográfica para registrar el evento en sitio.")}</Text>
         <Pressable
           style={({ pressed }) => [styles.permissionButton, pressed && { opacity: 0.85 }]}
           onPress={requestPermission}
         >
-          <Text style={styles.permissionButtonText}>Habilitar Cámara</Text>
+          <Text style={styles.permissionButtonText}>{tr("Habilitar Cámara")}</Text>
         </Pressable>
       </View>
     );
@@ -295,7 +297,7 @@ function NativeCameraViewInner({
           onPress={() => setFacing(facing === 'back' ? 'front' : 'back')}
         >
           <RotateCcw size={22} color={Colors.textWhite} />
-          <Text style={styles.controlText}>GIRAR</Text>
+          <Text style={styles.controlText}>{tr("GIRAR")}</Text>
         </Pressable>
 
         <Pressable
@@ -305,9 +307,9 @@ function NativeCameraViewInner({
           <View style={styles.captureButtonInner} />
         </Pressable>
 
-        {onExpand ? <Pressable accessibilityRole="button" accessibilityLabel="Abrir cámara a pantalla completa" onPress={onExpand} style={({ pressed }) => [styles.controlButton, pressed && { opacity: 0.7 }]}>
+        {onExpand ? <Pressable accessibilityRole="button" accessibilityLabel={tr("Abrir cámara a pantalla completa")} onPress={onExpand} style={({ pressed }) => [styles.controlButton, pressed && { opacity: 0.7 }]}>
           <Maximize2 size={22} color={Colors.textWhite} />
-          <Text style={styles.controlText} numberOfLines={1}>AMPLIAR</Text>
+          <Text style={styles.controlText} numberOfLines={1}>{tr("AMPLIAR")}</Text>
         </Pressable> : <View style={styles.controlPlaceholder} />}
       </View>
     </View>
@@ -387,6 +389,7 @@ function CameraSection({ onCapture, flash, onToggleFlash, fullscreen, onExpand }
 }
 
 export default function CheckinScreen({ embedded = false }: { embedded?: boolean } = {}) {
+  const { t: tr } = useInterfaceTranslation();
   const { id, type } = useLocalSearchParams<{ id: string; type?: string }>();
   const router = useRouter();
   const leaveCheckin = () => {
@@ -535,22 +538,22 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
         setLocationCoords({ latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy });
         return position.coords;
       } else {
-        if (!checkNativeModule('ExpoLocation')) throw new Error('GPS no disponible. Instala la compilación actual de la app.');
+        if (!checkNativeModule('ExpoLocation')) throw new Error(tr("GPS no disponible. Instala la compilación actual de la app."));
         const Location = require('expo-location') as typeof import('expo-location');
         const permission = await Location.requestForegroundPermissionsAsync();
-        if (permission.status !== 'granted') throw new Error('Permiso de GPS no concedido.');
+        if (permission.status !== 'granted') throw new Error(tr("Permiso de GPS no concedido."));
         const recent = await Location.getLastKnownPositionAsync({ maxAge: 60000, requiredAccuracy: 100 });
         const position = recent || await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        if (!Number.isFinite(position.coords.latitude) || !Number.isFinite(position.coords.longitude)) throw new Error('No se pudo obtener una ubicación válida.');
+        if (!Number.isFinite(position.coords.latitude) || !Number.isFinite(position.coords.longitude)) throw new Error(tr("No se pudo obtener una ubicación válida."));
         locationTimestamp.current = position.timestamp;
         setLocationCoords(position.coords);
         return position.coords;
       }
     } catch (error) {
-      setLocationError(error instanceof Error ? error.message : 'No se pudo obtener el GPS. Vuelve a intentarlo.');
+      setLocationError(error instanceof Error ? error.message : tr("No se pudo obtener el GPS. Vuelve a intentarlo."));
       return null;
     } finally { setLocationLoading(false); }
-  }, []);
+  }, [tr]);
 
   useEffect(() => {
     if (cameraActive) void fetchLocation();
@@ -574,8 +577,8 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
       setFeedbackModal({
         visible: true,
         type: 'warning',
-        title: 'Foto Requerida',
-        message: 'Debes capturar o seleccionar una evidencia fotográfica.',
+        title: tr("Foto Requerida"),
+        message: tr("Debes capturar o seleccionar una evidencia fotográfica."),
       });
       return;
     }
@@ -584,8 +587,8 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
       setFeedbackModal({
         visible: true,
         type: 'warning',
-        title: 'GPS Requerido',
-        message: 'Se requieren coordenadas GPS válidas para el registro.',
+        title: tr("GPS Requerido"),
+        message: tr("Se requieren coordenadas GPS válidas para el registro."),
       });
       return;
     }
@@ -594,8 +597,8 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
       setFeedbackModal({
         visible: true,
         type: 'error',
-        title: 'Sesión no Válida',
-        message: 'Sesión no válida o expirada. Por favor vuelve a iniciar sesión.',
+        title: tr("Sesión no Válida"),
+        message: tr("Sesión no válida o expirada. Por favor vuelve a iniciar sesión."),
       });
       return;
     }
@@ -604,8 +607,8 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
       setFeedbackModal({
         visible: true,
         type: 'warning',
-        title: 'Selecciona una Villa',
-        message: 'No hay una villa seleccionada para asociar el registro.',
+        title: tr("Selecciona una Villa"),
+        message: tr("No hay una villa seleccionada para asociar el registro."),
       });
       return;
     }
@@ -614,13 +617,13 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
     setIsSubmitting(true);
     try {
       const submissionLocation = Date.now() - locationTimestamp.current > 120_000 ? await fetchLocation() : locationCoords;
-      if (!submissionLocation) throw new Error('No se pudo validar una ubicación reciente. Comprueba el GPS y vuelve a intentarlo.');
+      if (!submissionLocation) throw new Error(tr("No se pudo validar una ubicación reciente. Comprueba el GPS y vuelve a intentarlo."));
       if (Platform.OS !== 'web') {
         await queueFieldRecord({ owner: user.id, projectId: currentProject.id, photoUri,
           tipo: isCheckOut ? 'check_out' : 'check_in', latitude: submissionLocation.latitude,
           longitude: submissionLocation.longitude, comments: notes.trim() || null });
-        setFeedbackModal({ visible: true, type: 'success', title: 'Registro guardado en el dispositivo',
-          message: 'La foto, la ubicación y la hora quedaron guardadas. Se enviará automáticamente cuando la app esté abierta y tenga conexión. Puedes consultar los pendientes en el aviso de sincronización.', onClose: leaveCheckin });
+        setFeedbackModal({ visible: true, type: 'success', title: tr("Registro guardado en el dispositivo"),
+          message: tr("La foto, la ubicación y la hora quedaron guardadas. Se enviará automáticamente cuando la app esté abierta y tenga conexión. Puedes consultar los pendientes en el aviso de sincronización."), onClose: leaveCheckin });
         return;
       }
       // Obtener o asociar automáticamente la orden de trabajo para esta villa
@@ -645,10 +648,10 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
       setFeedbackModal({
         visible: true,
         type: 'success',
-        title: isCheckOut ? 'Check-Out Registrado' : 'Check-In Registrado',
+        title: isCheckOut ? tr("Check-Out Registrado") : tr("Check-In Registrado"),
         message: isCheckOut
-          ? `Se registró tu salida de ${projectVilla} (${currentProject.desarrollo}) con éxito.`
-          : `Se registró tu llegada a ${projectVilla} (${currentProject.desarrollo}) con éxito.`,
+          ? tr("Se registró tu salida de {value0} ({value1}) con éxito.", { value0: projectVilla, value1: currentProject.desarrollo })
+          : tr("Se registró tu llegada a {value0} ({value1}) con éxito.", { value0: projectVilla, value1: currentProject.desarrollo }),
         onClose: leaveCheckin,
       });
     } catch (err: any) {
@@ -656,8 +659,8 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
       setFeedbackModal({
         visible: true,
         type: 'error',
-        title: 'Error al Guardar',
-        message: err?.message || 'Ocurrió un error al registrar en la base de datos.',
+        title: tr("Error al Guardar"),
+        message: err?.message || tr("Ocurrió un error al registrar en la base de datos."),
       });
     } finally {
       submittingRef.current = false;
@@ -665,7 +668,7 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
     }
   };
 
-  const submitText = isCheckOut ? 'Registrar Check-out' : 'Registrar Check-in';
+  const submitText = isCheckOut ? tr("Registrar Check-out") : tr("Registrar Check-in");
 
   return (
     <View style={styles.container}>
@@ -689,7 +692,7 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
                 <Image source={{ uri: photoUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
                 <View style={styles.previewBadge}>
                   <Check size={14} color={Colors.textWhite} />
-                  <Text style={styles.previewBadgeText}>EVIDENCIA CAPTURADA</Text>
+                  <Text style={styles.previewBadgeText}>{tr("EVIDENCIA CAPTURADA")}</Text>
                 </View>
                 <View style={styles.previewControls}>
                   <Pressable
@@ -697,17 +700,17 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
                     onPress={handleRetakePhoto}
                   >
                     <RotateCcw size={16} color={Colors.textWhite} />
-                    <Text style={styles.retakeText}>REPETIR / CAMBIAR</Text>
+                    <Text style={styles.retakeText}>{tr("REPETIR / CAMBIAR")}</Text>
                   </Pressable>
                 </View>
               </View>
             ) : (
               cameraActive && !cameraFullscreen ? <CameraSection onCapture={handleCapturePhoto} flash={flash} onToggleFlash={toggleFlash} onExpand={() => setCameraFullscreen(true)} /> : null
             )}
-              <Pressable accessibilityRole="button" accessibilityLabel={flash === 'on' ? 'Apagar flash' : 'Encender flash'} accessibilityState={{ selected: flash === 'on' }} onPress={toggleFlash} style={[styles.photoToolButton, styles.photoFlashButton]}>
+              <Pressable accessibilityRole="button" accessibilityLabel={flash === 'on' ? tr("Apagar flash") : tr("Encender flash")} accessibilityState={{ selected: flash === 'on' }} onPress={toggleFlash} style={[styles.photoToolButton, styles.photoFlashButton]}>
                 {flash === 'on' ? <Zap size={21} color="#FFFFFF" /> : <ZapOff size={21} color="#FFFFFF" />}
               </Pressable>
-              {photoUri && <Pressable accessibilityRole="button" accessibilityLabel="Abrir cámara a pantalla completa" onPress={() => setCameraFullscreen(true)} style={[styles.photoToolButton, styles.photoExpandButton]}>
+              {photoUri && <Pressable accessibilityRole="button" accessibilityLabel={tr("Abrir cámara a pantalla completa")} onPress={() => setCameraFullscreen(true)} style={[styles.photoToolButton, styles.photoExpandButton]}>
                 <Maximize2 size={21} color="#FFFFFF" />
               </Pressable>}
           </View>
@@ -720,11 +723,11 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
                   <Building size={20} color={Colors.primary} />
                 </View>
                 <View style={styles.taskCardDetails}>
-                  <Text style={styles.taskCardHeaderLabel}>DESARROLLO Y VILLA</Text>
+                  <Text style={styles.taskCardHeaderLabel}>{tr("DESARROLLO Y VILLA")}</Text>
                   {projectLoading && !currentProject ? (
                     <View style={styles.taskCardLoadingRow}>
                       <ActivityIndicator size="small" color={Colors.primary} />
-                      <Text style={styles.taskCardLoadingText}>Identificando villa...</Text>
+                      <Text style={styles.taskCardLoadingText}>{tr("Identificando villa...")}</Text>
                     </View>
                   ) : currentProject ? (
                     <>
@@ -736,12 +739,12 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
                       </Text>
                       <Text style={styles.taskCardSub}>
                         {isCheckOut
-                          ? 'Registro de salida (Check-Out) de la villa'
-                          : 'Registro de llegada (Check-In) a la villa'}
+                          ? tr("Registro de salida (Check-Out) de la villa")
+                          : tr("Registro de llegada (Check-In) a la villa")}
                       </Text>
                     </>
                   ) : (
-                    <Text style={styles.taskCardEmptyText}>Sin villa seleccionada</Text>
+                    <Text style={styles.taskCardEmptyText}>{tr("Sin villa seleccionada")}</Text>
                   )}
                 </View>
                 <Pressable
@@ -755,16 +758,16 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
                     const coords = await fetchLocation();
                     if (coords) {
                       Alert.alert(
-                        'Ubicación GPS',
-                        `Latitud: ${coords.latitude.toFixed(5)}\nLongitud: ${coords.longitude.toFixed(5)}\nEstado: Satélite conectado correctamente.`
+                        tr("Ubicación GPS"),
+                        tr("Latitud: {value0}\nLongitud: {value1}\nEstado: Satélite conectado correctamente.", { value0: coords.latitude.toFixed(5), value1: coords.longitude.toFixed(5) })
                       );
                     } else {
-                      Alert.alert('Error de GPS', 'No se pudo actualizar la ubicación. Comprueba el permiso y la señal de GPS.');
+                      Alert.alert(tr('Error de GPS'), tr("No se pudo actualizar la ubicación. Comprueba el permiso y la señal de GPS."));
                     }
                   }}
                   disabled={locationLoading}
                   accessibilityRole="button"
-                  accessibilityLabel="Ubicación GPS"
+                  accessibilityLabel={tr("Ubicación GPS")}
                 >
                   {locationLoading ? (
                     <ActivityIndicator size="small" color={Colors.primary} />
@@ -783,10 +786,10 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
                   <Pressable
                     style={({ pressed }) => [styles.taskChangeBtn, pressed && { opacity: 0.7 }]}
                     accessibilityRole="button"
-                    accessibilityLabel="Cambiar villa"
+                    accessibilityLabel={tr("Cambiar villa")}
                     onPress={() => { Keyboard.dismiss(); setShowVillaModal(true); }}
                   >
-                    <Text style={styles.taskChangeBtnText}>CAMBIAR VILLA</Text>
+                    <Text style={styles.taskChangeBtnText}>{tr("CAMBIAR VILLA")}</Text>
                     <ChevronDown size={14} color="#343e48" />
                   </Pressable>
                 )}
@@ -796,24 +799,22 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
             {projects.length === 0 && !projectLoading && (
               <View style={styles.taskWarningBox}>
                 <AlertCircle size={16} color={Colors.primary} />
-                <Text style={styles.taskWarningText}>
-                  No se encontraron villas activas registradas en el sistema.
-                </Text>
+                <Text style={styles.taskWarningText}>{tr("No se encontraron villas activas registradas en el sistema.")}</Text>
               </View>
             )}
 
             <View style={styles.notesSection}>
               <Text style={styles.notesLabel}>
                 {isCheckOut
-                  ? 'NOTAS DE SALIDA Y CIERRE DE VILLA'
-                  : 'NOTAS DE LLEGADA A LA VILLA'}
+                  ? tr("NOTAS DE SALIDA Y CIERRE DE VILLA")
+                  : tr('NOTAS DE LLEGADA A LA VILLA')}
               </Text>
               <TextInput
                 style={styles.notesInput}
                 placeholder={
                   isCheckOut
-                    ? 'Villa cerrada, equipos operando y salida del instalador...'
-                    : 'Llegada a la villa, acceso por caseta principal e inicio...'
+                    ? tr("Villa cerrada, equipos operando y salida del instalador...")
+                    : tr('Llegada a la villa, acceso por caseta principal e inicio...')
                 }
                 placeholderTextColor={Colors.textMuted}
                 value={notes}
@@ -837,7 +838,7 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
               {isSubmitting ? (
                 <>
                   <ActivityIndicator size="small" color={Colors.textWhite} />
-                  <Text style={styles.submitButtonText}>Guardando registro...</Text>
+                  <Text style={styles.submitButtonText}>{tr("Guardando registro...")}</Text>
                 </>
               ) : (
                 <>
@@ -854,8 +855,8 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
         <View style={styles.fullscreenPage}>
           {cameraFullscreen && cameraActive ? <CameraSection fullscreen flash={flash} onToggleFlash={toggleFlash} onCapture={uri => { handleCapturePhoto(uri); setCameraFullscreen(false); }} /> : null}
           <View style={[styles.photoToolbar, { top: insets.top + 12 }]}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Cerrar cámara completa" onPress={() => setCameraFullscreen(false)} style={styles.photoToolButton}><X size={23} color="#FFFFFF" /></Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel={flash === 'on' ? 'Apagar flash' : 'Encender flash'} onPress={toggleFlash} style={styles.photoToolButton}>{flash === 'on' ? <Zap size={21} color="#FFFFFF" /> : <ZapOff size={21} color="#FFFFFF" />}</Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={tr("Cerrar cámara completa")} onPress={() => setCameraFullscreen(false)} style={styles.photoToolButton}><X size={23} color="#FFFFFF" /></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={flash === 'on' ? tr("Apagar flash") : tr("Encender flash")} onPress={toggleFlash} style={styles.photoToolButton}>{flash === 'on' ? <Zap size={21} color="#FFFFFF" /> : <ZapOff size={21} color="#FFFFFF" />}</Pressable>
           </View>
         </View>
       </Modal>
@@ -868,13 +869,12 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
         onRequestClose={() => setShowVillaModal(false)}
       >
         <View style={styles.modalBackdrop}>
-          <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="Cerrar selección de villa" onPress={() => setShowVillaModal(false)} />
+          <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel={tr("Cerrar selección de villa")} onPress={() => setShowVillaModal(false)} />
           <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
             <View style={styles.modalHeader}>
               <View style={styles.modalDragPill} />
-              <Text style={styles.modalTitle}>SELECCIONAR VILLA</Text>
-              <Text style={styles.modalSubtitle}>
-                Elige la villa donde registrarás tu {isCheckOut ? 'salida (Check-Out)' : 'llegada (Check-In)'}:
+              <Text style={styles.modalTitle}>{tr("SELECCIONAR VILLA")}</Text>
+              <Text style={styles.modalSubtitle}>{tr("Elige la villa donde registrarás tu ")}{isCheckOut ? tr('salida (Check-Out)') : tr('llegada (Check-In)')}:
               </Text>
             </View>
 
@@ -938,7 +938,7 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
               style={({ pressed }) => [styles.modalCloseBtn, pressed && { opacity: 0.85 }]}
               onPress={() => setShowVillaModal(false)}
             >
-              <Text style={styles.modalCloseBtnText}>CERRAR</Text>
+              <Text style={styles.modalCloseBtnText}>{tr("CERRAR")}</Text>
             </Pressable>
           </View>
         </View>
@@ -972,8 +972,8 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
               )}
             </View>
 
-            <Text style={styles.feedbackTitle}>{feedbackModal.title}</Text>
-            <Text style={styles.feedbackMessage}>{feedbackModal.message}</Text>
+            <Text style={styles.feedbackTitle}>{tr(feedbackModal.title)}</Text>
+            <Text style={styles.feedbackMessage}>{tr(feedbackModal.message)}</Text>
 
             <Pressable
               style={({ pressed }) => [
@@ -982,7 +982,7 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
               ]}
               onPress={handleCloseFeedbackModal}
             >
-              <Text style={styles.feedbackButtonText}>ENTENDIDO</Text>
+              <Text style={styles.feedbackButtonText}>{tr("ENTENDIDO")}</Text>
             </Pressable>
           </View>
         </View>
@@ -1649,9 +1649,9 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     alignItems: 'center',
     borderRadius: BorderRadius.lg,
-    backgroundColor: '#000000',
+    backgroundColor: Colors.primary,
     borderWidth: 1,
-    borderColor: '#000000',
+    borderColor: Colors.primary,
     marginTop: Spacing.xs,
   },
   modalCloseBtnText: {

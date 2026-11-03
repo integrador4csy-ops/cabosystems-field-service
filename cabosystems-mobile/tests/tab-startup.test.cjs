@@ -15,14 +15,18 @@ function load(file) {
 }
 test('warmup waits for main readiness and resets for another account', async () => {
   const { TabStartupProvider, useTabStartup } = load('tabStartup.tsx');
-  let startup, renderer;
-  function Probe() { startup = useTabStartup(); return null; }
-  const render = owner => React.createElement(TabStartupProvider, { key: owner }, React.createElement(Probe));
+  let startup, renderer, mounts = 0;
+  function Probe() { startup = useTabStartup(); React.useEffect(() => { mounts++; }, []); return null; }
+  const render = owner => React.createElement(TabStartupProvider, { owner }, React.createElement(Probe));
   try {
     await React.act(async () => { renderer = Renderer.create(render('a')); });
     assert.equal(startup.mainReady, false);
     await React.act(async () => { startup.markMainReady(); }); assert.equal(startup.mainReady, true);
+    const previousReady = startup.markMainReady;
     await React.act(async () => { renderer.update(render('b')); }); assert.equal(startup.mainReady, false);
+    assert.equal(mounts, 1, 'account changes must preserve the navigator subtree');
+    await React.act(async () => previousReady()); assert.equal(startup.mainReady, false);
+    await React.act(async () => startup.markMainReady()); assert.equal(startup.mainReady, true);
   } finally { if (renderer) await React.act(async () => renderer.unmount()); }
 });
 test('agenda preparation rebuilds only changed pages and bounds retained trees', () => {
@@ -68,7 +72,7 @@ test('layout starts no preloads before Main and cancels late route preparation o
     router: { prefetch: route => prepared.push(route) },
     prepareTabs: (tasks, concurrency) => { queued = tasks; assert.equal(concurrency, 2); return () => { stopped = true; }; },
     preloadAgendaData: () => new Promise(resolve => { finish = resolve; }),
-    preloadMyChatGroups: async () => [], preloadUsersData: async () => {},
+    preloadMyChatGroups: async () => [], preloadUsersData: async () => {}, restoreChatRooms: async () => {}, prepareChatRooms: () => () => {},
   };
   vm.runInNewContext(ts.transpileModule(`globalThis.start = (${callback});`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, env);
   assert.equal(env.start(), undefined); assert.equal(queued, undefined);

@@ -1,3 +1,4 @@
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { ClipboardCheck, CheckCircle2, ChevronRight } from 'lucide-react-native';
@@ -21,8 +22,9 @@ export default function DailyFormCard({
   loading = false,
   compact = false,
 }: DailyFormCardProps) {
+  const { t: tr } = useInterfaceTranslation();
   const { language } = useLanguage();
-  const timeFormatted = formatCompletedTime(completedAt);
+  const timeFormatted = formatCompletedTime(completedAt, language === 'en' ? 'en-US' : 'es-MX');
   if (compact) {
     const label = language === 'en'
       ? (completed ? 'Daily field form completed' : 'Open daily field form · pending')
@@ -44,15 +46,12 @@ export default function DailyFormCard({
           </View>
 
           <View style={styles.infoCol}>
-            <Text style={styles.titleCompleted}>Reporte Diario de Campo</Text>
-            <Text style={styles.subtitleCompleted}>
-              Registrado hoy {timeFormatted ? `· ${timeFormatted}` : ''}
+            <Text style={styles.titleCompleted}>{tr("Reporte Diario de Campo")}</Text>
+            <Text style={styles.subtitleCompleted}>{tr("Registrado hoy ")}{timeFormatted ? `· ${timeFormatted}` : ''}
             </Text>
           </View>
 
-          <Badge color="success" variant="light" size="sm">
-            Completado
-          </Badge>
+          <Badge color="success" variant="light" size="sm">{tr("Completado")}</Badge>
         </View>
       </View>
     );
@@ -79,12 +78,10 @@ export default function DailyFormCard({
 
         <View style={styles.infoCol}>
           <View style={styles.titleRow}>
-            <Text style={styles.titlePending}>Formulario Diario de Campo</Text>
+            <Text style={styles.titlePending}>{tr("Formulario Diario de Campo")}</Text>
             <View style={styles.pulseDot} />
           </View>
-          <Text style={styles.subtitlePending}>
-            Pendiente de registrar para el turno de hoy
-          </Text>
+          <Text style={styles.subtitlePending}>{tr("Pendiente de registrar para el turno de hoy")}</Text>
         </View>
 
         <View style={styles.chevronContainer}>

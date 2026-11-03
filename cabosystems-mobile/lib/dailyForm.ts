@@ -62,11 +62,11 @@ function getTodayMazatlanDateKey(): string {
   }
 }
 
-export function formatCompletedTime(isoString?: string | null): string {
+export function formatCompletedTime(isoString?: string | null, locale = 'en-US'): string {
   if (!isoString) return '';
   try {
     const date = new Date(isoString);
-    return new Intl.DateTimeFormat('es-MX', {
+    return new Intl.DateTimeFormat(locale, {
       timeZone: 'America/Mazatlan',
       hour: '2-digit',
       minute: '2-digit',

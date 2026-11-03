@@ -14,6 +14,14 @@ El historial no permite INSERT/UPDATE/DELETE a clientes. Solo el trigger privado
 
 Los cambios desde web y móvil ya quedan registrados en el servidor. La interfaz de informes móvil queda para una segunda fase. En operaciones móviles sin conexión, esta primera versión registra la fecha de aceptación en el servidor, no una fecha retroactiva del dispositivo. Si se necesita atribuir al día exacto del trabajo offline, se debe añadir una fecha de ejecución explícita y validada al flujo de sincronización antes de usar estos informes para ese fin.
 
+## Comentarios y evidencia de tareas
+
+La migración local `20261102153000_task_progress_comments_and_evidence.sql` amplía el mismo historial; no crea un registro paralelo. Cada avance nuevo puede guardar `comentario`, `evidencia_path`, `captured_at`, `accepted_at` y un `request_id` único por autor. `record_task_progress` es la operación oficial para cambiar el estado o marcar una subtarea junto con estos datos. El cambio y la auditoría se confirman o revierten en la misma transacción. Repetir el mismo `request_id` devuelve el avance existente y no ejecuta una segunda modificación.
+
+La fotografía no se guarda como URL pública. Su ruta es `proyecto/tarea/autor/solicitud.ext` dentro del bucket privado `task-evidence`. Se admite una fotografía por avance, en JPEG, PNG o WebP. Para el despliegue, el bucket debe crearse mediante la API o el panel de Storage con límite duro de 10 MB y tipos `image/jpeg`, `image/png` y `image/webp`; la interfaz comprimirá la imagen antes de subirla cuando exceda ese límite. Después se aplica la migración de políticas. Un usuario puede subir únicamente en su propia ruta y con permiso para avanzar esa tarea. La lectura sigue la visibilidad vigente de la tarea. No existe actualización de archivos: una evidencia enlazada es inmutable, mientras una carga que quedó huérfana por una solicitud fallida puede eliminarla únicamente su autor.
+
+La migración y el bucket todavía no se han aplicado al entorno remoto. Las pantallas de la Sesión 4 ya están preparadas localmente: web confirma cambios de estado, subtareas y movimientos del tablero; móvil confirma desde el detalle de la tarea. Ambos permiten continuar sin comentario ni fotografía, conservan los datos al reintentar y muestran el historial autorizado con enlaces firmados de duración limitada. Ninguna URL pública queda almacenada.
+
 No se reconstruye actividad anterior a la activación: las tablas previas no guardaban la fecha/autor de cada clic. Las acciones administrativas sin identidad autenticada no se atribuyen a otra persona.
 
 ## Descargas

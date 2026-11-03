@@ -2,6 +2,36 @@ import { supabase } from './supabase';
 import type { TaskPermissions } from './taskAccess';
 import type { Project, Task, Subtarea, TaskStatus, FieldRecord } from '@/types/database';
 
+export interface TaskProgressActivity {
+  id: number;
+  request_id: string;
+  actor_name: string;
+  tarea_id: string;
+  subtarea_id: string | null;
+  subtarea_titulo: string | null;
+  accion: 'estado' | 'subtarea';
+  anterior: string | null;
+  siguiente: string;
+  comentario: string | null;
+  evidencia_path: string | null;
+  captured_at: string;
+  accepted_at: string;
+  evidence_url?: string | null;
+}
+
+export interface RecordTaskProgressInput {
+  requestId: string;
+  taskId: string;
+  projectId: string;
+  actorId: string;
+  taskStatus?: TaskStatus;
+  subtaskId?: string;
+  subtaskCompleted?: boolean;
+  comment?: string;
+  photoUri?: string | null;
+  capturedAt?: string;
+}
+
 export interface TaskWithProject extends Task {
   proyectos: (Pick<Project, 'desarrollo'> & { villa?: string; unidad?: string }) | null;
   profiles: { nombre: string } | null;
@@ -77,16 +107,17 @@ export async function getTaskById(id: string): Promise<TaskDetail> {
     .from('tareas')
     .select('*, proyectos(*), profiles(nombre), subtareas(id, titulo, completada)')
     .eq('id', id)
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
+  if (!data) throw Object.assign(new Error('Task unavailable'), { code: 'TASK_UNAVAILABLE' });
   return normalizeTaskProject(data) as TaskDetail;
 }
 
 export async function getTaskPermissions(id: string): Promise<TaskPermissions> {
   const { data, error } = await supabase.rpc('get_task_permissions', { p_task_id: id });
   if (error) throw error;
-  if (!data?.user_id || typeof data.can_progress !== 'boolean' || typeof data.can_edit !== 'boolean') throw new Error('No se pudieron verificar los permisos de la tarea');
+  if (!data?.user_id || typeof data.can_view !== 'boolean' || typeof data.can_view_all !== 'boolean' || typeof data.can_progress !== 'boolean' || typeof data.can_edit !== 'boolean') throw new Error('No se pudieron verificar los permisos de la tarea');
   return data as TaskPermissions;
 }
 
@@ -121,6 +152,106 @@ export async function toggleSubtarea(id: string, completada: boolean): Promise<v
     .single();
 
   if (error) throw error;
+}
+
+async function uploadTaskEvidence(input: RecordTaskProgressInput): Promise<string | null> {
+  if (!input.photoUri) return null;
+  const path = `${input.projectId}/${input.taskId}/${input.actorId}/${input.requestId}.jpg`;
+  const { optimizeEvidencePhoto } = await import('./evidencePhoto');
+  const optimizedUri = await optimizeEvidencePhoto(input.photoUri);
+  const response = await fetch(optimizedUri);
+  const body = await response.arrayBuffer();
+  if (body.byteLength > 10 * 1024 * 1024) throw new Error('La fotografía supera el límite de 10 MB.');
+  const bucket = supabase.storage.from('task-evidence');
+  const { error } = await bucket.upload(path, body, { contentType: 'image/jpeg', upsert: false });
+  if (error) {
+    const duplicate = String((error as { statusCode?: string }).statusCode) === '409' || /already exists|duplicate/i.test(error.message);
+    if (!duplicate) throw error;
+    const existing = await bucket.info(path);
+    if (existing.error) throw existing.error;
+  }
+  return path;
+}
+
+async function dispatchTaskActivityNotifications(activity: TaskProgressActivity, projectId: string, actorId: string) {
+  try {
+    const { data: groups } = await supabase
+      .from('chat_grupos')
+      .select('id, nombre')
+      .eq('proyecto_id', projectId);
+
+    if (!groups || groups.length === 0) return;
+
+    for (const group of groups) {
+      const content =
+        activity.accion === 'subtarea'
+          ? (activity.siguiente === 'true'
+              ? `${activity.actor_name} completó la subtarea «${activity.subtarea_titulo || 'Subtarea'}»`
+              : `${activity.actor_name} reabrió la subtarea «${activity.subtarea_titulo || 'Subtarea'}»`)
+          : `${activity.actor_name} cambió el estado a ${
+              activity.siguiente === 'en_proceso'
+                ? 'En Proceso'
+                : activity.siguiente === 'completada'
+                ? 'Completada'
+                : 'Pendiente'
+            }`;
+
+      supabase.functions
+        .invoke('chat-push-notifications', {
+          body: {
+            record: {
+              grupo_id: group.id,
+              remitente_id: actorId,
+              tipo: 'sistema',
+              contenido: content,
+              task_id: activity.tarea_id,
+              subtask_id: activity.subtarea_id,
+            },
+          },
+        })
+        .catch((err) => {
+          console.warn('Push notification dispatch error for task progress:', err);
+        });
+    }
+  } catch (err) {
+    console.warn('Could not dispatch task progress notifications:', err);
+  }
+}
+
+export async function recordTaskProgress(input: RecordTaskProgressInput): Promise<TaskProgressActivity> {
+  const evidencePath = await uploadTaskEvidence(input);
+  const { data, error } = await supabase.rpc('record_task_progress', {
+    p_request_id: input.requestId,
+    p_task_id: input.taskId,
+    p_task_status: input.taskStatus ?? null,
+    p_subtask_id: input.subtaskId ?? null,
+    p_subtask_completed: input.subtaskCompleted ?? null,
+    p_comment: input.comment?.trim() || null,
+    p_evidence_path: evidencePath,
+    p_captured_at: input.capturedAt ?? new Date().toISOString(),
+  });
+  if (error) {
+    if (evidencePath) {
+      const cleanup = await supabase.storage.from('task-evidence').remove([evidencePath]);
+      if (cleanup.error) console.warn('Could not remove unreferenced task evidence:', cleanup.error);
+    }
+    throw error;
+  }
+  const activity = data as TaskProgressActivity;
+  void dispatchTaskActivityNotifications(activity, input.projectId, input.actorId);
+  return activity;
+}
+
+export async function getTaskProgressHistory(taskId: string): Promise<TaskProgressActivity[]> {
+  const { data, error } = await supabase.from('task_activity')
+    .select('id,request_id,actor_name,tarea_id,subtarea_id,subtarea_titulo,accion,anterior,siguiente,comentario,evidencia_path,captured_at,accepted_at')
+    .eq('tarea_id', taskId).order('id', { ascending: false }).limit(30);
+  if (error) throw error;
+  return Promise.all(((data ?? []) as TaskProgressActivity[]).map(async activity => {
+    if (!activity.evidencia_path) return { ...activity, evidence_url: null };
+    const signed = await supabase.storage.from('task-evidence').createSignedUrl(activity.evidencia_path, 3600);
+    return { ...activity, evidence_url: signed.error ? null : signed.data.signedUrl };
+  }));
 }
 
 function decodeBase64ToUint8Array(base64: string): Uint8Array {

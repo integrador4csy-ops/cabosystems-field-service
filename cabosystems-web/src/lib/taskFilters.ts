@@ -2,7 +2,16 @@ import type { Proyecto, Tarea } from '../types/projects';
 
 export function sortWorkspaceTasks(tasks: Tarea[], direction: 'asc' | 'desc', locale: string) {
   const collator = new Intl.Collator(locale, { numeric: true, sensitivity: 'base' });
-  return [...tasks].sort((a, b) => collator.compare(a.titulo, b.titulo) * (direction === 'desc' ? -1 : 1));
+  const titleDirection = direction === 'desc' ? -1 : 1;
+  return [...tasks].sort((a, b) =>
+    taskPriorityRank(a) - taskPriorityRank(b)
+    || collator.compare(a.titulo, b.titulo) * titleDirection
+    || collator.compare(a.id || '', b.id || '')
+  );
+}
+
+export function taskPriorityRank(task: Pick<Tarea, 'prioridad' | 'prioridad_orden'>): number {
+  return task.prioridad_orden ?? ({ alta: 1, media: 2, baja: 3 }[task.prioridad || 'media'] ?? 2);
 }
 
 export interface TaskFilters {
@@ -11,6 +20,7 @@ export interface TaskFilters {
   project: string;
   assignee: string;
   status: string;
+  priority?: string;
   searchAllProjects?: boolean;
 }
 
@@ -65,6 +75,7 @@ export function filterWorkspaceTasks(tasks: Tarea[], projects: Proyecto[], filte
     if (filters.assignee === 'unassigned' && task.asignado_a) return false;
     if (filters.assignee !== 'all' && filters.assignee !== 'unassigned' && task.asignado_a !== filters.assignee) return false;
     if (filters.status !== 'all' && task.estatus !== filters.status) return false;
+    if (filters.priority && filters.priority !== 'all' && task.prioridad !== filters.priority) return false;
     return !query || [task.titulo, task.descripcion, task.profiles?.nombre, project?.villa, project?.desarrollo].filter(Boolean).join(' ').toLocaleLowerCase().includes(query);
   });
 }

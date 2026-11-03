@@ -18,11 +18,14 @@ import { TaskActionsMenu } from './TaskActionsMenu';
 import { isOverdue, parseDateKey } from '../../lib/taskDates';
 import {
   createSubtask,
-  toggleSubtask,
   deleteSubtask,
-  updateTask,
   deleteTask,
+  updateTask,
+  recordTaskProgress,
 } from '../../lib/projectsApi';
+import { taskProgressRequestId } from '../../lib/taskProgress';
+import { TaskProgressDialog } from './TaskProgressDialog';
+import { TaskProgressHistory } from './TaskProgressHistory';
 
 interface TaskCardProps {
   task: Tarea;
@@ -70,6 +73,10 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [subtasks, setSubtasks] = useState<Subtarea[]>(task.subtareas || []);
+  const [pendingProgress, setPendingProgress] = useState<{
+    requestId: string;
+    subtask: Subtarea;
+  } | null>(null);
 
   useEffect(() => {
     setSubtasks(task.subtareas || []);
@@ -78,27 +85,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const completedSubtasks = subtasks.filter((s) => s.completada).length;
   const totalSubtasks = subtasks.length;
   const hasSubtasks = totalSubtasks > 0;
-  const hasExpandableContent = hasSubtasks || Boolean(task.descripcion);
+  const hasExpandableContent = true;
   const progressPercent =
     totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : 0;
 
-  const handleToggleSubtask = async (sub: Subtarea) => {
-    const nextState = !sub.completada;
-    // Optimistic UI update
-    setSubtasks((prev) =>
-      prev.map((s) => (s.id === sub.id ? { ...s, completada: nextState } : s))
-    );
-
-    try {
-      await toggleSubtask(sub.id, nextState);
-      onTaskUpdated();
-    } catch (err) {
-      console.error('Error toggling subtask:', err);
-      // Revert on error
-      setSubtasks((prev) =>
-        prev.map((s) => (s.id === sub.id ? { ...s, completada: sub.completada } : s))
-      );
-    }
+  const handleToggleSubtask = (sub: Subtarea) => {
+    if (!canProgress || pendingProgress) return;
+    setPendingProgress({ requestId: taskProgressRequestId(), subtask: sub });
   };
 
   const handleAddSubtask = async (e: React.FormEvent) => {
@@ -138,9 +131,35 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     setUpdatingStatus(true);
     try {
       await updateTask(task.id, { estatus: newStatus });
-      onTaskUpdated();
+      await onTaskUpdated();
     } catch (err) {
       console.error('Error changing task status:', err);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const confirmProgress = async (comment: string, photo: File | null) => {
+    if (!pendingProgress || !user) throw new Error(t('La sesión cambió. Intenta de nuevo.'));
+    setUpdatingStatus(true);
+    try {
+      const subtask = pendingProgress.subtask;
+      await recordTaskProgress({
+        requestId: pendingProgress.requestId,
+        taskId: task.id,
+        projectId: task.proyecto_id,
+        actorId: user.id,
+        subtaskId: subtask.id,
+        subtaskCompleted: !subtask.completada,
+        comment,
+        photo,
+      });
+      setSubtasks((previous) =>
+        previous.map((item) =>
+          item.id === subtask.id ? { ...item, completada: !subtask.completada } : item
+        )
+      );
+      await onTaskUpdated();
     } finally {
       setUpdatingStatus(false);
     }
@@ -186,9 +205,20 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     dotClass: 'bg-slate-400',
     icon: null,
   };
+  const priorityConfig = {
+    alta: { label: t('Alta'), className: 'border-orange-200 bg-orange-50 text-brand-700' },
+    media: { label: t('Media'), className: 'border-slate-200 bg-slate-100 text-slate-700' },
+    baja: { label: t('Baja'), className: 'border-slate-200 bg-white text-slate-500' },
+  }[task.prioridad || 'media'];
+  const priorityBadge = <span className={`task-priority-badge inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${priorityConfig.className}`}>{priorityConfig.label}</span>;
+
+  const historyVersion = `${task.estatus}:${subtasks.map(subtask => `${subtask.id}:${subtask.completada}`).join(',')}`;
 
   return (
+    <>
     <div
+      id={`task-card-${task.id}`}
+      tabIndex={-1}
       className={`${variant === 'board' ? 'task-card-board' : ''} ${hasSubtasks ? 'has-subtasks' : 'no-subtasks'} rounded-2xl border bg-white transition-all duration-200 shadow-2xs hover:shadow-xs hover:border-slate-300 ${
         task.estatus === 'completada'
           ? 'border-emerald-200 bg-emerald-50/15'
@@ -208,7 +238,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         {variant === 'board' ? (
           <>
             <div className="task-card-board-top flex items-start gap-2 min-w-0 w-full">
-              {hasSubtasks && (
+              {hasExpandableContent && (
                 <ChevronDown
                   size={15}
                   className={`text-slate-400 transition-transform duration-200 shrink-0 mt-0.5 ${
@@ -228,6 +258,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
             <div className="task-card-board-footer flex items-center justify-between gap-2.5 w-full pt-1.5 min-w-0">
               <div className="task-card-board-footer-left min-w-0 flex-1 truncate">
+                {priorityBadge}
                 {contextLabel && (
                   <span className={`task-card-context text-[11.5px] ${isOverdue(task) ? 'task-overdue font-medium text-red-600' : 'text-slate-500'}`} title={contextLabel}>
                     {contextLabel}{isOverdue(task) && <span> · {t('Vencida')}</span>}
@@ -282,7 +313,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           <>
             <div className="task-card-main flex items-center gap-2.5 min-w-0 flex-1 basis-full sm:basis-auto">
               {/* Chevron Indicator */}
-              {hasSubtasks && (
+              {hasExpandableContent && (
                 <ChevronDown
                   size={16}
                   className={`text-slate-400 transition-transform duration-200 shrink-0 ${
@@ -297,6 +328,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 onClick={(e) => e.stopPropagation()}
               >
                 <AppSelect
+                  id={`task-status-${task.id}`}
                   value={task.estatus}
                   onChange={(event) => handleStatusChange(event.target.value as Tarea['estatus'])}
                   disabled={updatingStatus || !canProgress}
@@ -313,6 +345,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                   <option value="completada">{t("Completada")}</option>
                 </AppSelect>
               </div>
+
+              {priorityBadge}
 
               {/* Main Task Title */}
               <h4
@@ -377,7 +411,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       {variant === 'list' && contextLabel && <p className="px-4 pb-3 text-xs text-slate-500">{contextLabel}{isOverdue(task) && <span className="task-overdue"> · {t('Vencida')}</span>}</p>}
 
       {/* Expanded Details (Description, Progress, Checklist) */}
-      {isExpanded && (hasSubtasks || Boolean(task.descripcion) || (isAdmin && isAddingSubtask)) && (
+      {isExpanded && (
         <div className="px-4 pb-4 pt-1 border-t border-slate-100 space-y-3">
           {/* Optional Task Description */}
           {task.descripcion && (
@@ -410,6 +444,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                   <label className="flex items-start gap-2 flex-1 min-w-0 cursor-pointer select-none">
                     <div className="relative mt-0.5 flex items-center justify-center w-4.5 h-4.5 shrink-0">
                       <input
+                        id={`task-subtask-${sub.id}`}
                         type="checkbox"
                         className="w-4.5 h-4.5 appearance-none cursor-pointer border border-slate-300 rounded-md checked:bg-brand-500 checked:border-transparent transition-all focus:outline-hidden focus:ring-2 focus:ring-orange-500/20"
                         checked={sub.completada}
@@ -505,8 +540,25 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               </button>
             </form>
           ) : null}
+          <TaskProgressHistory taskId={task.id} version={historyVersion} />
         </div>
       )}
     </div>
+    {pendingProgress ? (
+      <TaskProgressDialog
+        title={task.titulo}
+        actionLabel={
+          pendingProgress.subtask.completada
+            ? t('Reabrir subtarea: {value0}', { value0: pendingProgress.subtask.titulo })
+            : t('Completar subtarea: {value0}', { value0: pendingProgress.subtask.titulo })
+        }
+        returnFocusId={`task-subtask-${pendingProgress.subtask.id}`}
+        onClose={() => {
+          if (!updatingStatus) setPendingProgress(null);
+        }}
+        onConfirm={confirmProgress}
+      />
+    ) : null}
+    </>
   );
 };

@@ -14,6 +14,14 @@ try {
     create function auth.role() returns text language sql stable as $$ select current_user::text $$;
     grant usage on schema public,auth to anon,authenticated;
     grant execute on function auth.uid(),auth.role() to anon,authenticated;
+    create schema storage;
+    create table storage.buckets(id text primary key,name text not null,public boolean not null default false,
+      file_size_limit bigint,allowed_mime_types text[]);
+    create table storage.objects(id bigint generated always as identity primary key,bucket_id text not null,
+      name text not null,owner_id uuid);
+    alter table storage.objects enable row level security;
+    grant usage on schema storage to authenticated;
+    grant select,insert,delete on storage.objects to authenticated;
   `);
   // The existing schema, plus only the columns actually used by this feature.
   await db.exec(readFileSync(new URL('../migrations/001_initial_schema.sql', import.meta.url), 'utf8'));
@@ -40,10 +48,13 @@ try {
   await db.exec(readFileSync(new URL('../migrations/20261015215504_project_hierarchy_and_access.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../migrations/20261015220443_harden_legacy_profile_access.sql', import.meta.url), 'utf8'));
 
+  await db.exec(readFileSync(new URL('../migrations/20261014190102_task_scheduled_date.sql', import.meta.url),'utf8'));
   await db.exec(readFileSync(new URL('../migrations/20261028184222_villa_task_progress.sql', import.meta.url),'utf8'));
   await db.exec(readFileSync(new URL('../migrations/20261028185402_task_assignee_informational.sql', import.meta.url),'utf8'));
   await db.exec(readFileSync(new URL('../migrations/20261028190342_task_progress_all_access_scopes.sql', import.meta.url),'utf8'));
   await db.exec(readFileSync(new URL('../migrations/20261029220523_task_activity_reports.sql', import.meta.url),'utf8'));
+  await db.exec(readFileSync(new URL('../migrations/20261102120000_task_visibility_and_priority.sql', import.meta.url),'utf8'));
+  await db.exec(readFileSync(new URL('../migrations/20261102153000_task_progress_comments_and_evidence.sql', import.meta.url),'utf8'));
   const project='f1000000-0000-0000-0000-000000000002';
   const task='f1000000-0000-0000-0000-000000000003';
   const otherProject='f1000000-0000-0000-0000-000000000004';
@@ -57,6 +68,8 @@ try {
   await db.query('insert into proyectos(id,desarrollo,villa) values($1,$2,$3)',[otherProject,'Other development','Other villa']);
   await db.query('insert into tareas(id,proyecto_id,asignado_a,titulo) values($1,$2,$3,$4)',[otherTask,otherProject,null,'Unrelated task']);
   await db.query('insert into subtareas(id,tarea_id,titulo) values($1,$2,$3)',[sub,task,'Original checklist']);
+  await db.query(`insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
+    values('task-evidence','task-evidence',false,10485760,array['image/jpeg','image/png','image/webp'])`);
   for(const user of [uid(2),uid(3),uid(6)])await db.query('insert into proyecto_participantes(proyecto_id,usuario_id) values($1,$2)',[project,user]);
   await db.query('insert into proyecto_accesos_globales(usuario_id) values($1)',[uid(4)]);
   const development=(await db.query('select desarrollo_id from proyectos where id=$1',[project])).rows[0].desarrollo_id;
@@ -67,11 +80,16 @@ try {
   await db.query('insert into tareas(id,proyecto_id,asignado_a,titulo) values($1,$2,$3,$4)',[visualTask,project,uid(7),'Visual assignment']);
   assert.equal((await db.query('select * from proyecto_participantes where proyecto_id=$1 and usuario_id=$2',[project,uid(7)])).rows.length,0);
   await login(uid(7));
-  assert.equal(await permissions(visualTask),null);
-  assert.equal((await db.query('update tareas set estatus=$1 where id=$2 returning id',['completada',visualTask])).rows.length,0);
-  console.log('PASS: assigning the responsible person alone grants neither membership, visibility nor progress.');
+  assert.deepEqual(await permissions(visualTask),{user_id:uid(7),can_view:true,can_view_all:false,can_progress:true,can_edit:false});
+  assert.equal((await db.query('select id from tareas order by id')).rows.length,1);
+  assert.equal((await db.query('select p.villa from tareas t join proyectos p on p.id=t.proyecto_id where t.id=$1',[visualTask])).rows[0]?.villa,'Existing villa');
+  assert.deepEqual((await db.query('select prioridad,prioridad_orden from tareas where id=$1',[visualTask])).rows[0],{prioridad:'media',prioridad_orden:2});
+  assert.equal((await db.query('update tareas set estatus=$1 where id=$2 returning id',['completada',visualTask])).rows.length,1);
+  assert.deepEqual((await db.query('select tarea_id from task_activity order by id')).rows,[{tarea_id:visualTask}]);
+  await assert.rejects(db.query('update tareas set prioridad=$1 where id=$2',['alta',visualTask]),/Solo/);
+  console.log('PASS: direct assignment grants only that task, its villa label and progress, never full-villa visibility or editing.');
   await login(uid(3));
-  assert.deepEqual(await permissions(task),{user_id:uid(3),can_progress:true,can_edit:false});
+  assert.deepEqual(await permissions(task),{user_id:uid(3),can_view:true,can_view_all:true,can_progress:true,can_edit:false});
   assert.equal((await db.query('update tareas set estatus=$1 where id=$2 returning id',['completada',task])).rows.length,1);
   assert.equal((await db.query('update subtareas set completada=true where id=$1 returning id',[sub])).rows.length,1);
   for(const sql of [`update tareas set titulo='Unauthorized' where id='${task}'`,`update tareas set asignado_a='${uid(3)}' where id='${task}'`,`update subtareas set titulo='Unauthorized' where id='${sub}'`,`update tareas set proyecto_id='${otherProject}' where id='${task}'`]) await assert.rejects(db.exec(sql),/Solo/);
@@ -81,14 +99,14 @@ try {
   assert.equal(await permissions(otherTask),null);
   console.log('PASS: villa member updates another assignee and checklist, but cannot edit, move, create or delete.');
   for(const user of [uid(4),uid(5)]){
-    await login(user);assert.deepEqual(await permissions(task),{user_id:user,can_progress:true,can_edit:false});
+    await login(user);assert.deepEqual(await permissions(task),{user_id:user,can_view:true,can_view_all:true,can_progress:true,can_edit:false});
     assert.equal((await db.query('update tareas set estatus=$1 where id=$2 returning id',['pendiente',task])).rows.length,1);
     assert.equal((await db.query('update subtareas set completada=false where id=$1 returning id',[sub])).rows.length,1);
     await assert.rejects(db.query('update tareas set titulo=$1 where id=$2',['Unauthorized',task]),/Solo/);
   }
   console.log('PASS: global and development access grants progress without content editing.');
   await login(uid(4));
-  assert.deepEqual(await permissions(otherTask),{user_id:uid(4),can_progress:true,can_edit:false});
+  assert.deepEqual(await permissions(otherTask),{user_id:uid(4),can_view:true,can_view_all:true,can_progress:true,can_edit:false});
   assert.equal((await db.query('update tareas set estatus=$1 where id=$2 returning id',['completada',otherTask])).rows.length,1);
   await db.exec('reset role');
   await db.query('delete from proyecto_accesos_globales where usuario_id=$1',[uid(4)]);
@@ -97,15 +115,69 @@ try {
   console.log('PASS: global access works in a second villa and disappears after revocation.');
   await login(uid(6));assert.equal(await permissions(task),null);
   assert.equal((await db.query('update tareas set estatus=$1 where id=$2 returning id',['pendiente',task])).rows.length,0);
-  await login(uid(2));assert.deepEqual(await permissions(task),{user_id:uid(2),can_progress:true,can_edit:true});
+  await login(uid(2));assert.deepEqual(await permissions(task),{user_id:uid(2),can_view:true,can_view_all:true,can_progress:true,can_edit:true});
   assert.equal((await db.query('update tareas set titulo=$1 where id=$2 returning id',['Supervisor edit',task])).rows.length,1);
   assert.equal((await db.query('update subtareas set titulo=$1 where id=$2 returning id',['Supervisor checklist',sub])).rows.length,1);
   assert.equal(await permissions(otherTask),null);
   await assert.rejects(db.query('update tareas set proyecto_id=$1 where id=$2',[otherProject,task]),/row-level security/);
   console.log('PASS: active supervisor edits only accessible villas; inactive users have no write access.');
-  await login(uid(1));assert.deepEqual(await permissions(otherTask),{user_id:uid(1),can_progress:true,can_edit:true});
+  await login(uid(1));assert.deepEqual(await permissions(otherTask),{user_id:uid(1),can_view:true,can_view_all:true,can_progress:true,can_edit:true});
   assert.equal((await db.query('update tareas set titulo=$1 where id=$2 returning id',['Admin edit',otherTask])).rows.length,1);
+  assert.equal((await db.query('update tareas set prioridad=$1 where id=$2 returning prioridad,prioridad_orden',['alta',otherTask])).rows[0]?.prioridad_orden,1);
+  await assert.rejects(db.query('update tareas set prioridad=$1 where id=$2',['urgente',otherTask]),/tareas_prioridad_check/);
   await db.exec('reset role; set role anon');
   await assert.rejects(db.query('select public.get_task_permissions($1)',[task]),/permission denied/);
   console.log('PASS: administrator access remains available and anonymous RPC calls are denied.');
+
+  const progressRequest='d3000000-0000-0000-0000-000000000001';
+  const evidencePath=`${project}/${visualTask}/${uid(7)}/${progressRequest}.jpg`;
+  await login(uid(7));
+  assert.equal((await db.query('select private.task_evidence_access($1,true) as allowed',[evidencePath])).rows[0].allowed,true);
+  await db.query('insert into storage.objects(bucket_id,name,owner_id) values($1,$2,$3)',
+    ['task-evidence',evidencePath,uid(7)]);
+  await assert.rejects(db.query('insert into storage.objects(bucket_id,name,owner_id) values($1,$2,$3)',
+    ['task-evidence',`${project}/${visualTask}/${uid(3)}/${progressRequest}.jpg`,uid(7)]),/row-level security/);
+  const recorded=(await db.query(`select public.record_task_progress($1,$2,$3,null,null,$4,$5,$6) as activity`,
+    [progressRequest,visualTask,'en_proceso','  Tablero energizado  ',evidencePath,'2026-11-02T08:00:00-07:00'])).rows[0].activity;
+  assert.equal(recorded.request_id,progressRequest);
+  assert.equal(recorded.comentario,'Tablero energizado');
+  assert.equal(recorded.evidencia_path,evidencePath);
+  assert.equal(recorded.siguiente,'en_proceso');
+  const reportRow=(await db.query(`select comentario,evidencia_path,request_id
+    from public.get_task_activity_report(
+      (statement_timestamp() at time zone 'America/Mazatlan')::date,
+      (statement_timestamp() at time zone 'America/Mazatlan')::date)
+    where request_id=$1`,[progressRequest])).rows[0];
+  assert.deepEqual(reportRow,{comentario:'Tablero energizado',evidencia_path:evidencePath,request_id:progressRequest});
+  const retried=(await db.query(`select public.record_task_progress($1,$2,$3,null,null,$4,$5,$6) as activity`,
+    [progressRequest,visualTask,'completada','Different retry',null,null])).rows[0].activity;
+  assert.equal(retried.id,recorded.id);
+  assert.equal((await db.query('select count(*)::int as count from task_activity where request_id=$1',[progressRequest])).rows[0].count,1);
+  assert.equal((await db.query('select estatus from tareas where id=$1',[visualTask])).rows[0].estatus,'en_proceso');
+  assert.equal((await db.query('delete from storage.objects where name=$1 returning name',[evidencePath])).rows.length,0);
+  const orphanPath=`${project}/${visualTask}/${uid(7)}/d3000000-0000-0000-0000-000000000099.jpg`;
+  await db.query('insert into storage.objects(bucket_id,name,owner_id) values($1,$2,$3)',
+    ['task-evidence',orphanPath,uid(7)]);
+  assert.equal((await db.query('delete from storage.objects where name=$1 returning name',[orphanPath])).rows.length,1);
+  await assert.rejects(db.query(`select public.record_task_progress($1,$2,$3)`,
+    ['d3000000-0000-0000-0000-000000000002',visualTask,'en_proceso']),/cambio efectivo/);
+  console.log('PASS: comments and private evidence are recorded atomically; retries are idempotent.');
+
+  await login(uid(3));
+  assert.equal((await db.query('select name from storage.objects where name=$1',[evidencePath])).rows.length,1);
+  const subRequest='d3000000-0000-0000-0000-000000000003';
+  const subActivity=(await db.query(`select public.record_task_progress($1,$2,null,$3,$4,$5) as activity`,
+    [subRequest,task,sub,true,'Revisión completada'])).rows[0].activity;
+  assert.equal(subActivity.accion,'subtarea');
+  assert.equal(subActivity.siguiente,'true');
+  await login(uid(7));
+  assert.equal((await db.query('select name from storage.objects where name=$1',[evidencePath])).rows.length,1);
+  await login(uid(6));
+  assert.equal((await db.query('select name from storage.objects where name=$1',[evidencePath])).rows.length,0);
+  await assert.rejects(db.query(`select public.record_task_progress($1,$2,$3)`,
+    ['d3000000-0000-0000-0000-000000000004',visualTask,'completada']),/permiso/);
+  await db.exec('reset role; set role anon');
+  await assert.rejects(db.query(`select public.record_task_progress($1,$2,$3)`,
+    ['d3000000-0000-0000-0000-000000000005',visualTask,'completada']),/permission denied/);
+  console.log('PASS: evidence reads follow task visibility; outsiders and anonymous users are denied.');
 } finally { await db.close(); }

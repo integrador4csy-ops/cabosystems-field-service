@@ -2,6 +2,7 @@ import { useSectionResources } from '../../context/SectionResources';
 import { teamProfiles } from '../../lib/teamSnapshot';
 import { getRoleLabel } from '../../lib/uiTranslations';
 import { useTranslation } from '../../context/LanguageContext';
+import { useSidebar } from '../../context/SidebarContext';
 import { useDialog } from '../ui/useDialog';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -9,13 +10,11 @@ import type { Profile } from '../../types/fleet';
 import { RoleSelect } from '../ui/RoleSelect';
 import {
   Users,
-  UserPlus,
   Edit2,
   X,
   Check,
   UserX,
   UserCheck,
-  Search,
   AlertCircle,
   AlertTriangle,
   RefreshCw,
@@ -27,22 +26,20 @@ import '../AdminUsersModal.css';
 
 interface CollaboratorsSectionProps {
   active: boolean;
-  onOpenInvite?: () => void;
   onUserListChanged?: () => void;
 }
 
 export const CollaboratorsSection: React.FC<CollaboratorsSectionProps> = ({
   active,
-  onOpenInvite,
   onUserListChanged,
 }) => {
   const { t } = useTranslation();
+  const { teamSearchQuery } = useSidebar();
   const resources = useSectionResources();
   const cached = resources.queries.read<Profile[]>('collaborators');
   const [profiles, setProfiles] = useState<Profile[]>(cached || []);
   const [loading, setLoading] = useState(!cached);
   const hasLoaded = useRef(Boolean(cached));
-  const [searchQuery, setSearchQuery] = useState('');
   const [globalBanner, setGlobalBanner] = useState<{
     type: 'success' | 'error';
     text: string;
@@ -290,7 +287,7 @@ export const CollaboratorsSection: React.FC<CollaboratorsSectionProps> = ({
   };
 
   const filteredProfiles = profiles.filter((p) => {
-    const q = searchQuery.toLowerCase().trim();
+    const q = teamSearchQuery.toLowerCase().trim();
     if (!q) return true;
     return (
       (p.nombre || '').toLowerCase().includes(q) ||
@@ -314,19 +311,7 @@ export const CollaboratorsSection: React.FC<CollaboratorsSectionProps> = ({
                 {t("Equipo técnico y personal operativo activo en CaboSystems")}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {onOpenInvite && (
-              <button
-                className="team-invite-button flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors"
-                onClick={() => {
-                  onOpenInvite();
-                }}
-              >
-                <UserPlus size={14} />
-                <span>{t("Invitar")}</span>
-              </button>
-            )}
-          </div>
+          <button type="button" className="team-refresh-button" onClick={() => void loadData()} disabled={loading} aria-label={t("Recargar colaboradores")} title={t("Recargar colaboradores")}><RefreshCw size={16} className={loading ? 'spin' : ''} /></button>
         </div>
 
         {/* Modal Body */}
@@ -342,29 +327,6 @@ export const CollaboratorsSection: React.FC<CollaboratorsSectionProps> = ({
           )}
 
           <div className="admin-tab-pane">
-            <div className="admin-search-bar">
-              <Search size={15} className="search-icon" />
-              <input
-                type="text"
-                placeholder={t("Buscar colaborador por nombre, correo o rol...")}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              {searchQuery && (
-                <button className="clear-search" onClick={() => setSearchQuery('')}>
-                  <X size={13} />
-                </button>
-              )}
-              <button
-                className="refresh-btn"
-                onClick={() => void loadData()}
-                disabled={loading}
-                title={t("Recargar colaboradores")}
-              >
-                <RefreshCw size={14} className={loading ? 'spin' : ''} />
-              </button>
-            </div>
-
             <div className="admin-users-table-wrapper" tabIndex={0} role="region" aria-label={t("Tabla de personal; desplázate horizontalmente para ver todas las acciones")}>
               <table className="admin-users-table">
                 <thead>

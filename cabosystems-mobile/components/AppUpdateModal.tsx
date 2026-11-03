@@ -1,3 +1,4 @@
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React from 'react';
 import {
   Modal,
@@ -24,6 +25,7 @@ export default function AppUpdateModal({
   updateInfo,
   onClose,
 }: AppUpdateModalProps) {
+  const { t: tr } = useInterfaceTranslation();
   if (!updateInfo || !visible) return null;
 
   const handleDownload = async () => {
@@ -62,23 +64,21 @@ export default function AppUpdateModal({
 
           {/* Badge & Title */}
           <View style={styles.badgeContainer}>
-            <Text style={styles.badgeText}>
-              NUEVA VERSIÓN v{updateInfo.latest_version}
+            <Text style={styles.badgeText}>{tr("NUEVA VERSIÓN v")}{updateInfo.latest_version}
             </Text>
           </View>
 
-          <Text style={styles.title}>¡Actualización Disponible!</Text>
-          <Text style={styles.subtitle}>
-            Tienes instalada la versión <Text style={styles.boldText}>v{updateInfo.current_version}</Text>. 
+          <Text style={styles.title}>{tr("¡Actualización Disponible!")}</Text>
+          <Text style={styles.subtitle}>{tr("Tienes instalada la versión ")}<Text style={styles.boldText}>v{updateInfo.current_version}</Text>.{' '}
             {updateInfo.is_forced
-              ? ' Esta actualización es obligatoria para continuar operando en campo.'
-              : ' Te recomendamos actualizar para disfrutar de las últimas mejoras y correcciones.'}
+              ? tr(" Esta actualización es obligatoria para continuar operando en campo.")
+              : tr(" Te recomendamos actualizar para disfrutar de las últimas mejoras y correcciones.")}
           </Text>
 
           {/* Release Notes Box */}
           {!!updateInfo.release_notes && (
             <View style={styles.notesContainer}>
-              <Text style={styles.notesTitle}>Novedades:</Text>
+              <Text style={styles.notesTitle}>{tr("Novedades:")}</Text>
               <ScrollView style={styles.notesScroll} nestedScrollEnabled>
                 <Text style={styles.notesText}>{updateInfo.release_notes}</Text>
               </ScrollView>
@@ -93,7 +93,7 @@ export default function AppUpdateModal({
               activeOpacity={0.85}
             >
               <Ionicons name="download" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.primaryButtonText}>Descargar e Instalar</Text>
+              <Text style={styles.primaryButtonText}>{tr("Descargar e Instalar")}</Text>
             </TouchableOpacity>
 
             {!updateInfo.is_forced && (
@@ -102,7 +102,7 @@ export default function AppUpdateModal({
                 onPress={onClose}
                 activeOpacity={0.7}
               >
-                <Text style={styles.secondaryButtonText}>Recordar más tarde</Text>
+                <Text style={styles.secondaryButtonText}>{tr("Recordar más tarde")}</Text>
               </TouchableOpacity>
             )}
           </View>

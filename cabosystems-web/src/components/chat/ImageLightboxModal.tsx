@@ -1,6 +1,7 @@
 import { useTranslation } from '../../context/LanguageContext';
 import React, { useEffect } from 'react';
 import { X, Download, ExternalLink } from 'lucide-react';
+import { downloadRemoteFile } from '../../lib/fileDownload';
 
 interface ImageLightboxModalProps {
   imageUrl: string | null;
@@ -35,16 +36,14 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
       >
         {/* Top Control Bar */}
         <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
-          <a
-            href={imageUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            download
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-brand-500 transition-all shadow-md backdrop-blur-xs"
+          <button
+            type="button"
+            onClick={() => void downloadRemoteFile(imageUrl, caption || 'imagen')}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-brand-500 transition-all shadow-md backdrop-blur-xs cursor-pointer"
             title={t("Descargar imagen")}
           >
             <Download size={18} />
-          </a>
+          </button>
           <a
             href={imageUrl}
             target="_blank"

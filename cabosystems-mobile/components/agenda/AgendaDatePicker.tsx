@@ -1,11 +1,15 @@
-import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type ViewInstance } from 'react-native';
 import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AgendaPalette as P } from '@/constants/Theme';
 import { dateKey, parseDateKey, shiftDate, shiftMonth, weekDates } from '@/lib/agenda';
 
-export function AgendaDatePicker({ date, today, locale, onSelect, compact = false, label }: { date: string; today: string; locale: string; onSelect: (date: string) => void; compact?: boolean; label?: string }) {
+export function AgendaDatePicker({ date, today, locale, onSelect, compact = false, field = false, label, onBeforeOpen, onAfterClose }: { date: string; today: string; locale: string; onSelect: (date: string) => void; compact?: boolean; field?: boolean; label?: string; onBeforeOpen?: (scrollBy: number) => Promise<void>; onAfterClose?: () => void }) {
+  const button = useRef<ViewInstance>(null);
+  const [anchor, setAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const { width, height } = useWindowDimensions();
+  useEffect(() => { setOpen(false); setAnchor(null); }, [width, height]);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(date);
   const [months, setMonths] = useState(false);
@@ -21,16 +25,19 @@ export function AgendaDatePicker({ date, today, locale, onSelect, compact = fals
     const count = (Math.round((parseDateKey(last).getTime() - parseDateKey(start).getTime()) / 86400000) + 1);
     return Array.from({ length: Math.ceil(count / 7) * 7 }, (_, i) => shiftDate(start, i));
   }, [draft]);
-  const close = () => setOpen(false);
+  const popupWidth = Math.min(340, width - 32);
+  const popupTop = anchor ? anchor.y + anchor.height + 4 : 0;
+  const popupHeight = Math.max(120, Math.min(420, height - popupTop - insets.bottom - 12));
+  const close = () => { setOpen(false); onAfterClose?.(); };
   const apply = (value: string) => { onSelect(value); close(); };
   return <>
-    <Pressable accessibilityRole="button" accessibilityLabel={`${es ? 'Elegir fecha' : 'Choose date'}: ${fullDate.format(parseDateKey(date))}`} accessibilityState={{ expanded: open }} onPress={() => { setDraft(date); setMonths(false); setOpen(true); }} style={[styles.dateButton, compact && styles.compactButton]}>
-      <Text numberOfLines={compact ? 1 : undefined} adjustsFontSizeToFit={compact} minimumFontScale={0.8} style={[styles.dateText, compact && styles.compactText]}>{label ? label.charAt(0).toLocaleUpperCase(locale) + label.slice(1) : date.split('-').reverse().join('/')}</Text>{!compact ? <CalendarDays size={18} color={P.ink} /> : null}
+    <Pressable ref={button} accessibilityRole="button" accessibilityLabel={`${es ? 'Elegir fecha' : 'Choose date'}: ${fullDate.format(parseDateKey(date))}`} accessibilityState={{ expanded: open }} onPress={() => { setDraft(date); setMonths(false); if (field) button.current?.measureInWindow(async (x, y, buttonWidth, buttonHeight) => { const scrollBy = Math.max(0, 390 - (height - y - buttonHeight - insets.bottom)); if (scrollBy > 0 && onBeforeOpen) await onBeforeOpen(scrollBy); button.current?.measureInWindow((x, y, width, height) => { setAnchor({ x, y, width, height }); setOpen(true); }); }); else setOpen(true); }} style={[styles.dateButton, compact && styles.compactButton, field && styles.fieldButton]}>
+      <Text numberOfLines={compact || field ? 1 : undefined} adjustsFontSizeToFit={compact} minimumFontScale={0.8} style={[styles.dateText, compact && styles.compactText, field && styles.fieldText]}>{label ? label.charAt(0).toLocaleUpperCase(locale) + label.slice(1) : date.split('-').reverse().join('/')}</Text>{!compact ? <CalendarDays size={field ? 16 : 18} color={P.ink} /> : null}
     </Pressable>
     {open && <Modal visible transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
-      <View style={[styles.backdrop, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
+      <View style={field ? StyleSheet.absoluteFill : [styles.backdrop, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
         <Pressable accessibilityRole="button" accessibilityLabel={es ? 'Cerrar' : 'Close'} onPress={close} style={StyleSheet.absoluteFill} />
-        <View style={styles.sheet} accessibilityViewIsModal>
+        <View style={[styles.sheet, field && anchor ? [styles.anchoredSheet, { left: Math.max(16, Math.min(anchor.x, width - popupWidth - 16)), top: popupTop, width: popupWidth, maxHeight: popupHeight }] : undefined]} accessibilityViewIsModal>
           <View style={styles.row}><Text style={styles.heading}>{es ? 'Elegir fecha' : 'Choose date'}</Text><Pressable accessibilityRole="button" accessibilityLabel={es ? 'Cerrar' : 'Close'} onPress={close} style={styles.icon}><X size={22} color={P.ink} /></Pressable></View>
           <ScrollView>
             <View style={styles.row}>
@@ -50,6 +57,9 @@ export function AgendaDatePicker({ date, today, locale, onSelect, compact = fals
   </>;
 }
 const styles = StyleSheet.create({
+  anchoredSheet: { position: 'absolute', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: P.line, elevation: 6, shadowColor: P.ink, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 8 },
+  fieldButton: { alignSelf: 'stretch', gap: 6, paddingHorizontal: 8, paddingVertical: 8, marginBottom: 0 },
+  fieldText: { flexShrink: 1, fontSize: 13 },
   compactButton: { flex: 1, alignSelf: 'stretch', borderWidth: 0, paddingHorizontal: 0, marginBottom: 0, gap: 0 }, compactText: { fontFamily: 'Outfit_600SemiBold', fontSize: 20, flexShrink: 1 },
   dateButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 24, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 12, borderWidth: 1, borderColor: P.line, borderRadius: 8 }, dateText: { fontFamily: 'Outfit_400Regular', fontSize: 15, color: P.ink },
   backdrop: { flex: 1, backgroundColor: P.overlay, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 }, sheet: { width: '100%', maxWidth: 480, maxHeight: '90%', padding: 16, borderRadius: 12, backgroundColor: P.white },

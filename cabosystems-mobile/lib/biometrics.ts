@@ -1,3 +1,4 @@
+import { translateCurrent } from './localization';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
@@ -189,14 +190,14 @@ export async function authenticateWithBiometrics(
     if (!available || !enrolled) {
       return {
         success: false,
-        error: `No se encontró ${label} configurada en este dispositivo.`,
+        error: translateCurrent('No se encontró {value0} configurada en este dispositivo.', {value0: translateCurrent(label)}),
       };
     }
 
     const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: promptMessage || `Acceder a CaboSystems con ${label}`,
-      fallbackLabel: 'Ingresar con contraseña',
-      cancelLabel: 'Cancelar',
+      promptMessage: promptMessage || translateCurrent('Acceder a CaboSystems con {value0}', { value0: translateCurrent(label) }),
+      fallbackLabel: translateCurrent("Ingresar con contraseña"),
+      cancelLabel: translateCurrent("Cancelar"),
       disableDeviceFallback: false,
     });
 
@@ -228,7 +229,7 @@ export async function performBiometricLogin(
   }
 
   const { label } = await getBiometricStatus();
-  const auth = await authenticateWithBiometrics(`Acceder a CaboSystems con ${label}`);
+  const auth = await authenticateWithBiometrics(translateCurrent('Acceder a CaboSystems con {value0}', {value0: translateCurrent(label)}));
   if (!auth.success) {
     return { success: false, error: auth.error };
   }

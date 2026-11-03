@@ -1,3 +1,4 @@
+import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -19,6 +20,7 @@ import { useAuth, formatAuthError } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
 export default function ResetPasswordScreen() {
+  const { t: tr } = useInterfaceTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
@@ -96,7 +98,7 @@ export default function ResetPasswordScreen() {
   const handleSendEmail = async () => {
     setErrorMessage(null);
     if (!email.trim()) {
-      setErrorMessage('Ingresa el correo electrónico asociado a tu cuenta.');
+      setErrorMessage(tr("Ingresa el correo electrónico asociado a tu cuenta."));
       return;
     }
 
@@ -117,7 +119,7 @@ export default function ResetPasswordScreen() {
   const handleVerifyOtp = async () => {
     setErrorMessage(null);
     if (!otpCode.trim() || otpCode.trim().length < 6) {
-      setErrorMessage('Ingresa el código de 6 dígitos recibido por correo.');
+      setErrorMessage(tr("Ingresa el código de 6 dígitos recibido por correo."));
       return;
     }
 
@@ -136,7 +138,7 @@ export default function ResetPasswordScreen() {
         setEmailSent(false);
       }
     } catch (err: any) {
-      setErrorMessage(formatAuthError(err?.message || 'Error al validar el código.'));
+      setErrorMessage(formatAuthError(err?.message || tr("Error al validar el código.")));
     } finally {
       setVerifyingOtp(false);
     }
@@ -146,11 +148,11 @@ export default function ResetPasswordScreen() {
   const handleUpdatePassword = async () => {
     setErrorMessage(null);
     if (!newPassword || newPassword.length < 6) {
-      setErrorMessage('La contraseña debe tener al menos 6 caracteres.');
+      setErrorMessage(tr("La contraseña debe tener al menos 6 caracteres."));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setErrorMessage('Las contraseñas no coinciden.');
+      setErrorMessage(tr("Las contraseñas no coinciden."));
       return;
     }
 
@@ -166,7 +168,7 @@ export default function ResetPasswordScreen() {
         setShowSuccessModal(true);
       }
     } catch (err: any) {
-      setErrorMessage(formatAuthError(err?.message || 'Error al actualizar contraseña.'));
+      setErrorMessage(formatAuthError(err?.message || tr("Error al actualizar contraseña.")));
     } finally {
       setLoading(false);
     }
@@ -199,7 +201,7 @@ export default function ResetPasswordScreen() {
           hitSlop={8}
         >
           <ArrowLeft size={18} color={Colors.text} />
-          <Text style={styles.backButtonText}>Volver al Login</Text>
+          <Text style={styles.backButtonText}>{tr("Volver al Login")}</Text>
         </Pressable>
       </View>
 
@@ -214,12 +216,12 @@ export default function ResetPasswordScreen() {
       >
         <View style={styles.card}>
           <Text style={styles.title}>
-            {isSettingNewPassword ? 'Nueva Contraseña' : '¿Olvidaste tu contraseña?'}
+            {isSettingNewPassword ? tr("Nueva Contraseña") : tr("¿Olvidaste tu contraseña?")}
           </Text>
           <Text style={styles.subtitle}>
             {isSettingNewPassword
-              ? 'Ingresa tu nueva clave de acceso para CaboSystems Field Service.'
-              : 'Ingresa tu correo registrado y te enviaremos un enlace y código para restablecer tu clave.'}
+              ? tr("Ingresa tu nueva clave de acceso para CaboSystems Field Service.")
+              : tr("Ingresa tu correo registrado y te enviaremos un enlace y código para restablecer tu clave.")}
           </Text>
 
           {!!errorMessage && (
@@ -232,21 +234,19 @@ export default function ResetPasswordScreen() {
           {emailSent ? (
             <View style={styles.successBox}>
               <CheckCircle size={36} color={Colors.primary} style={{ marginBottom: 10 }} />
-              <Text style={styles.successTitle}>Correo Enviado</Text>
-              <Text style={styles.successText}>
-                Hemos enviado un correo a <Text style={{ fontFamily: 'Outfit_700Bold', color: Colors.text }}>{email}</Text> con las instrucciones y el código de seguridad.
-              </Text>
+              <Text style={styles.successTitle}>{tr("Correo Enviado")}</Text>
+              <Text style={styles.successText}>{tr("Hemos enviado un correo a ")}<Text style={{ fontFamily: 'Outfit_700Bold', color: Colors.text }}>{email}</Text>{tr(" con las instrucciones y el código de seguridad.")}</Text>
 
               {/* Separador */}
               <View style={styles.divider}>
                 <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>O INGRESA EL CÓDIGO AQUÍ</Text>
+                <Text style={styles.dividerText}>{tr("O INGRESA EL CÓDIGO AQUÍ")}</Text>
                 <View style={styles.dividerLine} />
               </View>
 
               {/* Formulario para ingresar código OTP de 6 dígitos directamente */}
               <View style={[styles.inputGroup, { width: '100%' }]}>
-                <Text style={styles.inputLabel}>Código de seguridad (6 dígitos)</Text>
+                <Text style={styles.inputLabel}>{tr("Código de seguridad (6 dígitos)")}</Text>
                 <View style={styles.inputWrapper}>
                   <KeyRound size={18} color={Colors.textMuted} style={styles.inputIcon} />
                   <TextInput
@@ -275,7 +275,7 @@ export default function ResetPasswordScreen() {
                 {verifyingOtp ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Text style={styles.submitButtonText}>Validar Código y Continuar</Text>
+                  <Text style={styles.submitButtonText}>{tr("Validar Código y Continuar")}</Text>
                 )}
               </Pressable>
 
@@ -283,19 +283,19 @@ export default function ResetPasswordScreen() {
                 style={styles.cancelLink}
                 onPress={() => setEmailSent(false)}
               >
-                <Text style={styles.cancelLinkText}>Reintentar con otro correo</Text>
+                <Text style={styles.cancelLinkText}>{tr("Reintentar con otro correo")}</Text>
               </Pressable>
             </View>
           ) : isSettingNewPassword ? (
             <>
               {/* Nueva Contraseña */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Nueva contraseña</Text>
+                <Text style={styles.inputLabel}>{tr("Nueva contraseña")}</Text>
                 <View style={styles.inputWrapper}>
                   <Lock size={18} color={Colors.textMuted} style={styles.inputIcon} />
                   <TextInput
                     style={[styles.textInput, { paddingRight: 40 }]}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder={tr("Mínimo 6 caracteres")}
                     placeholderTextColor={Colors.textMuted}
                     value={newPassword}
                     onChangeText={setNewPassword}
@@ -319,12 +319,12 @@ export default function ResetPasswordScreen() {
 
               {/* Confirmar Nueva Contraseña */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Confirmar contraseña</Text>
+                <Text style={styles.inputLabel}>{tr("Confirmar contraseña")}</Text>
                 <View style={styles.inputWrapper}>
                   <Lock size={18} color={Colors.textMuted} style={styles.inputIcon} />
                   <TextInput
                     style={styles.textInput}
-                    placeholder="Repite la contraseña"
+                    placeholder={tr("Repite la contraseña")}
                     placeholderTextColor={Colors.textMuted}
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
@@ -347,7 +347,7 @@ export default function ResetPasswordScreen() {
                 {loading ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Text style={styles.submitButtonText}>Actualizar Contraseña</Text>
+                  <Text style={styles.submitButtonText}>{tr("Actualizar Contraseña")}</Text>
                 )}
               </Pressable>
             </>
@@ -355,12 +355,12 @@ export default function ResetPasswordScreen() {
             <>
               {/* Formulario de Solicitud de Correo */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Correo electrónico corporativo</Text>
+                <Text style={styles.inputLabel}>{tr("Correo electrónico corporativo")}</Text>
                 <View style={styles.inputWrapper}>
                   <Mail size={18} color={Colors.textMuted} style={styles.inputIcon} />
                   <TextInput
                     style={styles.textInput}
-                    placeholder="tu-correo@csy.mx"
+                    placeholder="name@csy.mx"
                     placeholderTextColor={Colors.textMuted}
                     value={email}
                     onChangeText={setEmail}
@@ -384,7 +384,7 @@ export default function ResetPasswordScreen() {
                 {loading ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Text style={styles.submitButtonText}>Enviar Enlace de Recuperación</Text>
+                  <Text style={styles.submitButtonText}>{tr("Enviar Enlace de Recuperación")}</Text>
                 )}
               </Pressable>
             </>
@@ -405,17 +405,15 @@ export default function ResetPasswordScreen() {
               <CheckCircle size={38} color={Colors.primary} />
             </View>
 
-            <Text style={styles.modalTitle}>¡Contraseña Actualizada!</Text>
+            <Text style={styles.modalTitle}>{tr("¡Contraseña Actualizada!")}</Text>
 
-            <Text style={styles.modalSubtitle}>
-              Tu contraseña de acceso en <Text style={{ fontFamily: 'Outfit_700Bold', color: Colors.text }}>CaboSystems</Text> ha sido cambiada correctamente. Ya puedes iniciar sesión con tus nuevas credenciales.
-            </Text>
+            <Text style={styles.modalSubtitle}>{tr("Tu contraseña de acceso en ")}<Text style={{ fontFamily: 'Outfit_700Bold', color: Colors.text }}>CaboSystems</Text>{tr(" ha sido cambiada correctamente. Ya puedes iniciar sesión con tus nuevas credenciales.")}</Text>
 
             <Pressable
               style={styles.modalButton}
               onPress={handleSuccessClose}
             >
-              <Text style={styles.modalButtonText}>Iniciar Sesión</Text>
+              <Text style={styles.modalButtonText}>{tr("Iniciar Sesión")}</Text>
             </Pressable>
           </View>
         </View>
