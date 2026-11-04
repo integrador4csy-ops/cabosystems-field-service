@@ -98,6 +98,7 @@ test('agenda renders with Expo Router focus alone and disables swipes when the r
     './CompanyAgendaSearchResults': component('CompanyAgendaSearchResults'),
     './CompanyCalendarFilters': component('CompanyCalendarFilters'),
     './CompanyEventModal': component('CompanyEventModal'),
+    './GoogleCalendarSyncModal': component('GoogleCalendarSyncModal'),
     './AgendaSwipeArea': component('AgendaSwipeArea'),
     './AgendaNativePager': component('AgendaNativePager'),
   });

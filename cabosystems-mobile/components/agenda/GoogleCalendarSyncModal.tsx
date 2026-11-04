@@ -25,8 +25,15 @@ interface GoogleCalendarSyncModalProps {
 interface CalendarStatus {
   configured: boolean;
   connected: boolean;
+  revision: string;
   account: string | null;
-  selectedCalendars?: { id: string; name: string }[];
+  selectedCalendars?: CalendarInfo[];
+}
+
+interface CalendarInfo {
+  id: string;
+  name: string;
+  accessRole: string;
 }
 
 export const GoogleCalendarSyncModal: React.FC<GoogleCalendarSyncModalProps> = ({
@@ -40,6 +47,8 @@ export const GoogleCalendarSyncModal: React.FC<GoogleCalendarSyncModalProps> = (
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [status, setStatus] = useState<CalendarStatus | null>(null);
+  const [calendars, setCalendars] = useState<CalendarInfo[] | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
 
   const fetchStatus = async () => {
@@ -58,13 +67,50 @@ export const GoogleCalendarSyncModal: React.FC<GoogleCalendarSyncModalProps> = (
         setErrorMessage(msg || (isEs ? 'No se pudo verificar el estado de Google Calendar.' : 'Could not check Google Calendar status.'));
         setStatus(null);
       } else if (data) {
-        setStatus(data as CalendarStatus);
+        const next = data as CalendarStatus;
+        setStatus(next);
+        setSelected((next.selectedCalendars || []).map((calendar) => calendar.id));
+        setCalendars(null);
       }
     } catch (err) {
       setErrorMessage(isEs ? 'Error al consultar Google Calendar.' : 'Error checking Google Calendar.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadCalendars = async () => {
+    setLoading(true);
+    setErrorMessage('');
+    try {
+      const { data, error } = await supabase.functions.invoke('google-calendar', { body: { action: 'calendars' } });
+      if (error || !data?.calendars) throw new Error();
+      setCalendars(data.calendars as CalendarInfo[]);
+      setStatus((current) => current ? { ...current, revision: data.revision } : current);
+    } catch {
+      setErrorMessage(isEs ? 'No se pudieron consultar tus calendarios.' : 'Could not load your calendars.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveCalendars = async () => {
+    if (!status?.revision) return;
+    setLoading(true);
+    setErrorMessage('');
+    try {
+      const { error } = await supabase.functions.invoke('google-calendar', { body: { action: 'select', revision: status.revision, calendarIds: selected } });
+      if (error) throw new Error();
+      await fetchStatus();
+      onSyncDone();
+    } catch {
+      setErrorMessage(isEs ? 'No se pudo guardar tu selección de calendarios.' : 'Could not save your calendar selection.');
+      setLoading(false);
+    }
+  };
+
+  const toggleCalendar = (id: string) => {
+    setSelected((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
   };
 
   useEffect(() => {
@@ -164,6 +210,33 @@ export const GoogleCalendarSyncModal: React.FC<GoogleCalendarSyncModalProps> = (
                     ? 'Cada usuario puede vincular su cuenta de Google Calendar. Si no la vinculas, el sistema gestiona tu agenda mediante el calendario local de CaboSystems.'
                     : 'Each user can connect their own Google Calendar account. If not connected, the local CaboSystems calendar is used.'}
                 </Text>
+
+                {status?.connected ? (
+                  <>
+                    <Pressable onPress={loadCalendars} style={({ pressed }) => [s.secondaryBtn, pressed && s.pressed]}>
+                      <CalendarSync size={16} color={P.ink} />
+                      <Text style={s.secondaryBtnText}>{isEs ? 'Elegir mis calendarios' : 'Choose my calendars'}</Text>
+                    </Pressable>
+                    {calendars ? (
+                      <View style={s.calendarList}>
+                        {calendars.map((calendar) => {
+                          const readable = ['owner', 'writer', 'reader', 'writerWithoutPrivateAccess', 'freeBusyReader'].includes(calendar.accessRole);
+                          const checked = selected.includes(calendar.id);
+                          return (
+                            <Pressable key={calendar.id} disabled={!readable} onPress={() => toggleCalendar(calendar.id)} style={({ pressed }) => [s.calendarRow, pressed && s.pressed, !readable && s.disabledBtn]}>
+                              <View style={[s.checkbox, checked && s.checkboxChecked]}>{checked ? <Check size={14} color={P.white} /> : null}</View>
+                              <Text style={s.calendarName}>{calendar.name}</Text>
+                            </Pressable>
+                          );
+                        })}
+                        <Pressable onPress={saveCalendars} style={({ pressed }) => [s.primaryBtn, pressed && s.pressed]}>
+                          <Check size={18} color={P.white} />
+                          <Text style={s.primaryBtnText}>{isEs ? 'Guardar mis calendarios' : 'Save my calendars'}</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </>
+                ) : null}
 
                 {/* Action button: Connect / Reconnect */}
                 <Pressable
@@ -333,6 +406,39 @@ const s = StyleSheet.create({
     fontSize: 12.5,
     color: P.slate,
     lineHeight: 18,
+  },
+  calendarList: {
+    gap: 8,
+  },
+  calendarRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: P.line,
+    borderRadius: 9,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 1,
+    borderColor: P.muted,
+    borderRadius: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary,
+  },
+  calendarName: {
+    flex: 1,
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 13,
+    color: P.ink,
   },
   primaryBtn: {
     flexDirection: 'row',

@@ -9,7 +9,7 @@ export function apiHandler(service: ReturnType<typeof createCalendarService>) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (request.method !== 'POST') return Response.json({ error: 'Método no permitido.' }, { status: 405, headers: { ...cors, Allow: 'POST, OPTIONS' } });
     try {
-      const actor = await service.requireAdmin(request);
+      const actor = await service.requireUser(request);
       if (Number(request.headers.get('content-length') || '0') > 16000) throw new CalendarError('Solicitud demasiado grande.', 413);
       const text = await request.text();
       if (text.length > 16000) throw new CalendarError('Solicitud demasiado grande.', 413);
@@ -18,10 +18,10 @@ export function apiHandler(service: ReturnType<typeof createCalendarService>) {
       if (!body || typeof body !== 'object') throw new CalendarError('Solicitud inválida.');
       let result;
       switch (body.action) {
-        case 'status': result = await service.status(); break;
+        case 'status': result = await service.status(actor); break;
         case 'connect': result = await service.start(actor, body.replace === true); break;
-        case 'calendars': result = await service.listCalendars(); break;
-        case 'select': result = await service.selectCalendars(body.revision, body.calendarIds, actor.id); break;
+        case 'calendars': result = await service.listCalendars(actor); break;
+        case 'select': result = await service.selectCalendars(body.revision, body.calendarIds, actor); break;
         default: throw new CalendarError('Acción no válida.');
       }
       return Response.json(result, { headers: cors });
@@ -39,7 +39,7 @@ export function callbackHandler(service: ReturnType<typeof createCalendarService
     if (request.method !== 'GET') return new Response('Método no permitido.', { status: 405, headers });
     try {
       await service.callback(new URL(request.url));
-      return new Response('Cuenta Google conectada. Cierra esta pestaña y vuelve a Agenda → Google Calendar → Actualizar para seleccionar los calendarios. Todavía no se han importado ni cambiado eventos.', { headers });
+      return new Response('Tu cuenta Google quedó conectada. Cierra esta pestaña y vuelve a Agenda → Google Calendar → Actualizar para seleccionar tus calendarios.', { headers });
     } catch (error) {
       const { message, status } = failure(error);
       return new Response(message, { status, headers });

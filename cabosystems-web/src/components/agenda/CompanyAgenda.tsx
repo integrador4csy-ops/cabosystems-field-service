@@ -41,7 +41,7 @@ export function CompanyAgenda() {
     return () => window.removeEventListener('focus', reload);
   }, [activeItem, personalColors.reload]);
   const canManage = Boolean(user && adminProfile?.activo && ['admin', 'supervisor_instalacion'].includes(adminProfile.rol || ''));
-  const canConnectGoogle = Boolean(user && adminProfile?.activo && adminProfile.rol === 'admin');
+  const canConnectGoogle = Boolean(user && adminProfile?.activo);
   const [searchRevision, setSearchRevision] = useState(0);
   const searching = Boolean(agendaSearchQuery.trim());
   const searchClient = useMemo(() => new AgendaSearchClient(), [user?.id]);

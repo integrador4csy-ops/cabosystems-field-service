@@ -14,24 +14,30 @@ export function createStore(db: SupabaseClient): Store {
       if (error || !data.user) return null;
       return actorById(data.user.id);
     },
-    async connection() {
-      const { data, error } = await db.from('google_calendar_connection').select('*').eq('id', true).single();
-      if (error || !data) throw new Error('Cannot read Calendar connection');
-      return data as Connection;
+    async connection(userId) {
+      const existing = await db.from('google_calendar_connection').select('*').eq('user_id', userId).maybeSingle();
+      if (existing.error) throw new Error('Cannot read Calendar connection');
+      if (existing.data) return existing.data as Connection;
+      const created = await db.from('google_calendar_connection').upsert({ user_id: userId }, { onConflict: 'user_id', ignoreDuplicates: true }).select('*').maybeSingle();
+      if (created.error) throw new Error('Cannot create Calendar connection');
+      if (created.data) return created.data as Connection;
+      const concurrent = await db.from('google_calendar_connection').select('*').eq('user_id', userId).single();
+      if (concurrent.error || !concurrent.data) throw new Error('Cannot read Calendar connection');
+      return concurrent.data as Connection;
     },
     async createState(hash, state, expires) {
-      const { error: cleanup } = await db.from('google_calendar_oauth_states').delete().or(`expires_at.lt.${new Date().toISOString()},admin_id.eq.${state.admin_id}`);
+      const { error: cleanup } = await db.from('google_calendar_oauth_states').delete().or(`expires_at.lt.${new Date().toISOString()},user_id.eq.${state.user_id}`);
       if (cleanup) throw new Error('Cannot clean OAuth states');
       const { error } = await db.from('google_calendar_oauth_states').insert({ state_hash: hash, ...state, expires_at: expires });
       if (error) throw new Error('Cannot create OAuth state');
     },
     async consumeState(hash, now) {
-      const { data, error } = await db.from('google_calendar_oauth_states').delete().eq('state_hash', hash).gt('expires_at', now).select('admin_id,base_revision,verifier_ciphertext').maybeSingle();
+      const { data, error } = await db.from('google_calendar_oauth_states').delete().eq('state_hash', hash).gt('expires_at', now).select('user_id,base_revision,verifier_ciphertext').maybeSingle();
       if (error) throw new Error('Cannot consume OAuth state');
       return data as OAuthState | null;
     },
-    async commitConnection(revision, patch) {
-      const { data, error } = await db.from('google_calendar_connection').update({ ...patch, revision: crypto.randomUUID(), updated_at: new Date().toISOString() }).eq('id', true).eq('revision', revision).select('id').maybeSingle();
+    async commitConnection(revision, patch, userId) {
+      const { data, error } = await db.from('google_calendar_connection').update({ ...patch, revision: crypto.randomUUID(), updated_at: new Date().toISOString() }).eq('user_id', userId).eq('revision', revision).select('user_id').maybeSingle();
       if (error) throw new Error('Cannot save Calendar connection');
       return Boolean(data);
     },

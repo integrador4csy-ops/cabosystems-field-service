@@ -60,14 +60,16 @@ function fixture({ pages = [[primary, office, reader]], tokenPatch = {}, configu
   return { service, store, calls, states, authorization, connection: () => connection, actor: (next) => { actor = next; }, advance: (ms) => { instant += ms; } };
 }
 
-test('server authority uses active canonical admins, not supervisor or user metadata', async () => {
+test('server authority allows every active canonical user and rejects inactive sessions', async () => {
   const f = fixture();
-  await assert.rejects(f.service.requireAdmin(new Request('https://test')), (error) => error.status === 401);
+  await assert.rejects(f.service.requireUser(new Request('https://test')), (error) => error.status === 401);
   const request = new Request('https://test', { headers: { Authorization: 'Bearer valid' } });
-  for (const actor of [{ ...admin, activo: false }, { ...admin, rol: 'supervisor_instalacion' }, { ...admin, rol: 'aux_instalacion' }, null]) {
-    f.actor(actor); await assert.rejects(f.service.requireAdmin(request), (error) => error.status === 403);
+  for (const actor of [{ ...admin, activo: false }, null]) {
+    f.actor(actor); await assert.rejects(f.service.requireUser(request), (error) => error.status === 403);
   }
-  f.actor(admin); assert.equal((await f.service.requireAdmin(request)).id, admin.id);
+  for (const actor of [admin, { ...admin, rol: 'supervisor_instalacion' }, { ...admin, rol: 'aux_instalacion' }]) {
+    f.actor(actor); assert.equal((await f.service.requireUser(request)).id, admin.id);
+  }
 });
 
 test('OAuth uses PKCE, offline consent, hashed expiring state and single-use callback', async () => {
@@ -90,6 +92,54 @@ test('OAuth uses PKCE, offline consent, hashed expiring state and single-use cal
   assert.ok(tokenCall.options.body.get('code_verifier'));
 });
 
+test('each user owns an isolated Google account, revision and calendar selection', async () => {
+  const users = [admin, { id: 'tech', activo: true, rol: 'aux_instalacion' }];
+  const actors = new Map(users.map((actor) => [actor.id, actor]));
+  const connections = new Map(users.map((actor) => [actor.id, { revision: `${actor.id}-revision`, refresh_token_ciphertext: null, account_label: null, selected_calendars: [], connected_at: null, connected_by: null }]));
+  const states = new Map();
+  const store = {
+    actorForToken: async () => null,
+    actorById: async (id) => actors.get(id) || null,
+    connection: async (userId) => structuredClone(connections.get(userId)),
+    createState: async (hash, row, expires) => states.set(hash, { ...row, expires }),
+    consumeState: async (hash, now) => {
+      const state = states.get(hash);
+      if (!state || state.expires <= now) return null;
+      states.delete(hash); return state;
+    },
+    commitConnection: async (revision, patch, userId) => {
+      const current = connections.get(userId);
+      if (!current || current.revision !== revision) return false;
+      connections.set(userId, { ...current, ...patch, revision: `${userId}-${crypto.randomUUID()}` });
+      return true;
+    },
+  };
+  const fetcher = async (url, options) => {
+    if (url === 'https://oauth2.googleapis.com/token') {
+      const code = options.body.get('code');
+      if (code) return Response.json({ access_token: `access-${code}`, refresh_token: `refresh-${code}`, token_type: 'Bearer', scope: SCOPES.join(' ') });
+      const refresh = options.body.get('refresh_token');
+      return Response.json({ access_token: `access-${refresh.endsWith('tech') ? 'tech' : 'admin'}`, token_type: 'Bearer' });
+    }
+    const token = options.headers.Authorization.replace('Bearer access-', '');
+    return Response.json({ items: [{ id: `${token}@example.test`, summary: token, primary: true, timeZone: 'America/Mazatlan', accessRole: 'owner' }] });
+  };
+  const service = createCalendarService({ store, clientId: 'client-id', clientSecret: 'test-secret-not-real-credential', redirectUri: 'https://project.supabase.co/functions/v1/google-calendar-callback', fetcher });
+  for (const actor of users) {
+    const auth = new URL((await service.start(actor, false)).url);
+    const callback = new URL('https://project.supabase.co/functions/v1/google-calendar-callback');
+    callback.searchParams.set('state', auth.searchParams.get('state'));
+    callback.searchParams.set('code', actor.id);
+    await service.callback(callback);
+  }
+  assert.equal((await service.status(admin)).account, 'admin@example.test');
+  assert.equal((await service.status(users[1])).account, 'tech@example.test');
+  const adminCalendars = await service.listCalendars(admin);
+  await service.selectCalendars(adminCalendars.revision, ['admin@example.test'], admin);
+  assert.deepEqual((await service.status(admin)).selectedCalendars.map(calendar => calendar.id), ['admin@example.test']);
+  assert.deepEqual((await service.status(users[1])).selectedCalendars, []);
+});
+
 test('expired, denied and revoked OAuth attempts cannot change the connection', async () => {
   const expired = fixture(); const e = await expired.authorization(); expired.advance(600001);
   await assert.rejects(expired.service.callback(e.callback), /venció/);
@@ -106,7 +156,7 @@ test('missing scopes or renewable tokens never create a connected status', async
   for (const tokenPatch of [{ scope: SCOPES[0] }, { refresh_token: undefined }, { token_type: 'unsafe' }]) {
     const f = fixture({ tokenPatch }); const { callback } = await f.authorization();
     await assert.rejects(f.service.callback(callback));
-    assert.equal((await f.service.status()).connected, false);
+    assert.equal((await f.service.status(admin)).connected, false);
   }
 });
 
@@ -123,15 +173,15 @@ test('overlapping authorizations cannot silently replace the connection', async 
 test('calendar pages are read completely, reader choices allowed and stale writes rejected', async () => {
   const f = fixture({ pages: [[primary], [office, reader]] }); const { callback } = await f.authorization();
   await f.service.callback(callback);
-  const list = await f.service.listCalendars();
+  const list = await f.service.listCalendars(admin);
   assert.equal(list.calendars.length, 3);
 
-  await assert.rejects(f.service.selectCalendars(list.revision, ['missing'], admin.id), /permiso/);
-  await assert.rejects(f.service.selectCalendars(list.revision, ['office', 'office'], admin.id), /válida/);
-  await f.service.selectCalendars(list.revision, ['office', 'readonly'], admin.id);
+  await assert.rejects(f.service.selectCalendars(list.revision, ['missing'], admin), /permiso/);
+  await assert.rejects(f.service.selectCalendars(list.revision, ['office', 'office'], admin), /válida/);
+  await f.service.selectCalendars(list.revision, ['office', 'readonly'], admin);
   assert.deepEqual(f.connection().selected_calendars.map((calendar) => calendar.id), ['office', 'readonly']);
-  await assert.rejects(f.service.selectCalendars(list.revision, [], admin.id), (error) => error.status === 409);
-  const status = await f.service.status();
+  await assert.rejects(f.service.selectCalendars(list.revision, [], admin), (error) => error.status === 409);
+  const status = await f.service.status(admin);
   assert.equal(status.syncEnabled, true);
   assert.equal(JSON.stringify(status).includes('ciphertext'), false);
 });
@@ -146,11 +196,11 @@ test('calendar display names replace an email with a configured label without ch
   const f = fixture({ pages: [[{ ...primary, id, summary: id, accessRole: 'reader' }]] });
   const { callback } = await f.authorization(); await f.service.callback(callback);
   await f.store.commitConnection(f.connection().revision, { calendar_aliases: aliases });
-  const list = await f.service.listCalendars();
+  const list = await f.service.listCalendars(admin);
   assert.equal(list.calendars[0].name, 'Integrador Cuatro'); assert.equal(list.calendars[0].id, id);
   assert.equal(list.calendars[0].accessRole, 'reader');
-  await f.service.selectCalendars(list.revision, [id], admin.id);
-  assert.equal((await f.service.status()).selectedCalendars[0].name, 'Integrador Cuatro');
+  await f.service.selectCalendars(list.revision, [id], admin);
+  assert.equal((await f.service.status(admin)).selectedCalendars[0].name, 'Integrador Cuatro');
   assert.equal((await f.service.eventCalendars('test-access'))[0].name, 'Integrador Cuatro');
 });
 
@@ -158,14 +208,14 @@ test('revoking an admin before saving calendar selection prevents the write', as
   const f = fixture(); const { callback } = await f.authorization(); await f.service.callback(callback);
   const revision = f.connection().revision;
   f.actor({ ...admin, activo: false });
-  await assert.rejects(f.service.selectCalendars(revision, ['office'], admin.id), (error) => error.status === 403);
+  await assert.rejects(f.service.selectCalendars(revision, ['office'], admin), (error) => error.status === 403);
   assert.deepEqual(f.connection().selected_calendars, []);
 });
 
 test('availability-only calendars are selectable but use only freeBusy and never expose private details', async () => {
   const f = fixture({ pages: [[primary, { ...reader, accessRole: 'freeBusyReader' }]] });
   const { callback } = await f.authorization(); await f.service.callback(callback);
-  await f.service.selectCalendars(f.connection().revision, ['readonly'], admin.id);
+  await f.service.selectCalendars(f.connection().revision, ['readonly'], admin);
   let queries = 0;
   const events = createEventService(f.service, async (url, options) => {
     assert.ok(url.endsWith('/freeBusy'));
@@ -188,7 +238,7 @@ test('availability-only calendars are selectable but use only freeBusy and never
 test('availability errors and missing scopes are explicit, never shown as a confirmed free calendar', async () => {
   const f = fixture({ pages: [[primary, { ...reader, accessRole: 'freeBusyReader' }]] });
   const { callback } = await f.authorization(); await f.service.callback(callback);
-  await f.service.selectCalendars(f.connection().revision, ['readonly'], admin.id);
+  await f.service.selectCalendars(f.connection().revision, ['readonly'], admin);
   for (const response of [{ calendars: { readonly: { errors: [{ reason: 'notFound' }], busy: [] } } }, { calendars: {} }, { calendars: { readonly: { busy: [{ start: 'invalid', end: 'invalid' }] } } }]) {
     await assert.rejects(createEventService(f.service, async () => Response.json(response)).list(admin, '2026-10-20', '2026-10-20'), error => error.status === 502);
   }
@@ -224,7 +274,7 @@ test('HTTP API authenticates every action, sanitizes errors and callback never e
 
 test('missing configuration is explicit and OAuth does not start', async () => {
   const f = fixture({ configured: false });
-  assert.equal((await f.service.status()).configured, false);
+  assert.equal((await f.service.status(admin)).configured, false);
   await assert.rejects(f.service.start(admin, false), (error) => error.status === 503);
 });
 
@@ -235,14 +285,17 @@ test('database denies every public client role access to credentials and OAuth s
       create table public.profiles (id uuid primary key);
       insert into public.profiles values ('00000000-0000-0000-0000-000000000001');`);
     const sql = readFileSync(new URL('../../supabase/migrations/20261020185353_google_calendar_connection.sql', import.meta.url), 'utf8');
+    const perUser = readFileSync(new URL('../../supabase/migrations/20261104120000_per_user_google_calendar.sql', import.meta.url), 'utf8');
     await db.exec(sql);
+    await db.exec(perUser);
+    await db.exec(`insert into public.google_calendar_connection(user_id) values ('00000000-0000-0000-0000-000000000001')`);
     for (const role of ['anon', 'authenticated']) {
       await db.exec(`set role ${role}`);
       for (const table of ['google_calendar_connection', 'google_calendar_oauth_states']) {
         await assert.rejects(db.query(`select * from public.${table}`), /permission denied/);
         await assert.rejects(db.exec(`delete from public.${table}`), /permission denied/);
         await assert.rejects(db.exec(`update public.${table} set created_at = now()`), /permission denied|does not exist/);
-        const column = table === 'google_calendar_connection' ? 'id' : 'state_hash';
+        const column = table === 'google_calendar_connection' ? 'user_id' : 'state_hash';
         await assert.rejects(db.exec(`insert into public.${table} (${column}) values (null)`), /permission denied/);
       }
       await db.exec('reset role');
@@ -253,8 +306,8 @@ test('database denies every public client role access to credentials and OAuth s
     const connection = await db.query('select revision from public.google_calendar_connection');
     assert.equal(connection.rows.length, 1);
     const revision = connection.rows[0].revision;
-    const first = await db.query('update public.google_calendar_connection set revision=gen_random_uuid() where revision=$1 returning id', [revision]);
-    const stale = await db.query('update public.google_calendar_connection set revision=gen_random_uuid() where revision=$1 returning id', [revision]);
+    const first = await db.query('update public.google_calendar_connection set revision=gen_random_uuid() where revision=$1 returning user_id', [revision]);
+    const stale = await db.query('update public.google_calendar_connection set revision=gen_random_uuid() where revision=$1 returning user_id', [revision]);
     assert.equal(first.rows.length, 1); assert.equal(stale.rows.length, 0);
   } finally { await db.close(); }
 });
@@ -295,7 +348,7 @@ test('global Google search represents unbounded recurring masters once and prote
 test('global Google search never exposes availability details or hides failed pages', async () => {
   const available = { ...reader, accessRole: 'freeBusyReader' };
   const f = fixture({ pages: [[primary, available]] }); const { callback } = await f.authorization(); await f.service.callback(callback);
-  await f.service.selectCalendars(f.connection().revision, ['readonly'], admin.id);
+  await f.service.selectCalendars(f.connection().revision, ['readonly'], admin);
   const events = createEventService(f.service, async () => { throw new Error('Availability has no searchable text'); });
   assert.deepEqual(await events.search(admin, 'sebastian', '2026-10-23'), { hits: [], unavailableCalendars: 1 });
   const g = await connectedFixture();
@@ -310,7 +363,7 @@ test('Google event metadata carries the actual calendar background color', () =>
 
 test('reader calendars display events but reject creation, updates and deletion before Google event requests', async () => {
   const f = fixture(); const { callback } = await f.authorization(); await f.service.callback(callback);
-  await f.service.selectCalendars(f.connection().revision, ['readonly'], admin.id);
+  await f.service.selectCalendars(f.connection().revision, ['readonly'], admin);
   let reads = 0;
   const events = createEventService(f.service, async (_url, options) => {
     assert.equal(options.method, undefined);
@@ -332,7 +385,7 @@ test('write permission is checked again when a selected calendar becomes read-on
   const calendar = { ...office };
   const f = fixture({ pages: [[primary, calendar]] });
   const { callback } = await f.authorization(); await f.service.callback(callback);
-  await f.service.selectCalendars(f.connection().revision, ['office'], admin.id);
+  await f.service.selectCalendars(f.connection().revision, ['office'], admin);
   calendar.accessRole = 'reader';
   const events = createEventService(f.service, async () => { throw new Error('No event requests expected'); });
   await assert.rejects(events.save(admin, { input: eventInput(), calendarId: 'office' }), error => error.status === 403);
@@ -340,7 +393,7 @@ test('write permission is checked again when a selected calendar becomes read-on
 });
 async function connectedFixture(searchIndex) {
   const f = fixture({ searchIndex }); const { callback } = await f.authorization(); await f.service.callback(callback);
-  await f.service.selectCalendars(f.connection().revision, ['office'], admin.id);
+  await f.service.selectCalendars(f.connection().revision, ['office'], admin);
   return f;
 }
 
@@ -438,7 +491,7 @@ test('calendar visibility choices include selected empty calendars with their cu
   const calendar = { ...office, backgroundColor: '#b39ddb' };
   const f = fixture({ pages: [[primary, calendar, reader]] });
   const { callback } = await f.authorization(); await f.service.callback(callback);
-  await f.service.selectCalendars(f.connection().revision, ['office'], admin.id);
+  await f.service.selectCalendars(f.connection().revision, ['office'], admin);
   calendar.backgroundColor = '#0b8043';
   const events = createEventService(f.service, async () => { throw new Error('Calendar choices must not depend on events'); });
   const result = await events.selected(admin);

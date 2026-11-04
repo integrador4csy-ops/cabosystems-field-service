@@ -9,14 +9,14 @@ export interface Connection {
   account_label: string | null; selected_calendars: Calendar[]; connected_at: string | null;
   calendar_aliases?: Record<string, string>;
 }
-export interface OAuthState { admin_id: string; base_revision: string; verifier_ciphertext: string }
+export interface OAuthState { user_id: string; base_revision: string; verifier_ciphertext: string }
 export interface Store {
   actorForToken(token: string): Promise<Actor | null>;
   actorById(id: string): Promise<Actor | null>;
-  connection(): Promise<Connection>;
+  connection(userId: string): Promise<Connection>;
   createState(hash: string, state: OAuthState, expires: string): Promise<void>;
   consumeState(hash: string, now: string): Promise<OAuthState | null>;
-  commitConnection(revision: string, patch: Partial<Connection>): Promise<boolean>;
+  commitConnection(revision: string, patch: Partial<Connection>, userId: string): Promise<boolean>;
 }
 interface Options { store: Store; clientId: string; clientSecret: string; redirectUri: string; fetcher?: typeof fetch; now?: () => number; searchIndex?: GoogleSearchIndex }
 export class CalendarError extends Error {
@@ -86,10 +86,10 @@ export function createCalendarService(options: Options) {
     async indexedEventSession(actor: Actor) {
       const current = await store.actorById(actor.id);
       if (!current?.activo) throw new CalendarError('Tu perfil no tiene acceso a la agenda.', 403);
-      return store.connection();
+      return store.connection(actor.id);
     },
-    async eventCalendars(token: string) {
-      return calendars(token, (await store.connection()).calendar_aliases || {});
+    async eventCalendars(actorId: string, token: string) {
+      return calendars(token, (await store.connection(actorId)).calendar_aliases || {});
     },
     async requireUser(request: Request): Promise<Actor> {
       const match = request.headers.get('Authorization')?.match(/^Bearer (.+)$/i);
@@ -101,33 +101,26 @@ export function createCalendarService(options: Options) {
     async eventSession(actor: Actor, manage = false) {
       const current = await store.actorById(actor.id);
       if (!current?.activo || manage && !canManageEvents(current)) throw new CalendarError('No tienes permiso para esta operación.', 403);
-      const connection = await store.connection();
+      const connection = await store.connection(actor.id);
       if (!connection.refresh_token_ciphertext || !connection.selected_calendars.length) return { connection, token: null };
       return { connection, token: await accessToken(connection) };
     },
     async verifyEventSession(actor: Actor, revision: string, manage = false) {
       const current = await store.actorById(actor.id);
       if (!current?.activo || manage && !canManageEvents(current)) throw new CalendarError('Permiso de agenda revocado.', 403);
-      if ((await store.connection()).revision !== revision) throw new CalendarError('Cambió la selección de calendarios. Actualiza la agenda.', 409);
+      if ((await store.connection(actor.id)).revision !== revision) throw new CalendarError('Cambió la selección de calendarios. Actualiza la agenda.', 409);
     },
-    async requireAdmin(request: Request): Promise<Actor> {
-      const match = request.headers.get('Authorization')?.match(/^Bearer (.+)$/i);
-      if (!match) throw new CalendarError('Inicia sesión para continuar.', 401);
-      const actor = await store.actorForToken(match[1]);
-      if (!isAdmin(actor)) throw new CalendarError('Solo un administrador activo puede configurar Google Calendar.', 403);
-      return actor!;
-    },
-    async status() {
-      const connection = await store.connection();
+    async status(actor: Actor) {
+      const connection = await store.connection(actor.id);
       return { configured, connected: Boolean(connection.refresh_token_ciphertext), revision: connection.revision, account: connection.account_label, selectedCalendars: connection.selected_calendars.map(calendar => ({ ...calendar, name: calendarDisplayName(calendar.id, calendar.name, connection.calendar_aliases) })), connectedAt: connection.connected_at, syncEnabled: true };
     },
     async start(actor: Actor, replace: boolean) {
       ensureConfig();
-      if (!isAdmin(actor)) throw new CalendarError('Permiso denegado.', 403);
-      const connection = await store.connection();
+      if (!actor.activo) throw new CalendarError('Tu perfil no tiene acceso a la agenda.', 403);
+      const connection = await store.connection(actor.id);
       if (connection.refresh_token_ciphertext && !replace) throw new CalendarError('Confirma el reemplazo de la cuenta conectada.', 409);
       const state = randomToken(); const verifier = randomToken();
-      await store.createState(await digest(state), { admin_id: actor.id, base_revision: connection.revision, verifier_ciphertext: await seal(verifier, clientSecret, clientId, 'pkce-verifier') }, new Date(now() + 10 * 60 * 1000).toISOString());
+      await store.createState(await digest(state), { user_id: actor.id, base_revision: connection.revision, verifier_ciphertext: await seal(verifier, clientSecret, clientId, 'pkce-verifier') }, new Date(now() + 10 * 60 * 1000).toISOString());
       const query = new URLSearchParams({ client_id: clientId, redirect_uri: redirectUri, response_type: 'code', scope: SCOPES.join(' '), access_type: 'offline', prompt: 'consent select_account', state, code_challenge: await challenge(verifier), code_challenge_method: 'S256' });
       return { url: `https://accounts.google.com/o/oauth2/v2/auth?${query}` };
     },
@@ -138,7 +131,7 @@ export function createCalendarService(options: Options) {
       // DELETE RETURNING is atomic: a callback can only be consumed once.
       const state = await store.consumeState(await digest(stateValue), new Date(now()).toISOString());
       if (!state) throw new CalendarError('La solicitud de conexión ya se usó o venció. Vuelve a conectar desde la agenda.');
-      if (!isAdmin(await store.actorById(state.admin_id))) throw new CalendarError('El administrador ya no tiene permiso para conectar la cuenta.', 403);
+      if (!(await store.actorById(state.user_id))?.activo) throw new CalendarError('El usuario ya no tiene permiso para conectar la cuenta.', 403);
       if (url.searchParams.has('error')) throw new CalendarError('No se autorizó la conexión con Google. Puedes volver a intentarlo desde la agenda.');
       const issuer = url.searchParams.get('iss');
       if (issuer && issuer !== 'https://accounts.google.com') throw new CalendarError('El proveedor de autorización no es válido.');
@@ -152,24 +145,24 @@ export function createCalendarService(options: Options) {
       const list = await calendars(data.access_token);
       const primary = list.find((calendar) => calendar.primary);
       // Recheck canonical authority immediately before the privileged write.
-      if (!isAdmin(await store.actorById(state.admin_id))) throw new CalendarError('Permiso de administrador revocado.', 403);
-      const committed = await store.commitConnection(state.base_revision, { refresh_token_ciphertext: await seal(data.refresh_token, clientSecret, clientId, 'refresh-token'), connected_by: state.admin_id, account_label: primary?.id || 'Cuenta Google autorizada', connected_at: new Date(now()).toISOString(), selected_calendars: [] });
+      if (!(await store.actorById(state.user_id))?.activo) throw new CalendarError('Permiso del usuario revocado.', 403);
+      const committed = await store.commitConnection(state.base_revision, { refresh_token_ciphertext: await seal(data.refresh_token, clientSecret, clientId, 'refresh-token'), connected_by: state.user_id, account_label: primary?.id || 'Cuenta Google autorizada', connected_at: new Date(now()).toISOString(), selected_calendars: [] }, state.user_id);
       if (!committed) throw new CalendarError('La conexión cambió mientras autorizabas. Vuelve a la agenda y revisa la cuenta actual.', 409);
       return { connected: true };
     },
-    async listCalendars() {
-      const connection = await store.connection();
+    async listCalendars(actor: Actor) {
+      const connection = await store.connection(actor.id);
       return { revision: connection.revision, calendars: await calendars(await accessToken(connection), connection.calendar_aliases) };
     },
-    async selectCalendars(revision: unknown, ids: unknown, actorId: string) {
+    async selectCalendars(revision: unknown, ids: unknown, actor: Actor) {
       if (typeof revision !== 'string' || !Array.isArray(ids) || ids.length > 100 || ids.some((id) => typeof id !== 'string' || !id || id.length > 1024) || new Set(ids).size !== ids.length) throw new CalendarError('La selección de calendarios no es válida.');
-      const connection = await store.connection();
+      const connection = await store.connection(actor.id);
       if (connection.revision !== revision) throw new CalendarError('La conexión cambió. Actualiza antes de guardar.', 409);
       const list = await calendars(await accessToken(connection), connection.calendar_aliases);
       const selected = ids.map((id) => list.find((calendar) => calendar.id === id));
       if (selected.some((calendar) => !calendar || !isReadable(calendar))) throw new CalendarError('Selecciona únicamente calendarios con permiso para consultar eventos.');
-      if (!isAdmin(await store.actorById(actorId))) throw new CalendarError('Permiso de administrador revocado.', 403);
-      if (!await store.commitConnection(revision, { selected_calendars: selected as Calendar[] })) throw new CalendarError('La conexión cambió. Actualiza antes de guardar.', 409);
+      if (!(await store.actorById(actor.id))?.activo) throw new CalendarError('Permiso del usuario revocado.', 403);
+      if (!await store.commitConnection(revision, { selected_calendars: selected as Calendar[] }, actor.id)) throw new CalendarError('La conexión cambió. Actualiza antes de guardar.', 409);
       return { saved: true, syncEnabled: true };
     },
   };

@@ -21,7 +21,7 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
   async function session(actor: Actor, calendarId: unknown) {
     const current = await service.eventSession(actor, true);
     if (!current.token || !current.connection.selected_calendars.some((item) => item.id === calendarId)) throw new CalendarError('El calendario no está seleccionado para la agenda.', 403);
-    const calendar = (await service.eventCalendars(current.token)).find(item => item.id === calendarId);
+    const calendar = (await service.eventCalendars(actor.id, current.token)).find(item => item.id === calendarId);
     if (!calendar || !isWritable(calendar)) throw new CalendarError('Este calendario es de solo consulta. No puedes crear, editar ni eliminar sus eventos.', 403);
     return { ...current, calendar, token: current.token };
   }
@@ -32,7 +32,7 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
       const { connection, token } = await service.eventSession(actor);
       if (!token || !service.searchIndex) return { ready: true };
       const index = service.searchIndex;
-      const current = new Map((await service.eventCalendars(token)).map(calendar => [calendar.id, calendar]));
+      const current = new Map((await service.eventCalendars(actor.id, token)).map(calendar => [calendar.id, calendar]));
       let position = 0; let ready = true;
       async function worker() {
         while (position < connection.selected_calendars.length) {
@@ -68,7 +68,7 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
       if (!token || !service.searchIndex) return { dates: [] };
       const selected = new Set(connection.selected_calendars.map(calendar => calendar.id));
       if (identities.some(identity => !selected.has(identity.calendarId))) throw new CalendarError('El calendario no está seleccionado para la agenda.', 403);
-      const calendars = new Map((await service.eventCalendars(token)).map(calendar => [calendar.id, calendar]));
+      const calendars = new Map((await service.eventCalendars(actor.id, token)).map(calendar => [calendar.id, calendar]));
       const dates: { id: string; nextDate: string | null }[] = [];
       let position = 0;
       async function worker() {
@@ -125,7 +125,7 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
       };
       const { connection, token } = await service.eventSession(actor);
       if (!token) return { hits: [], unavailableCalendars: 0 };
-      const calendars = new Map((await service.eventCalendars(token)).map(calendar => [calendar.id, calendar]));
+      const calendars = new Map((await service.eventCalendars(actor.id, token)).map(calendar => [calendar.id, calendar]));
       const hits: { event: NonNullable<ReturnType<typeof normalizeGoogleEvent>>; series: boolean; nextDate: string | null }[] = [];
       let position = 0; let unavailableCalendars = 0;
       async function worker() {
@@ -181,7 +181,7 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
     },
     async selected(actor: Actor) {
       const { connection, token } = await service.eventSession(actor);
-      const current = token ? new Map((await service.eventCalendars(token)).map(calendar => [calendar.id, calendar])) : new Map<string, Calendar>();
+      const current = token ? new Map((await service.eventCalendars(actor.id, token)).map(calendar => [calendar.id, calendar])) : new Map<string, Calendar>();
       const calendars = connection.selected_calendars.map(selected => {
         const calendar = current.get(selected.id);
         if (!calendar) throw new CalendarError('Un calendario seleccionado ya no está disponible. Revisa la selección.', 409);
@@ -194,7 +194,7 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
       const { connection, token } = await service.eventSession(actor);
       if (!token) return { events: [], timeZone: COMPANY_ZONE };
       // Calendar colors are user-specific and can change after selection.
-      const currentCalendars = new Map((await service.eventCalendars(token)).map((calendar) => [calendar.id, calendar]));
+      const currentCalendars = new Map((await service.eventCalendars(actor.id, token)).map((calendar) => [calendar.id, calendar]));
       const result: ReturnType<typeof googleOccurrences> = [];
       let position = 0;
       // Bound concurrency and page count; fail explicitly rather than truncating.
