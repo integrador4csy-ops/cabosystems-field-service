@@ -120,14 +120,6 @@
   background: #f78c26;
 }
 
-/* Leaflet map container */
-.leaflet-container {
-  width: 100% !important;
-  height: 100% !important;
-  font-family: var(--font-sans) !important;
-  background-color: #e2e8f0 !important;
-}
-
 /* Floating Map Controls - Clean White Minimalist */
 .floating-map-controls {
   position: absolute;

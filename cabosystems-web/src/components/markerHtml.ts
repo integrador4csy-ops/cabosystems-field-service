@@ -9,7 +9,7 @@ const HOVER_BATTERY_CHARGING_SVG = `<svg width="14" height="14" viewBox="0 0 24 
 const HOVER_BATTERY_NORMAL_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:4px;"><rect x="2" y="7" width="16" height="10" rx="2" ry="2"/><line x1="22" y1="11" x2="22" y2="13"/></svg>`;
 
 /**
- * Generates the HTML string for the Leaflet divIcon representing the technician.
+ * Generates the HTML content for the Google Maps marker representing the technician.
  * Matches clean Life360 pin: circular avatar with green online dot, pointer, battery charging pill.
  */
 export function createLife360MarkerHtml(
