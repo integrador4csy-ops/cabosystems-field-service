@@ -199,11 +199,17 @@ export const AppSidebar: React.FC = () => {
         <div className="flex h-16 items-center justify-between px-4 border-b border-slate-100">
           {isWide ? (
             <div className="flex items-center gap-2 overflow-hidden">
-              <img
-                src="/logo-cabosystems-light.svg"
-                alt="CaboSystems Field Service"
-                className="h-12 w-auto max-w-[240px] object-contain"
-              />
+              <div className="flex items-center gap-3">
+                <img
+                  src="/logo-cabosystems-icon.svg"
+                  alt="CaboSystems"
+                  className="h-9 w-9 shrink-0 object-contain"
+                />
+                <div className="flex flex-col">
+                  <span className="font-outfit text-base font-bold text-slate-900 leading-tight">CaboSystems</span>
+                  <span className="text-[10px] font-bold text-[#f78c26] uppercase tracking-widest">Field Service</span>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="mx-auto flex h-10 w-10 items-center justify-center">
