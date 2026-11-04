@@ -10,6 +10,7 @@ import {
 } from '../../icons';
 import {
   Map,
+  Route,
   Settings,
   User,
   LogOut,
@@ -98,6 +99,12 @@ export const AppSidebar: React.FC = () => {
       name: t('sidebar.radar'),
       icon: <Map size={20} className="shrink-0" />,
       action: () => setActiveItem('radar'),
+    },
+    {
+      id: 'historial',
+      name: t('sidebar.history'),
+      icon: <Route size={20} className="shrink-0" />,
+      action: () => setActiveItem('historial'),
     },
     {
       id: 'proyectos',

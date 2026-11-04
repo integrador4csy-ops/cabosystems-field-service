@@ -11,7 +11,7 @@ import { dateKey, parseDateKey } from '@/lib/agenda';
 import { moveAgendaPeriod } from '@/lib/agendaGestures';
 import { getAgendaWindow } from '@/lib/agendaWindowService';
 import { canManageCompanyAgenda, companyDays, companyRows, type CompanyRow, type CompanyView } from '@/lib/companyAgenda';
-import { saveCompanyEvent, deleteCompanyEvent } from '@/lib/companyAgendaApi';
+import { saveCompanyEvent, deleteCompanyEvent, getLocalEvents } from '@/lib/companyAgendaApi';
 import { cacheCompanyAgenda, readCompanyAgendaCache } from '@/lib/companyAgendaCache';
 import { COMPANY_AGENDA_COPY } from '@/lib/companyAgendaCopy';
 import { eventSchedule } from '@/lib/companyAgendaPresentation';
@@ -25,6 +25,7 @@ import { afterTabPaint } from '@/lib/tabPreparation';
 import { CompanyAgendaSearchResults } from './CompanyAgendaSearchResults';
 import { CompanyCalendarFilters } from './CompanyCalendarFilters';
 import { CompanyEventModal } from './CompanyEventModal';
+import { GoogleCalendarSyncModal } from './GoogleCalendarSyncModal';
 import { AgendaSwipeArea } from './AgendaSwipeArea';
 import { AgendaNativePager } from './AgendaNativePager';
 import { AgendaPreviewCache } from '@/lib/agendaPreviewCache';
@@ -80,6 +81,7 @@ export default function CompanyAgendaScreen() {
   const [loading, setLoading] = useState(() => !hasInitialCache); const [refreshing, setRefreshing] = useState(false); const [error, setError] = useState(false); const [cached, setCached] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [dialog, setDialog] = useState<{ owner: string; event: CompanyEvent | null; day: string } | null>(null);
+  const [syncModalVisible, setSyncModalVisible] = useState(false);
   const [calendars, setCalendars] = useState<{ owner: string; items: AgendaGoogleCalendar[] }>({ owner: '', items: [] });
   const [hiddenCalendars, setHiddenCalendars] = useState<string[]>([]);
   const sequence = useRef(0);
@@ -101,9 +103,16 @@ export default function CompanyAgendaScreen() {
       setCalendars(current => current.owner === owner && current.items === available ? current : { owner, items: available });
       void cacheCompanyAgenda(owner, from, to, items);
     } catch (reason) {
-      const items = periodCache.read(from, to) ?? await readCompanyAgendaCache(owner, from, to);
+      let items = periodCache.read(from, to) ?? await readCompanyAgendaCache(owner, from, to);
+      if (!items || items.length === 0) {
+        try {
+          items = await getLocalEvents(from, to);
+        } catch {
+          items = [];
+        }
+      }
       if (request !== sequence.current) return;
-      setData({ owner, from, to, items: items || [] }); setCached(items !== null); setError(true);
+      setData({ owner, from, to, items: items || [] }); setCached(items !== null && items.length > 0); setError(true);
       setErrorMessage(reason instanceof Error ? reason.message : '');
     } finally { if (request === sequence.current) { setLoading(false); setRefreshing(false); } }
   }, [owner, from, to, periodCache, windowManager, hydrated]);
@@ -197,7 +206,7 @@ export default function CompanyAgendaScreen() {
   const counts = useMemo(() => countsFor(rows), [rows]);
   const renderPeriodHeader = useCallback((pageAnchor: string, pageDays: string[], pageRows: CompanyRow[]) => <View style={s.calendarEdge}><CompanyAgendaGrid copy={c} locale={locale} view={view} anchor={pageAnchor} today={today} days={pageDays} counts={countsFor(pageRows)} onDate={setAnchor} onView={setView} /></View>, [c, locale, view, today, setAnchor]);
   const controls = <View style={s.fixedControls}>
-    <CompanyAgendaControls showCalendar={false} calendarFilter={<CompanyCalendarFilters key={owner} colors={personalColors.colors} loadingColors={personalColors.loading} colorsFailed={personalColors.failed} onRetryColors={personalColors.reload} onSaveColor={personalColors.save} calendars={calendarFilters} hidden={hiddenCalendars} locale={locale} onToggle={toggleCalendar} />} copy={c} locale={locale} query={query} view={view} anchor={anchor} today={today} days={days} counts={counts} heading={periodHeading(anchor, days)} onSearch={setQuery} onView={setView} onDate={setAnchor} onMove={move} onToday={() => setAnchor(dateKey(new Date()))} />
+    <CompanyAgendaControls showCalendar={false} onSyncPress={() => setSyncModalVisible(true)} calendarFilter={<CompanyCalendarFilters key={owner} colors={personalColors.colors} loadingColors={personalColors.loading} colorsFailed={personalColors.failed} onRetryColors={personalColors.reload} onSaveColor={personalColors.save} calendars={calendarFilters} hidden={hiddenCalendars} locale={locale} onToggle={toggleCalendar} />} copy={c} locale={locale} query={query} view={view} anchor={anchor} today={today} days={days} counts={counts} heading={periodHeading(anchor, days)} onSearch={setQuery} onView={setView} onDate={setAnchor} onMove={move} onToday={() => setAnchor(dateKey(new Date()))} />
     {!query.trim() && error ? <View accessibilityRole="alert" style={s.error}><Text style={[s.help, s.errorCopy]}>{errorMessage || c.failed}{cached ? `\n${c.cached}` : ''}</Text><Pressable accessibilityRole="button" accessibilityLabel={c.retry} onPress={() => void load(true)} style={s.icon}><RefreshCw size={18} color={P.ink} /></Pressable></View> : null}
   </View>;
   const header = useMemo(() => query.trim() ? <View /> : renderPeriodHeader(anchor, days, rows), [query, renderPeriodHeader, anchor, days, rows]);
@@ -237,6 +246,7 @@ export default function CompanyAgendaScreen() {
     {nativePaging && !query.trim() ? <FocusAwareAgendaNativePager key={`${owner}:${view}:${pageEpoch}`} anchor={anchor} pagePosition={position} view={view} enabled={hydrated && !dialog} renderPage={nativePage} onMove={swipeMove} style={s.listArea} /> : <FocusAwareAgendaSwipeArea scopeKey={`${owner}:${view}:${pageEpoch}`} pagePosition={position} previousPages={previousPages} nextPages={nextPages} periodKey={`${owner}:${view}:${from}:${to}`} canGoPrevious={moveAgendaPeriod(anchor, view, -1) !== anchor} canGoNext={moveAgendaPeriod(anchor, view, 1) !== anchor} style={s.listArea} enabled={hydrated && !query.trim() && !dialog} onMove={swipeMove}><CompanyAgendaSearchResults periodKey={`${view}:${from}:${to}`} colors={personalColors.colors} client={searchClient} key={owner} query={query.trim()} today={today} locale={locale} hiddenCalendars={hiddenCalendars} revision={searchRevision} header={header} bottomInset={insets.bottom} onOpen={openEvent} onClear={() => setQuery('')} onDate={day => { setQuery(''); setAnchor(day); setView('day'); }} fallback={{ rows, renderItem: renderRow, refreshing, onRefresh: () => void load(true), empty: loading && periodCache.read(from, to) === null ? <View style={s.empty}><ActivityIndicator color={P.accent} /><Text style={s.help}>{c.loading}</Text></View> : <View style={s.empty}><CalendarDays size={26} color={P.slate} /><Text style={s.emptyText}>{c.empty}</Text></View> }} /></FocusAwareAgendaSwipeArea>}
     </> : <View style={s.boot}><ActivityIndicator color={P.accent} /></View>}
     {dialog && dialog.owner === owner ? <CompanyEventModal key={`${owner}-${dialog.event?.id || dialog.day}`} event={dialog.event} day={dialog.day} canManage={canManage} copy={c} locale={locale} onClose={() => setDialog(null)} onSave={save} onDelete={remove} /> : null}
+    <GoogleCalendarSyncModal visible={syncModalVisible} onClose={() => setSyncModalVisible(false)} onSyncDone={() => { setSyncModalVisible(false); void load(true); }} copy={c} locale={locale} />
   </View>;
 }
 const s = StyleSheet.create({

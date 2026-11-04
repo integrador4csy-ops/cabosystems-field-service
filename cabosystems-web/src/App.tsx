@@ -12,7 +12,7 @@ import { AppHeader } from './components/layout/AppHeader';
 import { AuthSplitScreen } from './components/auth/AuthSplitScreen';
 import { RetainedView } from './components/layout/RetainedView';
 import { preloadModules } from './lib/modulePreload';
-import { loadLiveMap, loadChat, loadTasks, loadAgenda, loadDirectory, loadTeam } from './lib/viewModules';
+import { loadLiveMap, loadChat, loadTasks, loadAgenda, loadDirectory, loadTeam, loadLocationHistory } from './lib/viewModules';
 import { SectionResourcesProvider, useSectionResources, canSpeculate } from './context/SectionResources';
 import { fleetSnapshot } from './lib/fleetSnapshot';
 import {
@@ -33,6 +33,7 @@ const ChatView = lazy(() => loadChat().then((module) => ({ default: module.ChatV
 
 const ProjectsManagementView = lazy(() => loadTasks().then((module) => ({ default: module.ProjectsManagementView })));
 const CompanyAgenda = lazy(() => loadAgenda().then((module) => ({ default: module.CompanyAgenda })));
+const LocationHistoryView = lazy(() => loadLocationHistory().then((module) => ({ default: module.LocationHistoryView })));
 const ProjectDirectoryView = lazy(() => loadDirectory().then((module) => ({ default: module.ProjectDirectoryView })));
 
 const TeamManagementView = lazy(() => loadTeam().then((module) => ({ default: module.TeamManagementView })));
@@ -420,7 +421,15 @@ function DashboardContent() {
           <RetainedView active={activeItem === 'proyectos'} fallback={<ViewLoading />}>
             <ProjectsManagementView mode="tasks" />
           </RetainedView>
-          <RetainedView active={!['chat', 'colaboradores', 'invitaciones', 'directorio-proyectos', 'agenda', 'proyectos'].includes(activeItem)} fallback={<ViewLoading />}>
+          <RetainedView active={activeItem === 'historial'} fallback={<ViewLoading />}>
+            <LocationHistoryView
+              workers={workers}
+              selectedWorkerId={selectedWorkerId}
+              onSelectWorker={handleSelectWorker}
+              onBackToRadar={() => setActiveItem('radar')}
+            />
+          </RetainedView>
+          <RetainedView active={!['chat', 'colaboradores', 'invitaciones', 'directorio-proyectos', 'agenda', 'proyectos', 'historial'].includes(activeItem)} fallback={<ViewLoading />}>
             <div className="flex-1 h-full w-full rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden relative isolate">
               <LiveMap
                 workers={filteredWorkers}
@@ -429,6 +438,10 @@ function DashboardContent() {
                 focusTrigger={focusTrigger}
                 onRefresh={() => fetchFleet(true)}
                 isRefreshing={isRefreshing}
+                onOpenHistory={(id) => {
+                  handleSelectWorker(id);
+                  setActiveItem('historial');
+                }}
               />
             </div>
           </RetainedView>

@@ -449,6 +449,7 @@ export const UI_TRANSLATIONS: Record<string, string> = {
   "No se pudo actualizar el estatus": "Could not update the status",
   "No se pudo actualizar la subtarea": "Could not update the subtask",
   "No se encontró la tarea": "Task not found",
+  "La tarea fue eliminada o no tienes acceso para verla.": "The task was deleted or you don't have access to view it.",
   "Volver a tareas": "Back to tasks",
   "Detalle y especificaciones": "Details and specifications",
   "Sin especificaciones adicionales registradas.": "No additional specifications recorded.",
@@ -676,5 +677,9 @@ export const UI_TRANSLATIONS: Record<string, string> = {
   "salida (Check-Out)": "check-out",
   "llegada (Check-In)": "check-in",
   "Ver tarea": "View task",
-  "Avance de tarea": "Task progress"
+  "Avance de tarea": "Task progress",
+  "Fecha de nacimiento (Cumpleaños)": "Date of birth (Birthday)",
+  "AAAA-MM-DD (Ej. 1995-05-18)": "YYYY-MM-DD (e.g. 1995-05-18)",
+  "Por favor ingresa tu fecha de nacimiento (cumpleaños).": "Please enter your date of birth (birthday).",
+  "Por favor ingresa tu nombre completo.": "Please enter your full name."
 };

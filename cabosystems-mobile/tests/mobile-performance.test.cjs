@@ -50,6 +50,7 @@ test('concurrent location callbacks cannot overlap network writes, and a failed 
     'expo-secure-store': { getItemAsync: async () => 'u' },
     './supabase': { supabase: { from: () => ({ upsert: () => { writes++; return new Promise(resolve => { release = resolve; }); }, insert: async () => ({}) }) } },
     './activityRecognitionService': { classifyActivity: () => 'still' },
+    './locationHistorySampling': { shouldRecordLocationHistory: () => true },
     './kalmanLocationFilter': { globalKalmanFilter: { filter: (latitude, longitude, accuracy) => ({ latitude, longitude, accuracy }) } },
     '@/components/BackgroundLocationModal': {},
   });

@@ -19,6 +19,7 @@ const es = {
   invalid: 'Revisa el título, la hora (HH:mm), los días de repetición y la fecha final. La fecha final debe ser igual o posterior al inicio.',
   saveFailed: 'No se pudo guardar. Comprueba tu conexión y tus permisos e intenta de nuevo.', deleteFailed: 'No se pudo eliminar. Intenta de nuevo.',
   selectDay: 'Ver eventos de', count: 'registros',
+  syncCalendar: 'Sincronizar calendario', syncGoogle: 'Sync', connectGoogle: 'Conectar Google Calendar', reauthorizeGoogle: 'Reautorizar cuenta Google',
 };
 export type CompanyAgendaCopy = typeof es;
 const en: CompanyAgendaCopy = {
@@ -42,5 +43,6 @@ const en: CompanyAgendaCopy = {
   invalid: 'Check the title, time (HH:mm), repeat days, and end date. The end date must be on or after the start.',
   saveFailed: 'Could not save. Check your connection and permissions and try again.', deleteFailed: 'Could not delete. Try again.',
   selectDay: 'View events for', count: 'entries',
+  syncCalendar: 'Sync calendar', syncGoogle: 'Sync', connectGoogle: 'Connect Google Calendar', reauthorizeGoogle: 'Reauthorize Google account',
 };
 export const COMPANY_AGENDA_COPY = { es, en };

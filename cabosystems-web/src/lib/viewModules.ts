@@ -9,11 +9,13 @@ export const loadTasks = sharedModule(() => import('../components/projects/Proje
 export const loadAgenda = sharedModule(() => import('../components/agenda/CompanyAgenda'));
 export const loadDirectory = sharedModule(() => import('../components/projects/ProjectDirectoryView'));
 export const loadTeam = sharedModule(() => import('../components/team/TeamManagementView'));
+export const loadLocationHistory = sharedModule(() => import('../components/history/LocationHistoryView'));
 
 /** A deliberate hover/focus downloads only the target's code, then queues its data. */
 export async function preloadView(id: string, resources: SectionResources, userId: string, admin: boolean) {
   resources.setIntent(id);
   if (id === 'radar') { await loadLiveMap(); await resources.prefetch(() => resources.queries.load('fleet', fleetSnapshot, false, 10_000), id); return; }
+  if (id === 'historial') { await loadLocationHistory(); return; }
   if (id === 'proyectos') { const module = await loadTasks(); await resources.prefetch(() => module.prefetchTasks(resources), id); }
   if (id === 'agenda') { const module = await loadAgenda(); await resources.prefetch(() => module.prefetchAgenda(resources), id); }
   if (id === 'directorio-proyectos') { const module = await loadDirectory(); await resources.prefetch(() => module.prefetchDirectory(resources, admin), id); }

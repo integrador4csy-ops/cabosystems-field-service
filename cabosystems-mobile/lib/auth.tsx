@@ -19,7 +19,8 @@ interface AuthContextType {
     email: string,
     password: string,
     nombre: string,
-    avatarUrl: string | null
+    avatarUrl: string | null,
+    fechaNacimiento?: string | null
   ) => Promise<{ error: Error | null }>;
   sendPasswordReset: (email: string) => Promise<{ error: Error | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
@@ -322,11 +323,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string,
     password: string,
     nombre: string,
-    avatarUrl: string | null
+    avatarUrl: string | null,
+    fechaNacimiento?: string | null
   ): Promise<{ error: Error | null }> {
     clearAuthError();
     try {
       const cleanEmail = email.trim().toLowerCase();
+      const cleanFechaNacimiento = (fechaNacimiento || '').trim() || null;
 
       // Validar invitación
       const { data: invite, error: inviteError } = await supabase
@@ -352,6 +355,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             password,
             nombre: nombre.trim(),
             avatarUrl,
+            fechaNacimiento: cleanFechaNacimiento,
           },
         });
 
@@ -382,6 +386,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           data: {
             nombre,
             avatar_url: avatarUrl,
+            fecha_nacimiento: cleanFechaNacimiento,
           },
         },
       });
@@ -403,6 +408,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             rol: invite.rol || 'aux_instalacion',
             activo: true,
             avatar_url: avatarUrl,
+            fecha_nacimiento: cleanFechaNacimiento,
           });
 
         // Marcar invitación como aceptada

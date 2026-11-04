@@ -7,6 +7,7 @@ export interface Profile {
   role?: string | null;
   avatar_url?: string | null;
   activo?: boolean;
+  fecha_nacimiento?: string | null;
 }
 
 export interface UserLocation {

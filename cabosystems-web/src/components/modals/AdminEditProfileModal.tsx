@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { useLanguage, type SupportedLanguage } from '../../context/LanguageContext';
 import { cn } from '../../utils';
-import { User, X, Check, UploadCloud, Trash2, AlertCircle, Camera, Globe } from 'lucide-react';
+import { User, X, Check, UploadCloud, Trash2, AlertCircle, Camera, Globe, Calendar } from 'lucide-react';
 import '../AdminUsersModal.css';
 
 export const AdminEditProfileModal: React.FC = () => {
@@ -18,6 +18,7 @@ export const AdminEditProfileModal: React.FC = () => {
 
   const [nombre, setNombre] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [fechaNacimiento, setFechaNacimiento] = useState('');
   const [selectedLang, setSelectedLang] = useState<SupportedLanguage>(language);
   const [saving, setSaving] = useState(false);
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -28,6 +29,7 @@ export const AdminEditProfileModal: React.FC = () => {
     if (adminProfile) {
       setNombre(adminProfile.nombre || '');
       setAvatarUrl(adminProfile.avatar_url || null);
+      setFechaNacimiento(adminProfile.fecha_nacimiento || '');
       setSelectedLang(language);
     }
   }, [adminProfile, isEditProfileModalOpen, language]);
@@ -102,6 +104,7 @@ export const AdminEditProfileModal: React.FC = () => {
     const result = await updateAdminProfile({
       nombre: nombre.trim(),
       avatar_url: avatarUrl,
+      fecha_nacimiento: fechaNacimiento.trim() || null,
     });
 
     setSaving(false);
@@ -238,6 +241,19 @@ export const AdminEditProfileModal: React.FC = () => {
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 required
+              />
+            </div>
+
+            {/* Birthday Field */}
+            <div className="form-field">
+              <label className="flex items-center gap-1.5">
+                <Calendar size={13} className="text-slate-500" />
+                <span>{t('Fecha de nacimiento (Cumpleaños)')}</span>
+              </label>
+              <input
+                type="date"
+                value={fechaNacimiento}
+                onChange={(e) => setFechaNacimiento(e.target.value)}
               />
             </div>
 

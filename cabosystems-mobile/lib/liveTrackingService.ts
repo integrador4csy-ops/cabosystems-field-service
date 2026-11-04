@@ -13,6 +13,9 @@ import {
   type ActivityType,
 } from './activityRecognitionService';
 import { globalKalmanFilter } from './kalmanLocationFilter';
+import { shouldRecordLocationHistory } from './locationHistorySampling';
+
+const historyLastCaptured = new Map<string, number>();
 
 export const BACKGROUND_LOCATION_TASK = 'cabosystems-background-location';
 const TRACKING_USER_KEY = 'cabosystems_tracking_user_id';
@@ -193,7 +196,9 @@ async function transmitLocation(
 
       // Enviar al historial de manera segura
       try {
-        await supabase.from('historial_ubicaciones').insert({
+        const capturedAt = location.timestamp || Date.now();
+        if (shouldRecordLocationHistory(historyLastCaptured.get(userId), capturedAt, speedKmH)) {
+        const { error: historyError } = await supabase.from('historial_ubicaciones').insert({
           usuario_id: userId,
           latitud: filteredCoords.latitude,
           longitud: filteredCoords.longitude,
@@ -201,9 +206,13 @@ async function transmitLocation(
           velocidad: speedKmH,
           bateria: battery.level,
           actividad: detectedActivity,
+          created_at: new Date(capturedAt).toISOString(),
         });
+        if (historyError) console.warn('No se pudo guardar el historial de ubicación:', historyError.message);
+        else historyLastCaptured.set(userId, capturedAt);
+        }
       } catch (histErr) {
-        // Ignorar error no crítico de inserción en historial
+        console.warn('No se pudo guardar el historial de ubicación:', histErr);
       }
     }
   } catch (err) {

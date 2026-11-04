@@ -19,7 +19,7 @@ export async function getCompanyEvents(from: string, to: string): Promise<Compan
   const [local, remote] = await Promise.all([getLocalEvents(from, to), googleRequest<{ events: CompanyEvent[] }>({ action: 'list', from, to })]);
   return [...local, ...remote.events].sort((a, b) => `${a.occurrence_date || a.fecha}/${a.hora || ''}/${a.id}`.localeCompare(`${b.occurrence_date || b.fecha}/${b.hora || ''}/${b.id}`));
 }
-async function getLocalEvents(from: string, to: string): Promise<CompanyEvent[]> {
+export async function getLocalEvents(from: string, to: string): Promise<CompanyEvent[]> {
   const events: CompanyEvent[] = [];
   // A series can begin before this month. Page results so older series don't hide later ones.
   const pageSize = 500;

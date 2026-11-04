@@ -15,7 +15,11 @@ interface AdminAuthContextType {
   setIsEditProfileModalOpen: (open: boolean) => void;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
-  updateAdminProfile: (data: { nombre: string; avatar_url: string | null }) => Promise<{ success: boolean; error?: string }>;
+  updateAdminProfile: (data: {
+    nombre: string;
+    avatar_url: string | null;
+    fecha_nacimiento?: string | null;
+  }) => Promise<{ success: boolean; error?: string }>;
   refreshAdminProfile: () => Promise<void>;
 }
 
@@ -177,17 +181,26 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   // Update Admin Profile (name and avatar)
-  const updateAdminProfile = async (data: { nombre: string; avatar_url: string | null }) => {
+  const updateAdminProfile = async (data: {
+    nombre: string;
+    avatar_url: string | null;
+    fecha_nacimiento?: string | null;
+  }) => {
     if (!user) return { success: false, error: 'No hay sesión de administrador activa.' };
     const version = authVersion.current;
 
     try {
+      const updatePayload: Record<string, any> = {
+        nombre: data.nombre.trim(),
+        avatar_url: data.avatar_url,
+      };
+      if (data.fecha_nacimiento !== undefined) {
+        updatePayload.fecha_nacimiento = data.fecha_nacimiento?.trim() || null;
+      }
+
       const { error } = await supabase
         .from('profiles')
-        .update({
-          nombre: data.nombre.trim(),
-          avatar_url: data.avatar_url,
-        })
+        .update(updatePayload)
         .eq('id', user.id);
 
       if (error) {
@@ -197,11 +210,17 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       setAdminProfile((prev) =>
         prev
-          ? { ...prev, nombre: data.nombre.trim(), avatar_url: data.avatar_url }
+          ? {
+              ...prev,
+              nombre: data.nombre.trim(),
+              avatar_url: data.avatar_url,
+              fecha_nacimiento: data.fecha_nacimiento !== undefined ? (data.fecha_nacimiento?.trim() || null) : prev.fecha_nacimiento,
+            }
           : {
               id: user.id,
               nombre: data.nombre.trim(),
               avatar_url: data.avatar_url,
+              fecha_nacimiento: data.fecha_nacimiento?.trim() || null,
               rol: 'aux_instalacion',
               activo: false,
               email: user.email,

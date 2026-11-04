@@ -12,6 +12,7 @@ export const WEB_TRANSLATIONS = {
     // Sidebar
     'sidebar.operationsAndStaff': 'Operaciones y Personal',
     'sidebar.radar': 'Radar Satelital',
+    'sidebar.history': 'Historial GPS',
     'sidebar.projects': 'Tareas por villa',
     'sidebar.agenda': 'Agenda',
     'sidebar.comingSoon': 'Próximamente',
@@ -78,6 +79,7 @@ export const WEB_TRANSLATIONS = {
     // Sidebar
     'sidebar.operationsAndStaff': 'Operations & Personnel',
     'sidebar.radar': 'Satellite Radar',
+    'sidebar.history': 'Route History',
     'sidebar.projects': 'Villa tasks',
     'sidebar.agenda': 'Schedule',
     'sidebar.comingSoon': 'Coming soon',

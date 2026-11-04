@@ -5,7 +5,7 @@ import { useSidebar } from '../../context/SidebarContext';
 import { useTranslation } from '../../context/LanguageContext';
 import { useSessionPreference } from '../../hooks/useSessionPreference';
 import { agendaDays, type CompanyAgendaView } from '../../lib/agendaDates';
-import { getCompanyEvents, getGoogleCalendars } from '../../lib/agendaApi';
+import { getCompanyEvents, getGoogleCalendars, getLocalEvents } from '../../lib/agendaApi';
 import { dateKey, parseDateKey, shiftDate, shiftMonth } from '../../lib/taskDates';
 import { supabase } from '../../lib/supabase';
 import type { AgendaGoogleCalendar, CompanyEvent } from '../../types/agenda';
@@ -107,7 +107,15 @@ export function CompanyAgenda() {
         })();
       }, 300);
     } catch (reason) {
-      if (request === version.current) setError(reason instanceof Error && reason.message ? reason.message : 'No se pudo cargar la agenda. Intenta de nuevo.');
+      if (request === version.current) {
+        setError(reason instanceof Error && reason.message ? reason.message : 'No se pudo cargar la agenda. Intenta de nuevo.');
+        try {
+          const localEvents = await getLocalEvents(monthFrom, monthTo);
+          if (localEvents.length > 0) {
+            setSnapshot({ from: monthFrom, to: monthTo, events: localEvents });
+          }
+        } catch {}
+      }
     }
     finally { if (request === version.current) resources.markReady(); }
   }, [cache, monthFrom, monthTo, anchor, resources]);

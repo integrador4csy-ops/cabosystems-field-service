@@ -27,6 +27,7 @@ import {
   ArrowLeft,
   Eye,
   EyeOff,
+  Calendar,
 } from 'lucide-react-native';
 import CaboLogo from '@/components/CaboLogo';
 import { Colors, Spacing, BorderRadius } from '@/constants/Theme';
@@ -43,6 +44,7 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState(params.email || '');
   const [role, setRole] = useState('aux_instalacion');
   const [fullName, setFullName] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -129,7 +131,11 @@ export default function RegisterScreen() {
       return;
     }
     if (!fullName.trim()) {
-      setErrorMessage('Por favor ingresa tu nombre completo.');
+      setErrorMessage(tr('Por favor ingresa tu nombre completo.'));
+      return;
+    }
+    if (!birthDate.trim()) {
+      setErrorMessage(tr('Por favor ingresa tu fecha de nacimiento (cumpleaños).'));
       return;
     }
     if (!password || password.length < 6) {
@@ -157,7 +163,8 @@ export default function RegisterScreen() {
         email.trim(),
         password,
         fullName.trim(),
-        finalAvatarUrl
+        finalAvatarUrl,
+        birthDate.trim()
       );
 
       if (error) {
@@ -282,6 +289,23 @@ export default function RegisterScreen() {
                     value={fullName}
                     onChangeText={setFullName}
                     autoCapitalize="words"
+                    editable={!loading}
+                  />
+                </View>
+              </View>
+
+              {/* Fecha de Nacimiento (Cumpleaños) */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>{tr("Fecha de nacimiento (Cumpleaños)")}</Text>
+                <View style={styles.inputWrapper}>
+                  <Calendar size={18} color={Colors.textMuted} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder={tr("AAAA-MM-DD (Ej. 1995-05-18)")}
+                    placeholderTextColor={Colors.textMuted}
+                    value={birthDate}
+                    onChangeText={setBirthDate}
+                    autoCapitalize="none"
                     editable={!loading}
                   />
                 </View>

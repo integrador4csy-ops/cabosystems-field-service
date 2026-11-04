@@ -23,6 +23,7 @@ export interface Profile {
   rol: UserRole;
   activo: boolean;
   avatar_url?: string | null;
+  fecha_nacimiento?: string | null;
   created_at: string;
 }
 

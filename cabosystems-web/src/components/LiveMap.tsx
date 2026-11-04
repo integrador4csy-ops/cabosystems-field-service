@@ -6,7 +6,7 @@ import './Life360Map.css';
 import type { LiveWorker } from '../types/fleet';
 import { createLife360MarkerHtml, createHoverCardHtml } from './markerHtml';
 import { detectPlace, formatDwellTime } from '../lib/places';
-import { Navigation, ZoomIn, ZoomOut, RotateCw } from 'lucide-react';
+import { Navigation, ZoomIn, ZoomOut, RotateCw, Route } from 'lucide-react';
 
 interface LiveMapProps {
   workers: LiveWorker[];
@@ -15,6 +15,7 @@ interface LiveMapProps {
   focusTrigger?: number;
   onRefresh?: () => void;
   isRefreshing?: boolean;
+  onOpenHistory?: (workerId: string) => void;
 }
 
 // Helper: Calculate bearing in degrees (0 - 360) between two coordinates
@@ -52,6 +53,7 @@ export const LiveMap: React.FC<LiveMapProps> = ({
   focusTrigger,
   onRefresh,
   isRefreshing,
+  onOpenHistory,
 }) => {
   const { t, language } = useTranslation();
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -384,6 +386,17 @@ export const LiveMap: React.FC<LiveMapProps> = ({
               </span>
             </div>
           </div>
+
+          {onOpenHistory && (
+            <button
+              onClick={() => onOpenHistory(selectedWorker.profile.id)}
+              className="flex items-center gap-1 rounded-lg bg-orange-50 hover:bg-orange-100 text-[#f78c26] px-2 py-1 text-[11px] font-bold transition-colors shrink-0"
+              title={t("Ver historial de rutas")}
+            >
+              <Route size={12} />
+              <span>{t("Historial")}</span>
+            </button>
+          )}
 
           {/* Dismiss button */}
           <button
