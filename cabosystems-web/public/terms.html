@@ -4,106 +4,391 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Condiciones del Servicio | CaboSystems Field Service</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --text: #f8fafc;
+      --bg-dark: #070d18;
+      --bg-card: #0f182c;
+      --bg-card-header: #14203a;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(247, 140, 38, 0.5);
+      --text-main: #f8fafc;
       --text-muted: #94a3b8;
-      --primary: #2563eb;
-      --border: #334155;
+      --text-light: #cbd5e1;
+      --brand-orange: #f78c26;
+      --brand-orange-soft: rgba(247, 140, 38, 0.12);
+      --brand-blue: #38bdf8;
+      --brand-blue-soft: rgba(56, 189, 248, 0.12);
+      --card-radius: 16px;
     }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
+
+    * {
+      box-sizing: border-box;
       margin: 0;
-      padding: 40px 20px;
+      padding: 0;
     }
-    .container {
-      max-width: 800px;
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      line-height: 1.65;
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(37, 99, 235, 0.15), transparent 45%),
+        radial-gradient(circle at 90% 20%, rgba(247, 140, 38, 0.08), transparent 35%);
+      background-repeat: no-repeat;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Navigation */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(7, 13, 24, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 14px 24px;
+    }
+
+    .nav-container {
+      max-width: 1040px;
       margin: 0 auto;
-      background: var(--card-bg);
-      padding: 40px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
-    h1 {
-      font-size: 2rem;
-      margin-top: 0;
-      color: #38bdf8;
-      border-bottom: 2px solid var(--border);
-      padding-bottom: 12px;
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      text-decoration: none;
+      gap: 12px;
     }
-    h2 {
-      font-size: 1.35rem;
-      margin-top: 2rem;
-      color: #60a5fa;
+
+    .nav-logo {
+      height: 38px;
+      width: auto;
+      object-fit: contain;
     }
-    p, li {
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .nav-link {
       color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color 0.15s ease;
     }
-    strong {
-      color: var(--text);
+
+    .nav-link:hover, .nav-link.active {
+      color: var(--text-main);
     }
-    ul {
-      padding-left: 20px;
-    }
-    .badge {
-      display: inline-block;
-      background: #1e3a8a;
-      color: #bfdbfe;
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 0.85rem;
+
+    .nav-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 16px;
+      background: linear-gradient(135deg, #f78c26, #ea580c);
+      color: #ffffff;
+      font-size: 0.875rem;
       font-weight: 600;
+      text-decoration: none;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(247, 140, 38, 0.3);
+      transition: all 0.2s ease;
+    }
+
+    .nav-btn:hover {
+      background: linear-gradient(135deg, #ea580c, #c2410c);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(247, 140, 38, 0.4);
+    }
+
+    /* Content Area */
+    .content-wrapper {
+      max-width: 920px;
+      margin: 40px auto 60px;
+      padding: 0 20px;
+      width: 100%;
+      flex: 1;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--card-radius);
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+    }
+
+    .card-header {
+      background: var(--bg-card-header);
+      padding: 36px 40px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--brand-orange-soft);
+      color: #fb923c;
+      border: 1px solid rgba(247, 140, 38, 0.25);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      margin-bottom: 16px;
+    }
+
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #f78c26;
+    }
+
+    h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1.25;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+
+    .card-body {
+      padding: 40px;
+    }
+
+    .section-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #ffffff;
+      margin-top: 36px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-title:first-of-type {
+      margin-top: 0;
+    }
+
+    .icon-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: var(--brand-blue-soft);
+      color: var(--brand-blue);
+      flex-shrink: 0;
+    }
+
+    p {
+      color: var(--text-light);
+      margin-bottom: 14px;
+      font-size: 0.95rem;
+    }
+
+    ul {
+      list-style: none;
+      padding-left: 0;
       margin-bottom: 20px;
     }
+
+    li {
+      color: var(--text-light);
+      font-size: 0.95rem;
+      position: relative;
+      padding-left: 24px;
+      margin-bottom: 10px;
+    }
+
+    li::before {
+      content: "";
+      position: absolute;
+      left: 6px;
+      top: 10px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: var(--brand-orange);
+    }
+
+    strong {
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    /* Footer */
     .footer {
-      margin-top: 40px;
-      padding-top: 20px;
-      border-top: 1px solid var(--border);
-      font-size: 0.9rem;
-      color: var(--text-muted);
+      border-top: 1px solid var(--border-subtle);
+      background: rgba(7, 13, 24, 0.95);
+      padding: 32px 20px;
+      margin-top: auto;
       text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 14px;
+    }
+
+    .footer-link {
+      color: var(--text-light);
+      text-decoration: none;
+      transition: color 0.15s ease;
+    }
+
+    .footer-link:hover {
+      color: var(--brand-orange);
+    }
+
+    @media (max-width: 640px) {
+      .card-header, .card-body {
+        padding: 24px 20px;
+      }
+      h1 {
+        font-size: 1.75rem;
+      }
+      .nav-links {
+        display: none;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="badge">Última actualización: Noviembre 2026</div>
-    <h1>Condiciones del Servicio de CaboSystems Field Service</h1>
-    
-    <p>Bienvenido a <strong>CaboSystems Field Service</strong>. Al acceder o utilizar nuestra plataforma web y aplicación móvil, usted acepta regirse por estas Condiciones del Servicio. Si no está de acuerdo con alguno de los términos, no debe utilizar el servicio.</p>
 
-    <h2>1. Descripción del Servicio</h2>
-    <p>CaboSystems Field Service es una solución empresarial de control operativo y coordinación de servicios técnicos en campo, que incluye despacho de tareas, geolocalización de técnicos en jornada laboral, bitácoras de servicio y sincronización de agendas.</p>
-
-    <h2>2. Uso Aceptable y Cuentas de Usuario</h2>
-    <ul>
-      <li>El usuario es responsable de mantener la confidencialidad de sus credenciales de acceso.</li>
-      <li>El servicio está destinado exclusivamente a operaciones legítimas de servicio y mantenimiento técnico autorizadas por CaboSystems.</li>
-      <li>Queda estrictamente prohibido cualquier intento de ingeniería inversa, acceso no autorizado o manipulación maliciosa de los datos de la plataforma.</li>
-    </ul>
-
-    <h2>3. Integraciones de Terceros (Google Calendar)</h2>
-    <p>Nuestra aplicación permite conectar de manera opcional su cuenta de Google Calendar para sincronizar eventos de servicio técnico. Al conectar su cuenta:</p>
-    <ul>
-      <li>Usted autoriza a la plataforma a leer y gestionar únicamente los calendarios seleccionados para la programación de servicios.</li>
-      <li>Puede desvincular la integración en cualquier momento desde la aplicación o desde la configuración de seguridad de Google.</li>
-    </ul>
-
-    <h2>4. Modificaciones del Servicio</h2>
-    <p>Nos reservamos el derecho de actualizar, modificar o discontinuar cualquier aspecto de la plataforma con el objetivo de mejorar el rendimiento y la seguridad del sistema.</p>
-
-    <h2>5. Contacto</h2>
-    <p>Para cualquier aclaración sobre estos términos, favor de comunicarse a través del portal de asistencia de CaboSystems.</p>
-
-    <div class="footer">
-      © 2026 CaboSystems Field Service. Todos los derechos reservados.
+  <!-- Top Navigation -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="/" class="nav-brand">
+        <img src="/logo-cabosystems-light.svg" alt="CaboSystems Field Service" class="nav-logo">
+      </a>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Inicio</a>
+        <a href="/terms.html" class="nav-link active">Términos del Servicio</a>
+        <a href="/privacy.html" class="nav-link">Privacidad</a>
+        <a href="/" class="nav-btn">Acceder al Sistema</a>
+      </div>
     </div>
-  </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="content-wrapper">
+    <div class="card">
+      <div class="card-header">
+        <div class="badge-pill">
+          <span class="badge-dot"></span>
+          Última actualización: Noviembre 2026
+        </div>
+        <h1>Condiciones del Servicio</h1>
+        <p class="subtitle">
+          Términos generales de uso, responsabilidades operativas y políticas de la plataforma <strong>CaboSystems Field Service</strong>.
+        </p>
+      </div>
+
+      <div class="card-body">
+        
+        <h2 class="section-title">
+          <span class="icon-badge">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </span>
+          1. Aceptación de los Términos
+        </h2>
+        <p>
+          Al iniciar sesión o utilizar las herramientas web y móviles de <strong>CaboSystems Field Service</strong>, el usuario declara haber leído, comprendido y aceptado las presentes Condiciones de Servicio en su totalidad.
+        </p>
+
+        <h2 class="section-title">
+          <span class="icon-badge">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
+          2. Cuentas y Responsabilidad de Uso
+        </h2>
+        <ul>
+          <li><strong>Uso Personal e Intransferible:</strong> Cada cuenta de usuario o técnico está asignada de manera individual. El colaborador es responsable de salvaguardar su contraseña y dispositivo de trabajo.</li>
+          <li><strong>Conducta y Seguridad:</strong> No está permitido ningún intento de eludir los controles de acceso, inyectar código no autorizado ni realizar ingeniería inversa sobre el software.</li>
+          <li><strong>Uso Laboral:</strong> Las funcionalidades de seguimiento GPS y registro de tareas están diseñadas exclusivamente para la coordinación de servicios técnicos autorizados por CaboSystems.</li>
+        </ul>
+
+        <h2 class="section-title">
+          <span class="icon-badge">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </span>
+          3. Integración con Google Calendar
+        </h2>
+        <p>
+          La sincronización opcional con Google Calendar opera bajo los protocolos de autorización OAuth 2.0 proporcionados por Google LLC:
+        </p>
+        <ul>
+          <li>CaboSystems únicamente interactúa con los calendarios necesarios para la correcta sincronización de citas y tareas técnicas asignadas.</li>
+          <li>El usuario puede pausar o desconectar la sincronización cuando lo considere conveniente desde su panel de preferencias o desde su cuenta de Google.</li>
+        </ul>
+
+        <h2 class="section-title">
+          <span class="icon-badge">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </span>
+          4. Propiedad Intelectual
+        </h2>
+        <p>
+          Todos los logotipos, marcas comerciales, diseños de interfaz, código fuente y contenidos asociados a <strong>CaboSystems Field Service</strong> son propiedad exclusiva de CaboSystems. No se concede licencia alguna sin consentimiento expreso por escrito.
+        </p>
+
+        <h2 class="section-title">
+          <span class="icon-badge">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </span>
+          5. Contacto
+        </h2>
+        <p>
+          Para soporte, consultas legales o dudas sobre los presentes términos de servicio, comuníquese con el departamento administrativo a través de los canales internos de CaboSystems.
+        </p>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-links">
+      <a href="/" class="footer-link">Inicio</a>
+      <a href="/terms.html" class="footer-link">Condiciones del Servicio</a>
+      <a href="/privacy.html" class="footer-link">Política de Privacidad</a>
+    </div>
+    <p>© 2026 CaboSystems Field Service. Todos los derechos reservados.</p>
+  </footer>
+
 </body>
 </html>
