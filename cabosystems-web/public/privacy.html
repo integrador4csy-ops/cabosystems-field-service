@@ -10,18 +10,21 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-dark: #070d18;
-      --bg-card: #0f182c;
-      --bg-card-header: #14203a;
-      --border-subtle: rgba(255, 255, 255, 0.08);
-      --border-focus: rgba(247, 140, 38, 0.5);
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --text-light: #cbd5e1;
+      --bg-page: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-card-header: #ffffff;
+      --border-card: #e2e8f0;
+      --border-subtle: #f1f5f9;
+      --text-main: #0f172a;
+      --text-body: #334155;
+      --text-muted: #64748b;
       --brand-orange: #f78c26;
-      --brand-orange-soft: rgba(247, 140, 38, 0.12);
-      --brand-blue: #38bdf8;
-      --brand-blue-soft: rgba(56, 189, 248, 0.12);
+      --brand-orange-hover: #ea580c;
+      --brand-orange-soft: #fff7ed;
+      --brand-orange-border: #ffedd5;
+      --brand-blue: #0284c7;
+      --brand-blue-soft: #f0f9ff;
+      --brand-blue-border: #bae6fd;
       --card-radius: 16px;
     }
 
@@ -33,13 +36,9 @@
 
     body {
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: var(--bg-dark);
-      color: var(--text-main);
+      background-color: var(--bg-page);
+      color: var(--text-body);
       line-height: 1.65;
-      background-image: 
-        radial-gradient(circle at 50% 0%, rgba(37, 99, 235, 0.15), transparent 45%),
-        radial-gradient(circle at 90% 20%, rgba(247, 140, 38, 0.08), transparent 35%);
-      background-repeat: no-repeat;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -50,11 +49,11 @@
       position: sticky;
       top: 0;
       z-index: 50;
-      background: rgba(7, 13, 24, 0.85);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border-bottom: 1px solid var(--border-subtle);
-      padding: 14px 24px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-card);
+      padding: 12px 24px;
     }
 
     .nav-container {
@@ -72,16 +71,38 @@
       gap: 12px;
     }
 
-    .nav-logo {
-      height: 38px;
-      width: auto;
+    .nav-logo-icon {
+      width: 36px;
+      height: 36px;
       object-fit: contain;
+    }
+
+    .nav-brand-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .nav-brand-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+    }
+
+    .nav-brand-sub {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--brand-orange);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
     }
 
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 20px;
+      gap: 24px;
     }
 
     .nav-link {
@@ -94,33 +115,34 @@
 
     .nav-link:hover, .nav-link.active {
       color: var(--text-main);
+      font-weight: 600;
     }
 
     .nav-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 8px 16px;
-      background: linear-gradient(135deg, #f78c26, #ea580c);
+      padding: 8px 18px;
+      background: linear-gradient(135deg, var(--brand-orange), var(--brand-orange-hover));
       color: #ffffff;
       font-size: 0.875rem;
       font-weight: 600;
       text-decoration: none;
       border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(247, 140, 38, 0.3);
+      box-shadow: 0 2px 8px rgba(247, 140, 38, 0.25);
       transition: all 0.2s ease;
     }
 
     .nav-btn:hover {
       background: linear-gradient(135deg, #ea580c, #c2410c);
       transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(247, 140, 38, 0.4);
+      box-shadow: 0 4px 12px rgba(247, 140, 38, 0.35);
     }
 
     /* Content Area */
     .content-wrapper {
-      max-width: 920px;
-      margin: 40px auto 60px;
+      max-width: 900px;
+      margin: 36px auto 60px;
       padding: 0 20px;
       width: 100%;
       flex: 1;
@@ -128,16 +150,16 @@
 
     .card {
       background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
+      border: 1px solid var(--border-card);
       border-radius: var(--card-radius);
-      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.04), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
       overflow: hidden;
     }
 
     .card-header {
       background: var(--bg-card-header);
       padding: 36px 40px;
-      border-bottom: 1px solid var(--border-subtle);
+      border-bottom: 1px solid var(--border-card);
     }
 
     .badge-pill {
@@ -145,8 +167,8 @@
       align-items: center;
       gap: 6px;
       background: var(--brand-orange-soft);
-      color: #fb923c;
-      border: 1px solid rgba(247, 140, 38, 0.25);
+      color: var(--brand-orange-hover);
+      border: 1px solid var(--brand-orange-border);
       padding: 4px 12px;
       border-radius: 9999px;
       font-size: 0.78rem;
@@ -159,14 +181,14 @@
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: #f78c26;
+      background: var(--brand-orange);
     }
 
     h1 {
       font-family: 'Outfit', sans-serif;
-      font-size: 2.25rem;
+      font-size: 2.2rem;
       font-weight: 700;
-      color: #ffffff;
+      color: var(--text-main);
       line-height: 1.25;
       letter-spacing: -0.02em;
       margin-bottom: 12px;
@@ -185,8 +207,8 @@
     .section-title {
       font-family: 'Outfit', sans-serif;
       font-size: 1.25rem;
-      font-weight: 600;
-      color: #ffffff;
+      font-weight: 700;
+      color: var(--text-main);
       margin-top: 36px;
       margin-bottom: 14px;
       display: flex;
@@ -202,16 +224,17 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 32px;
-      height: 32px;
+      width: 34px;
+      height: 34px;
       border-radius: 8px;
       background: var(--brand-blue-soft);
+      border: 1px solid var(--brand-blue-border);
       color: var(--brand-blue);
       flex-shrink: 0;
     }
 
     p {
-      color: var(--text-light);
+      color: var(--text-body);
       margin-bottom: 14px;
       font-size: 0.95rem;
     }
@@ -223,7 +246,7 @@
     }
 
     li {
-      color: var(--text-light);
+      color: var(--text-body);
       font-size: 0.95rem;
       position: relative;
       padding-left: 24px;
@@ -242,25 +265,25 @@
     }
 
     strong {
-      color: #ffffff;
+      color: var(--text-main);
       font-weight: 600;
     }
 
     /* Google Compliance Box */
     .google-box {
       margin: 28px 0;
-      background: rgba(15, 23, 42, 0.7);
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      border-left: 4px solid #38bdf8;
+      background: var(--brand-blue-soft);
+      border: 1px solid var(--brand-blue-border);
+      border-left: 4px solid var(--brand-blue);
       border-radius: 12px;
       padding: 24px;
     }
 
     .google-box-title {
       font-family: 'Outfit', sans-serif;
-      font-size: 1.1rem;
-      font-weight: 600;
-      color: #38bdf8;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--brand-blue);
       margin-bottom: 10px;
       display: flex;
       align-items: center;
@@ -268,19 +291,19 @@
     }
 
     .google-box p {
-      font-size: 0.9rem;
-      color: #cbd5e1;
+      font-size: 0.92rem;
+      color: var(--text-body);
       margin-bottom: 10px;
     }
 
     .google-box li::before {
-      background-color: #38bdf8;
+      background-color: var(--brand-blue);
     }
 
     /* Footer */
     .footer {
-      border-top: 1px solid var(--border-subtle);
-      background: rgba(7, 13, 24, 0.95);
+      border-top: 1px solid var(--border-card);
+      background: #ffffff;
       padding: 32px 20px;
       margin-top: auto;
       text-align: center;
@@ -292,12 +315,13 @@
       display: flex;
       justify-content: center;
       gap: 24px;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
 
     .footer-link {
-      color: var(--text-light);
+      color: var(--text-body);
       text-decoration: none;
+      font-weight: 500;
       transition: color 0.15s ease;
     }
 
@@ -324,7 +348,11 @@
   <header class="navbar">
     <div class="nav-container">
       <a href="/" class="nav-brand">
-        <img src="/logo-cabosystems-light.svg" alt="CaboSystems Field Service" class="nav-logo">
+        <img src="/logo-cabosystems-icon.svg" alt="CaboSystems" class="nav-logo-icon">
+        <div class="nav-brand-text">
+          <span class="nav-brand-title">CaboSystems</span>
+          <span class="nav-brand-sub">Field Service</span>
+        </div>
       </a>
       <div class="nav-links">
         <a href="/" class="nav-link">Inicio</a>
@@ -381,7 +409,7 @@
             Cumplimiento con Google API Services User Data Policy
           </div>
           <p>
-            El uso y transferencia que <strong>CaboSystems Field Service</strong> realiza de la información recibida a través de las APIs de Google se adhiere de forma estricta a la <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" style="color: #38bdf8; text-decoration: underline;">Política de Datos de Usuario de los Servicios de las APIs de Google</a>, cumpliendo con los requisitos de <em>Uso Limitado (Limited Use)</em>:
+            El uso y transferencia que <strong>CaboSystems Field Service</strong> realiza de la información recibida a través de las APIs de Google se adhiere de forma estricta a la <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: underline; font-weight: 600;">Política de Datos de Usuario de los Servicios de las APIs de Google</a>, cumpliendo con los requisitos de <em>Uso Limitado (Limited Use)</em>:
           </p>
           <ul>
             <li><strong>Finalidad Exclusiva:</strong> La integración con Google Calendar se utiliza exclusivamente para crear, consultar y sincronizar citas técnicas asignadas al colaborador en su agenda laboral.</li>
@@ -411,7 +439,7 @@
         </p>
         <ul>
           <li>Puede desconectar la cuenta de Google Calendar en cualquier momento desde los ajustes de la agenda de la aplicación móvil o del panel web.</li>
-          <li>Puede revocar el acceso a nivel global directamente desde su cuenta de Google en <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" style="color: #f78c26; text-decoration: underline;">myaccount.google.com/permissions</a>.</li>
+          <li>Puede revocar el acceso a nivel global directamente desde su cuenta de Google en <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" style="color: #f78c26; text-decoration: underline; font-weight: 600;">myaccount.google.com/permissions</a>.</li>
         </ul>
 
         <h2 class="section-title">
