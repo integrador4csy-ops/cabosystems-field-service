@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Repeat2, CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { Repeat2, CalendarDays, CakeSlice, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { useSidebar } from '../../context/SidebarContext';
 import { useTranslation } from '../../context/LanguageContext';
 import { useSessionPreference } from '../../hooks/useSessionPreference';
 import { agendaDays, type CompanyAgendaView } from '../../lib/agendaDates';
-import { getCompanyEvents, getGoogleCalendars, getLocalEvents } from '../../lib/agendaApi';
+import { getCompanyBirthdays, getCompanyEvents, getGoogleCalendars, getLocalEvents, type CompanyBirthdayProfile } from '../../lib/agendaApi';
 import { dateKey, parseDateKey, shiftDate, shiftMonth } from '../../lib/taskDates';
 import { supabase } from '../../lib/supabase';
 import type { AgendaGoogleCalendar, CompanyEvent } from '../../types/agenda';
@@ -15,7 +15,7 @@ import { AgendaSearchClient } from '../../lib/agendaSearchClient';
 import { AgendaSearchResults } from './AgendaSearchResults';
 import { AgendaMiniCalendar } from './AgendaMiniCalendar';
 import { GoogleCalendarDialog } from './GoogleCalendarDialog';
-import { calendarAppearance, eventSchedule } from '../../lib/agendaPresentation';
+import { birthdaysForMonth, calendarAppearance, eventSchedule, resolveCalendarDisplayName } from '../../lib/agendaPresentation';
 import { readSessionPreference } from '../../lib/sessionPreferences';
 import { useSectionResources, canSpeculate, type SectionResources } from '../../context/SectionResources';
 import '../projects/TaskWorkspace.css';
@@ -26,7 +26,11 @@ import { PersonalCalendarColors } from './PersonalCalendarColors';
 export async function prefetchAgenda(resources: SectionResources) {
   const anchor = readSessionPreference('csy_company_agenda_date', dateKey(new Date()), (value): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && dateKey(parseDateKey(value)) === value);
   const days = agendaDays(anchor, 'month');
-  return Promise.all([resources.getAgenda(getCompanyEvents).load(days[0], days[days.length - 1]), resources.queries.load('google-calendars', getGoogleCalendars)]);
+  return Promise.all([
+    resources.getAgenda(getCompanyEvents).load(days[0], days[days.length - 1]),
+    resources.queries.load('google-calendars', getGoogleCalendars),
+    resources.queries.load('company-birthdays', getCompanyBirthdays),
+  ]);
 }
 
 export function CompanyAgenda() {
@@ -57,6 +61,23 @@ export function CompanyAgenda() {
   const [anchor, setAnchor] = useSessionPreference('csy_company_agenda_date', dateKey(new Date()), (value): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && dateKey(parseDateKey(value)) === value);
   const [view, setView] = useSessionPreference<CompanyAgendaView>('csy_company_agenda_view', 'month', (value): value is CompanyAgendaView => value === 'month' || value === 'week' || value === 'day');
   const resources = useSectionResources();
+  const [birthdayProfiles, setBirthdayProfiles] = useState<CompanyBirthdayProfile[]>(() => resources.queries.read<CompanyBirthdayProfile[]>('company-birthdays') || []);
+  const [birthdaysReady, setBirthdaysReady] = useState(() => resources.queries.read<CompanyBirthdayProfile[]>('company-birthdays') !== null);
+  const loadBirthdays = useCallback(async (refresh = false) => {
+    try {
+      setBirthdayProfiles(await resources.queries.load('company-birthdays', getCompanyBirthdays, refresh));
+    } catch {
+      // Birthdays complement the agenda and must never block calendar events.
+    } finally {
+      setBirthdaysReady(true);
+    }
+  }, [resources]);
+  useEffect(() => {
+    void loadBirthdays();
+    const refresh = () => { if (document.visibilityState === 'visible') void loadBirthdays(true); };
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
+  }, [loadBirthdays]);
   const cache = useMemo(() => resources.getAgenda(getCompanyEvents), [resources]);
   const [snapshot, setSnapshot] = useState<{ from: string; to: string; events: CompanyEvent[] } | null>(null);
   const [calendars, setCalendars] = useState<AgendaGoogleCalendar[]>(() => resources.queries.read<AgendaGoogleCalendar[]>('google-calendars') || []);
@@ -145,11 +166,21 @@ export function CompanyAgenda() {
     }
     return result;
   }, [events, agendaSearchQuery, locale, hiddenCalendars]);
-  const calendarFilters = [{ id: 'local', name: 'CaboSystems', backgroundColor: '#343e48' }, ...calendars];
+  const userEmail = user?.email || adminProfile?.email;
+  const userFullName = adminProfile?.nombre || (user?.user_metadata?.nombre as string);
+  const calendarFilters = useMemo(() => [
+    { id: 'local', name: 'CaboSystems', backgroundColor: '#343e48' },
+    ...calendars.map(cal => ({
+      ...cal,
+      name: resolveCalendarDisplayName(cal, userEmail, userFullName),
+    })),
+  ], [calendars, userEmail, userFullName]);
   const toggleCalendar = (id: string) => setHiddenCalendars(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id]);
   const move = (direction: number) => setAnchor(view === 'month' ? shiftMonth(anchor, direction) : shiftDate(anchor, direction * (view === 'week' ? 7 : 1)));
   const today = dateKey(new Date());
   const heading = view === 'day' ? parseDateKey(anchor).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' }) : view === 'week' ? `${parseDateKey(from).toLocaleDateString(locale, { day: 'numeric', month: 'short' })} – ${parseDateKey(to).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}` : parseDateKey(anchor).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+  const birthdays = useMemo(() => birthdaysForMonth(birthdayProfiles, anchor, locale), [birthdayProfiles, anchor, locale]);
+  const birthdayMonth = useMemo(() => parseDateKey(anchor).toLocaleDateString(locale, { month: 'long' }), [anchor, locale]);
   const renderEvent = (event: CompanyEvent) => <button type="button" key={event.id} className={`company-event ${event.google || personalColors.colors['local'] ? 'has-calendar-color' : ''}`} style={calendarAppearance(event, personalColors.colors[event.google?.calendarId || 'local'])} onClick={() => setDialog({ event, day: event.occurrence_date || event.fecha })}>
     {event.repeticion !== 'ninguna' || event.google?.recurring ? <Repeat2 size={14} role="img" aria-label={t('Se repite')} /> : <CalendarDays size={14} aria-hidden="true" />}
     <span><span className="company-event-title">{event.google?.availabilityOnly ? (locale.startsWith('en') ? 'Busy' : 'Ocupado') : event.titulo}</span><span className="company-event-meta">{eventSchedule(event, locale)}</span>{view !== 'month' && event.ubicacion && <span className="company-event-meta">{event.ubicacion}</span>}</span>
@@ -167,6 +198,16 @@ export function CompanyAgenda() {
       <div className="agenda-period-heading"><button className="workspace-button" onClick={() => setAnchor(today)}>{t('Hoy')}</button><div className="agenda-period-arrows"><button className="workspace-icon agenda-period-arrow" aria-label={t('Periodo anterior')} onClick={() => move(-1)}><ChevronLeft size={20} /></button><button className="workspace-icon agenda-period-arrow" aria-label={t('Periodo siguiente')} onClick={() => move(1)}><ChevronRight size={20} /></button></div><h2 className="agenda-month-title" aria-live="polite">{heading}</h2></div>
       <div className="agenda-date-controls">{canConnectGoogle && <button type="button" className="workspace-button" onClick={() => setGoogleOpen(true)}>{locale.startsWith('en') ? 'Sync calendar' : 'Sincronizar calendario'}<img className="google-calendar-sync-icon" src="/google-calendar.png" alt="" width={24} height={24} /></button>}<AppSelect aria-label={t('Vista de agenda')} value={view} onChange={(e) => setView(e.target.value as CompanyAgendaView)}><option value="month">{t('Mes')}</option><option value="week">{t('Semana')}</option><option value="day">{t('Día')}</option></AppSelect><input type="date" min="1900-01-01" max="9999-12-31" aria-label={t('Ir a fecha')} value={anchor} onChange={(e) => { if (e.target.validity.valid && e.target.value) setAnchor(e.target.value); }} /></div>
     </div>}
+
+    {!searching && <section className="company-birthdays" aria-labelledby="company-birthdays-title">
+      <header className="company-birthdays-heading">
+        <span className="company-birthdays-icon" aria-hidden="true"><CakeSlice size={19} /></span>
+        <div><h3 id="company-birthdays-title">{locale.startsWith('en') ? `Birthdays in ${birthdayMonth}` : `Cumpleaños de ${birthdayMonth}`}</h3><p>{birthdays.length > 0 ? (locale.startsWith('en') ? `${birthdays.length} this month` : `${birthdays.length} este mes`) : (locale.startsWith('en') ? 'No birthdays this month' : 'Sin cumpleaños este mes')}</p></div>
+      </header>
+      <div className="company-birthdays-list" role="list">
+        {!birthdaysReady ? <span className="company-birthdays-empty">{locale.startsWith('en') ? 'Loading…' : 'Cargando…'}</span> : birthdays.map(birthday => <div className="company-birthday" role="listitem" key={birthday.id}><time dateTime={`--${birthday.date.slice(5)}`}>{birthday.day}</time><span>{birthday.name}</span></div>)}
+      </div>
+    </section>}
 
     {!searching && error ? <div role="alert" className="workspace-empty"><p>{t(error)}</p>{canConnectGoogle && error.includes('Vuelve a autorizar') && <button type="button" className="workspace-primary" onClick={() => setGoogleOpen(true)}>{locale.startsWith('en') ? 'Sync calendar' : 'Sincronizar calendario'}<img className="google-calendar-sync-icon" src="/google-calendar.png" alt="" width={24} height={24} /></button>}<button className="workspace-button" onClick={() => void load(true)}>{t('Reintentar')}</button></div> : null}
     {!searching && loading && <p className="company-sync-status" role="status" aria-live="polite">{locale.startsWith('en') ? 'Loading events…' : 'Cargando eventos…'}</p>}

@@ -117,3 +117,14 @@ test('mobile preserves the Google authorization error instead of reporting an em
   readable = false;
   await assert.rejects(api.getGoogleCalendars(), /No se pudo consultar Google Calendar/);
 });
+
+test('mobile monthly birthdays match the selected month and are ordered by day', () => {
+  const { birthdaysForMonth } = load('lib/companyAgendaPresentation.ts');
+  const profiles = [
+    { id: 'later', nombre: 'María López', fecha_nacimiento: '1990-11-25' },
+    { id: 'first', nombre: 'Ana Ruiz', fecha_nacimiento: '1995-11-02' },
+    { id: 'other', nombre: 'Octavio Díaz', fecha_nacimiento: '1980-10-01' },
+    { id: 'invalid', nombre: 'Fecha inválida', fecha_nacimiento: '1990-11-31' },
+  ];
+  assert.deepEqual(plain(birthdaysForMonth(profiles, '2026-11-04', 'es-MX').map(item => [item.id, item.day])), [['first', 2], ['later', 25]]);
+});

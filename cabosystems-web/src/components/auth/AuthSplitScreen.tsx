@@ -71,6 +71,12 @@ export const AuthSplitScreen: React.FC = () => {
       const urlToken = params.get('token') || '';
       const urlEmail = params.get('email') || '';
       const modeParam = params.get('mode') || params.get('action') || '';
+      const errorParam = params.get('error') || '';
+
+      if (errorParam === 'invitacion_invalida') {
+        setErrorMsg(t('El enlace de invitación no es válido o ya fue utilizado.'));
+      }
+
       if (urlToken || modeParam === 'register') {
         setAuthMode('register');
         if (urlEmail) setInviteEmail(urlEmail);

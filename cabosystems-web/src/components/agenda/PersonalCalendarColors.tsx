@@ -31,7 +31,7 @@ export function PersonalCalendarColors({ calendars, hidden, onToggle, colors, lo
       const iconColor = calendarTextColor(color);
       return <div key={calendar.id}>
         <div className="company-calendar-color-row">
-          <label><span className="calendar-filter-checkbox"><input type="checkbox" checked={!hidden.includes(calendar.id)} onChange={() => onToggle(calendar.id)} style={!hidden.includes(calendar.id) ? { backgroundColor: color, borderColor: color } : undefined} /><Check size={16} strokeWidth={3} aria-hidden="true" /></span><span>{calendar.name}</span></label>
+          <label><span className="calendar-filter-checkbox"><input type="checkbox" checked={!hidden.includes(calendar.id)} onChange={() => onToggle(calendar.id)} style={!hidden.includes(calendar.id) ? { backgroundColor: color, borderColor: color } : undefined} /><Check size={16} strokeWidth={3} aria-hidden="true" /></span><span className="company-calendar-name" title={calendar.name}>{calendar.name}</span></label>
           <button type="button" className="calendar-color-toggle" aria-label={`${en ? 'Change color for' : 'Cambiar color de'} ${calendar.name}`} aria-expanded={editing === calendar.id} disabled={loading || failed || busy} onClick={() => { setDraft(color); setError(''); setEditing(editing === calendar.id ? null : calendar.id); }}>
             <span style={{ backgroundColor: color, color: iconColor }}><Palette size={14} aria-hidden="true" /></span>
           </button>

@@ -12,6 +12,8 @@ import {
 import { CalendarSync, Check, X, ExternalLink, RefreshCw, AlertTriangle, ShieldCheck } from 'lucide-react-native';
 import { AgendaPalette as P, Colors } from '@/constants/Theme';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth';
+import { resolveCalendarDisplayName } from '@/lib/companyAgendaPresentation';
 import type { CompanyAgendaCopy } from '@/lib/companyAgendaCopy';
 
 interface GoogleCalendarSyncModalProps {
@@ -43,6 +45,7 @@ export const GoogleCalendarSyncModal: React.FC<GoogleCalendarSyncModalProps> = (
   copy: c,
   locale,
 }) => {
+  const { profile, user } = useAuth();
   const isEs = locale.startsWith('es');
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
@@ -225,7 +228,7 @@ export const GoogleCalendarSyncModal: React.FC<GoogleCalendarSyncModalProps> = (
                           return (
                             <Pressable key={calendar.id} disabled={!readable} onPress={() => toggleCalendar(calendar.id)} style={({ pressed }) => [s.calendarRow, pressed && s.pressed, !readable && s.disabledBtn]}>
                               <View style={[s.checkbox, checked && s.checkboxChecked]}>{checked ? <Check size={14} color={P.white} /> : null}</View>
-                              <Text style={s.calendarName}>{calendar.name}</Text>
+                              <Text style={s.calendarName}>{resolveCalendarDisplayName(calendar, user?.email, profile?.nombre)}</Text>
                             </Pressable>
                           );
                         })}

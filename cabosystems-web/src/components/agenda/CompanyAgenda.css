@@ -25,6 +25,16 @@
 }
 .company-agenda-body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 .company-agenda-main { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.company-birthdays { display: flex; align-items: center; gap: 18px; margin: 0 16px 14px; padding: 12px 14px; border: 1px solid #fed7aa; border-radius: 10px; background: #fffaf5; }
+.company-birthdays-heading { display: flex; align-items: center; gap: 10px; min-width: 210px; }
+.company-birthdays-icon { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; border-radius: 50%; background: #ffedd5; color: #c2410c; }
+.company-birthdays-heading h3 { margin: 0; color: var(--color-slate-800); font-size: 14px; font-weight: 600; text-transform: capitalize; }
+.company-birthdays-heading p { margin: 2px 0 0; color: var(--color-slate-500); font-size: 12px; }
+.company-birthdays-list { display: flex; align-items: center; gap: 8px; min-width: 0; overflow-x: auto; padding: 2px 0; scrollbar-width: thin; }
+.company-birthday { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; min-height: 38px; padding: 5px 12px 5px 6px; border-left: 1px solid #fed7aa; color: var(--color-slate-700); font-size: 13px; }
+.company-birthday time { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--color-brand-500); color: #fff; font-weight: 700; font-variant-numeric: tabular-nums; }
+.company-birthday span { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.company-birthdays-empty { color: var(--color-slate-500); font-size: 13px; }
 .company-agenda-sidebar { width: 200px; flex-shrink: 0; overflow-y: auto; padding: 16px 10px; border-right: 1px solid var(--color-slate-200); background: var(--color-slate-50); }
 .company-agenda-sidebar .company-calendar-filters { flex-direction: column; flex-wrap: nowrap; gap: 4px; padding: 16px 4px 4px; border-top: 1px solid var(--color-slate-200); margin-top: 20px; }
 .company-agenda-sidebar .company-calendar-filters legend { margin-bottom: 8px; padding-right: 8px; }
@@ -57,6 +67,11 @@
   .company-agenda-sidebar.is-open { grid-template-columns: 1fr; gap: 16px; }
   .agenda-mini { width: 224px; max-width: 100%; margin-inline: auto; }
 }
+@media (max-width: 700px) {
+  .company-birthdays { align-items: flex-start; flex-direction: column; gap: 8px; margin-inline: 12px; }
+  .company-birthdays-heading { min-width: 0; }
+  .company-birthdays-list { width: 100%; }
+}
 .google-calendar-body { padding: 20px 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
 .google-calendar-body fieldset { width: 100%; border-block: 1px solid var(--color-slate-200); padding: 12px 0; }
 .google-calendar-body legend { padding-right: 8px; font-size: 14px; font-weight: 600; }
@@ -64,8 +79,8 @@
 .google-calendar-option input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; padding: 0; accent-color: var(--color-brand-500); }
 .google-calendar-body footer { width: 100%; padding-top: 8px; }
 .company-calendar-color-row { display: flex; align-items: center; gap: 4px; }
-.company-calendar-color-row > label { flex: 1; min-width: 0; }
-.company-calendar-color-row > label > span { overflow-wrap: anywhere; }
+.company-calendar-color-row > label { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.company-calendar-color-row .company-calendar-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .calendar-color-toggle { width: 36px; min-height: 44px; flex-shrink: 0; display: grid; place-items: center; border: 0; background: transparent; cursor: pointer; }
 .calendar-color-toggle > span { width: 22px; height: 22px; border: 1px solid rgba(0,0,0,.2); border-radius: 6px; display: grid; place-items: center; }
 .calendar-color-toggle svg { color: inherit; background: transparent; padding: 0; }

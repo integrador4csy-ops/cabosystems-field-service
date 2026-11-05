@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useDialog } from '../ui/useDialog';
 import { useTranslation } from '../../context/LanguageContext';
+import { useAdminAuth } from '../../context/AdminAuthContext';
+import { resolveCalendarDisplayName } from '../../lib/agendaPresentation';
 import { calendarRequest, type GoogleCalendar, type GoogleCalendarStatus } from '../../lib/googleCalendarApi';
 
 const COPY = {
@@ -39,6 +41,9 @@ const COPY = {
 
 export function GoogleCalendarDialog({ onClose }: { onClose: () => void }) {
   const { locale } = useTranslation();
+  const { user, adminProfile } = useAdminAuth();
+  const userEmail = user?.email || adminProfile?.email;
+  const userFullName = adminProfile?.nombre || (user?.user_metadata?.nombre as string);
   const c = COPY[locale.startsWith('en') ? 'en' : 'es'];
   const [status, setStatus] = useState<GoogleCalendarStatus | null>(null);
   const [calendars, setCalendars] = useState<GoogleCalendar[] | null>(null);
@@ -106,7 +111,7 @@ export function GoogleCalendarDialog({ onClose }: { onClose: () => void }) {
           {!status.configured && <p>{c.unconfigured}</p>}
           {status.connected ? <>
             <p>{c.connected} <strong>{status.account}</strong></p>
-            <p>{status.selectedCalendars.length ? `${c.selected} ${status.selectedCalendars.map((calendar) => calendar.name).join(', ')}` : c.noSelection}</p>
+            <p>{status.selectedCalendars.length ? `${c.selected} ${status.selectedCalendars.map((calendar) => resolveCalendarDisplayName(calendar, userEmail, userFullName)).join(', ')}` : c.noSelection}</p>
             <p className="company-field-help">{c.privacy}</p>
             <button type="button" className="workspace-button" disabled={busy || !status.configured} onClick={() => void run(list)}>{c.chooseFirst}</button>
             {calendars && <fieldset disabled={busy}><legend>{c.choose}</legend>
@@ -114,7 +119,8 @@ export function GoogleCalendarDialog({ onClose }: { onClose: () => void }) {
               {calendars.map((calendar) => {
                 const writable = ['owner', 'writer'].includes(calendar.accessRole);
                 const readable = ['owner', 'writer', 'reader', 'writerWithoutPrivateAccess', 'freeBusyReader'].includes(calendar.accessRole);
-                return <label className="google-calendar-option" key={calendar.id}><input type="checkbox" disabled={!readable || busy} checked={selected.includes(calendar.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, calendar.id] : current.filter((id) => id !== calendar.id))} /><span>{calendar.name}{!writable && <span className="company-event-meta">{calendar.accessRole === 'freeBusyReader' ? c.availabilityOnly : readable ? c.readOnly : c.unavailable}</span>}{!readable && <span className="company-event-meta">{c.needsDetails}</span>}</span></label>;
+                const displayName = resolveCalendarDisplayName(calendar, userEmail, userFullName);
+                return <label className="google-calendar-option" key={calendar.id}><input type="checkbox" disabled={!readable || busy} checked={selected.includes(calendar.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, calendar.id] : current.filter((id) => id !== calendar.id))} /><span>{displayName}{!writable && <span className="company-event-meta">{calendar.accessRole === 'freeBusyReader' ? c.availabilityOnly : readable ? c.readOnly : c.unavailable}</span>}{!readable && <span className="company-event-meta">{c.needsDetails}</span>}</span></label>;
               })}
               <button type="button" className="workspace-primary" disabled={busy} onClick={() => void run(save)}>{c.save}</button>
             </fieldset>}

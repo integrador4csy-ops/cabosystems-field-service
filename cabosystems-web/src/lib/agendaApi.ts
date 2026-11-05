@@ -2,6 +2,12 @@ import { supabase } from './supabase';
 import type { AgendaGoogleCalendar, CompanyEvent, EventInput } from '../types/agenda';
 import { expandCompanyEvents, validRecurrence } from './agendaRecurrence';
 
+export interface CompanyBirthdayProfile {
+  id: string;
+  nombre: string | null;
+  fecha_nacimiento: string | null;
+}
+
 async function googleRequest<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke('google-calendar-events', { body });
   if (error) {
@@ -14,6 +20,15 @@ async function googleRequest<T>(body: Record<string, unknown>): Promise<T> {
 }
 export async function getGoogleCalendars(): Promise<AgendaGoogleCalendar[]> {
   return (await googleRequest<{ calendars: AgendaGoogleCalendar[] }>({ action: 'calendars' })).calendars;
+}
+export async function getCompanyBirthdays(): Promise<CompanyBirthdayProfile[]> {
+  const { data, error } = await supabase.from('profiles')
+    .select('id, nombre, fecha_nacimiento')
+    .eq('activo', true)
+    .not('fecha_nacimiento', 'is', null)
+    .order('nombre');
+  if (error) throw error;
+  return (data || []) as CompanyBirthdayProfile[];
 }
 export async function getCompanyEvents(from: string, to: string): Promise<CompanyEvent[]> {
   const [local, remote] = await Promise.all([getLocalEvents(from, to), googleRequest<{ events: CompanyEvent[] }>({ action: 'list', from, to })]);

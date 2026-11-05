@@ -1,5 +1,10 @@
 project_id = "cabosystems-field-service"
 
+[functions.invite-colaborador]
+# El enlace del correo y el alta por token son públicos; la función valida
+# internamente las operaciones administrativas con la sesión del responsable.
+verify_jwt = false
+
 [functions.google-calendar]
 verify_jwt = true
 

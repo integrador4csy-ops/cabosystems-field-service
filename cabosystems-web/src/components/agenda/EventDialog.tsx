@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { CalendarDays, Check, X } from 'lucide-react';
 import { useTranslation } from '../../context/LanguageContext';
 import { deleteCompanyEvent, getGoogleCalendars, saveCompanyEvent } from '../../lib/agendaApi';
+import { resolveCalendarDisplayName } from '../../lib/agendaPresentation';
+import { useAdminAuth } from '../../context/AdminAuthContext';
 import { validRecurrence } from '../../lib/agendaRecurrence';
 import { agendaRequestId } from '../../lib/agendaRequestId';
 import type { AgendaGoogleCalendar, CompanyEvent, EventInput } from '../../types/agenda';
@@ -14,6 +16,9 @@ export function EventDialog({ event, day, canManage: allowed, onClose, onSaved }
   event: CompanyEvent | null; day: string; canManage: boolean; onClose: () => void; onSaved: () => void;
 }) {
   const { t, locale } = useTranslation();
+  const { user, adminProfile } = useAdminAuth();
+  const userEmail = user?.email || adminProfile?.email;
+  const userFullName = adminProfile?.nombre || (user?.user_metadata?.nombre as string);
   const canManage = allowed && event?.google?.editable !== false;
   const en = locale.startsWith('en');
   const c = { startTime: en ? 'Start time' : 'Hora de inicio', invalidTime: en ? 'Enter a valid start and end time. Local events must end after they start on the same day.' : 'Indica inicio y fin válidos. Los eventos locales deben terminar después del inicio en el mismo día.', calendar: en ? 'Calendar' : 'Calendario', local: en ? 'CaboSystems only' : 'Solo CaboSystems', endDate: en ? 'Last day' : 'Último día', endTime: en ? 'End time' : 'Hora de fin', zone: en ? 'Google times use Los Cabos time.' : 'Las horas de Google se muestran en horario de Los Cabos.', occurrence: en ? 'Changes and deletion apply only to this occurrence. Manage the full series in Google Calendar.' : 'Los cambios y la eliminación afectan solo esta ocurrencia. La serie completa se administra en Google Calendar.', calendarError: en ? 'Could not load Google calendars. You can still save locally.' : 'No se pudieron consultar los calendarios de Google. Puedes guardar solo en CaboSystems.' };
@@ -59,7 +64,7 @@ export function EventDialog({ event, day, canManage: allowed, onClose, onSaved }
         <div className="company-event-fields">
         <fieldset disabled={!canManage || busy}>
           <label className="company-title-field">{t('Título')}<input required maxLength={160} value={input.titulo} onChange={(e) => change({ titulo: e.target.value })} /></label>
-          {event ? <p className="company-field-help">{c.calendar}: {event.google?.calendarName || c.local}</p> : <label>{c.calendar}<AppSelect aria-label={c.calendar} disabled={!canManage || busy} value={input.calendar_id || ''} onChange={(e) => change({ calendar_id: e.target.value })}><option value="">{c.local}</option>{calendars.map((calendar) => <option key={calendar.id} value={calendar.id}>{calendar.name}</option>)}</AppSelect></label>}
+          {event ? <p className="company-field-help">{c.calendar}: {event.google ? resolveCalendarDisplayName({ id: event.google.calendarId || '', name: event.google.calendarName }, userEmail, userFullName) : c.local}</p> : <label>{c.calendar}<AppSelect aria-label={c.calendar} disabled={!canManage || busy} value={input.calendar_id || ''} onChange={(e) => change({ calendar_id: e.target.value })}><option value="">{c.local}</option>{calendars.map((calendar) => <option key={calendar.id} value={calendar.id}>{resolveCalendarDisplayName(calendar, userEmail, userFullName)}</option>)}</AppSelect></label>}
           {event?.google?.availabilityOnly && <p className="company-field-help">{en ? 'Availability only. Google shares busy times without event details.' : 'Solo disponibilidad. Google comparte los horarios ocupados sin los detalles de los eventos.'}</p>}
           {calendarError && <p role="status" className="company-field-help">{c.calendarError}</p>}
           <div className="company-schedule-fields">
