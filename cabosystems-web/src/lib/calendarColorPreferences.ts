@@ -1,7 +1,12 @@
 import { supabase } from './supabase';
 
 export type CalendarColors = Record<string, string>;
-export const CALENDAR_COLOR_PALETTE = ['#f78c26', '#d50000', '#e67c73', '#f4511e', '#f6bf26', '#0b8043', '#33b679', '#039be5', '#3f51b5', '#8e24aa', '#616161', '#343e48'];
+export const CALENDAR_COLOR_PALETTE = [
+  '#c2185b', '#f4511e', '#f6bf26', '#0b8043', '#3f51b5', '#8e24aa',
+  '#e91e63', '#ef6c00', '#c0ca33', '#009688', '#7986cb', '#795548',
+  '#d50000', '#fb8c00', '#7cb342', '#039be5', '#b39ddb', '#616161',
+  '#e67c73', '#fbbd23', '#33b679', '#4285f4', '#9e69af', '#a79b8e',
+];
 export const validCalendarColor = (color: string) => /^#[a-f0-9]{6}$/i.test(color);
 
 export async function getCalendarColors(owner: string): Promise<CalendarColors> {

@@ -61,6 +61,8 @@ import { GroupTaskActivitySection } from '@/components/chat/GroupTaskActivitySec
 import { useTranslation } from '@/lib/i18n';
 import { CHAT_COPY } from '@/lib/chatCopy';
 
+type GroupInfoSection = 'members' | 'tasks' | 'media';
+
 export default function GroupInfoScreen() {
   const { t: tr } = useInterfaceTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -73,6 +75,7 @@ export default function GroupInfoScreen() {
   const [group, setGroup] = useState<ChatGroup | null>(null);
   const [members, setMembers] = useState<ChatMember[]>([]);
   const [attachments, setAttachments] = useState<ChatMessage[]>([]);
+  const [activeSection, setActiveSection] = useState<GroupInfoSection>('members');
   const [mediaTab, setMediaTab] = useState<'all' | 'media' | 'docs' | 'audio'>('all');
   const [activeDoc, setActiveDoc] = useState<{ url: string; fileName?: string; fileSize?: number; mimeType?: string } | null>(null);
   const [activeVideo, setActiveVideo] = useState<{ url: string; title?: string } | null>(null);
@@ -415,8 +418,42 @@ export default function GroupInfoScreen() {
             )}
           </View>
 
+          <View style={styles.primaryTabs}>
+            {([
+              { key: 'members', label: tr('Integrantes') },
+              { key: 'tasks', label: tr('Tareas realizadas') },
+              { key: 'media', label: tr('Archivos y multimedia') },
+            ] satisfies { key: GroupInfoSection; label: string }[]).map((tab) => {
+              const isActive = activeSection === tab.key;
+
+              return (
+                <Pressable
+                  key={tab.key}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: isActive }}
+                  onPress={() => setActiveSection(tab.key)}
+                  style={({ pressed }) => [
+                    styles.primaryTab,
+                    isActive ? styles.primaryTabActive : null,
+                    pressed ? styles.primaryTabPressed : null,
+                  ]}
+                >
+                  <Text
+                    numberOfLines={2}
+                    style={[
+                      styles.primaryTabText,
+                      isActive ? styles.primaryTabTextActive : null,
+                    ]}
+                  >
+                    {tab.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           {/* Configuración de Admin: Modo Solo Multimedia */}
-          {isUserAdmin && (
+          {activeSection === 'members' && isUserAdmin ? (
             <View style={styles.settingCard}>
               <View style={styles.settingHeader}>
                 <Shield size={18} color={Colors.primary} />
@@ -439,10 +476,11 @@ export default function GroupInfoScreen() {
                 />
               </View>
             </View>
-          )}
+          ) : null}
 
           {/* Sección de Archivos y Multimedia */}
-          <View style={styles.mediaSection}>
+          {activeSection === 'media' ? (
+            <View style={styles.mediaSection}>
             <View style={styles.mediaHeader}>
               <View style={styles.mediaTitleRow}>
                 <Paperclip size={16} color={Colors.primary} />
@@ -618,28 +656,38 @@ export default function GroupInfoScreen() {
                 </View>
               );
             })()}
-          </View>
+            </View>
+          ) : null}
 
           {/* Tareas realizadas de la villa vinculada */}
-          {group.proyecto_id ? (
-            <GroupTaskActivitySection
-              groupId={group.id}
-              onImage={(url) =>
-                setActiveDoc({
-                  url,
-                  fileName: tr('Evidencia'),
-                  mimeType: 'image/jpeg',
-                })
-              }
-            />
+          {activeSection === 'tasks' ? (
+            group?.proyecto_id ? (
+              <GroupTaskActivitySection
+                groupId={group.id}
+                onImage={(url) =>
+                  setActiveDoc({
+                    url,
+                    fileName: tr('Evidencia'),
+                    mimeType: 'image/jpeg',
+                  })
+                }
+              />
+            ) : (
+              <View style={styles.emptySectionCard}>
+                <Text style={styles.emptySectionText}>
+                  {tr('Vincula una villa para consultar sus tareas realizadas.')}
+                </Text>
+              </View>
+            )
           ) : null}
 
           {/* Lista de Integrantes */}
-          <View style={styles.membersSection}>
+          {activeSection === 'members' ? (
+            <View style={styles.membersSection}>
             <View style={styles.membersHeader}>
               <View style={styles.membersTitleRow}>
                 <Users size={16} color={Colors.primary} />
-                <Text style={styles.membersTitle}>{tr("INTEGRANTES (")}{members.length})
+                <Text style={styles.membersTitle}>{tr('Integrantes').toUpperCase()} ({members.length})
                 </Text>
               </View>
 
@@ -700,10 +748,11 @@ export default function GroupInfoScreen() {
                 );
               })}
             </View>
-          </View>
+            </View>
+          ) : null}
 
           {/* Acciones Destructivas */}
-          {isUserAdmin && (
+          {activeSection === 'members' && isUserAdmin ? (
             <View style={styles.dangerZone}>
               <Pressable
                 style={({ pressed }) => [styles.deleteGroupBtn, pressed && { opacity: 0.8 }]}
@@ -713,7 +762,7 @@ export default function GroupInfoScreen() {
                 <Text style={styles.deleteGroupText}>{tr("Eliminar Grupo Definitivamente")}</Text>
               </Pressable>
             </View>
-          )}
+          ) : null}
         </ScrollView>
       )}
 
@@ -818,6 +867,63 @@ export default function GroupInfoScreen() {
 }
 
 const styles = StyleSheet.create({
+  primaryTabs: {
+    flexDirection: 'row',
+    gap: 4,
+    padding: 4,
+    marginBottom: Spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(52, 62, 72, 0.16)',
+    borderRadius: 12,
+    borderCurve: 'continuous',
+  },
+  primaryTab: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+    borderRadius: 9,
+    borderCurve: 'continuous',
+  },
+  primaryTabActive: {
+    backgroundColor: Colors.primary,
+  },
+  primaryTabPressed: {
+    opacity: 0.72,
+  },
+  primaryTabText: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 10.5,
+    lineHeight: 13,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
+  primaryTabTextActive: {
+    color: '#FFFFFF',
+  },
+  emptySectionCard: {
+    minHeight: 112,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.lg,
+    marginBottom: Spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(52, 62, 72, 0.16)',
+    borderRadius: 16,
+    borderCurve: 'continuous',
+  },
+  emptySectionText: {
+    maxWidth: 250,
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 12,
+    lineHeight: 17,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
   mediaSection: {
     marginBottom: Spacing.md,
     backgroundColor: '#FFFFFF',

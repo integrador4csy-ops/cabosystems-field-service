@@ -200,12 +200,10 @@ export function CompanyAgenda() {
     </div>}
 
     {!searching && <section className="company-birthdays" aria-labelledby="company-birthdays-title">
-      <header className="company-birthdays-heading">
-        <span className="company-birthdays-icon" aria-hidden="true"><CakeSlice size={19} /></span>
-        <div><h3 id="company-birthdays-title">{locale.startsWith('en') ? `Birthdays in ${birthdayMonth}` : `Cumpleaños de ${birthdayMonth}`}</h3><p>{birthdays.length > 0 ? (locale.startsWith('en') ? `${birthdays.length} this month` : `${birthdays.length} este mes`) : (locale.startsWith('en') ? 'No birthdays this month' : 'Sin cumpleaños este mes')}</p></div>
-      </header>
+      <CakeSlice className="company-birthdays-icon" size={15} aria-hidden="true" />
+      <h3 id="company-birthdays-title">{locale.startsWith('en') ? `Birthdays · ${birthdayMonth}` : `Cumpleaños · ${birthdayMonth}`}</h3>
       <div className="company-birthdays-list" role="list">
-        {!birthdaysReady ? <span className="company-birthdays-empty">{locale.startsWith('en') ? 'Loading…' : 'Cargando…'}</span> : birthdays.map(birthday => <div className="company-birthday" role="listitem" key={birthday.id}><time dateTime={`--${birthday.date.slice(5)}`}>{birthday.day}</time><span>{birthday.name}</span></div>)}
+        {!birthdaysReady ? <span className="company-birthdays-empty">{locale.startsWith('en') ? 'Loading…' : 'Cargando…'}</span> : birthdays.length > 0 ? birthdays.map(birthday => <span className="company-birthday" role="listitem" key={birthday.id}><time dateTime={`--${birthday.date.slice(5)}`}>{birthday.day}</time><span>{birthday.name}</span></span>) : <span className="company-birthdays-empty">{locale.startsWith('en') ? 'None this month' : 'Ninguno este mes'}</span>}
       </div>
     </section>}
 

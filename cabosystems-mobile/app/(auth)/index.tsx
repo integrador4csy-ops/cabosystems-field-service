@@ -48,7 +48,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const { width, height } = useWindowDimensions();
   const isCompact = height < 700 || width < 360;
-  const logoWidth = Math.min(width * 0.55, 220);
+  const logoWidth = Math.min(width * 0.68, 295);
 
   // Inicializar verificación de hardware biométrico y credenciales guardadas
   useEffect(() => {
@@ -153,7 +153,7 @@ export default function LoginScreen() {
         <View style={[styles.logoContainer, isCompact && styles.logoContainerCompact]}>
           <Image
             source={LOGO_DARK}
-            style={{ width: logoWidth, height: logoWidth * (54 / 220) }}
+            style={{ width: logoWidth, height: logoWidth * (320 / 1000) }}
             contentFit="contain"
             priority="high"
           />

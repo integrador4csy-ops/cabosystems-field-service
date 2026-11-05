@@ -1,5 +1,6 @@
 import { ChatPopover } from './ChatPopover';
 import { ReplyPreview } from './ReplyPreview';
+import { ChatAudioPlayer } from './ChatAudioPlayer';
 import { useTranslation } from '../../context/LanguageContext';
 import React, { lazy, Suspense, useCallback, useEffect, useState, useRef } from 'react';
 const EmojiPicker = lazy(() => import('./EmojiPicker'));
@@ -192,7 +193,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               {mediaType === 'audio' ? t('Nota de voz') : mediaType === 'archivo' ? t('Documento') : mediaType === 'video' ? t('Video técnico') : t('Foto de evidencia')}
             </p>
           </div>
-          {mediaType === 'audio' && <audio controls src={mediaPreview} className="max-w-[180px]" aria-label={t('Escuchar nota de voz')} />}
+          {mediaType === 'audio' && <ChatAudioPlayer src={mediaPreview} compact className="max-w-[240px]" />}
           <button
             type="button"
             onClick={removeMedia}

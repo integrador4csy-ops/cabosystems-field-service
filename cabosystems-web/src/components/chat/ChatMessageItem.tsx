@@ -5,6 +5,7 @@ import { useTranslation } from '../../context/LanguageContext';
 import React from 'react';
 import { MessageActions } from './MessageActions';
 import { ReplyPreview } from './ReplyPreview';
+import { ChatAudioPlayer } from './ChatAudioPlayer';
 import { ChatVideoPlayer } from './ChatVideoPlayer';
 import { ChatSystemMessage } from './ChatSystemMessage';
 import {
@@ -151,12 +152,12 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
               onReaction={(emoji) => onToggleReaction(message.id, emoji)}
               onError={onError}
               triggerClassName={
-                message.reply
-                  ? "message-options-trigger message-options-reply flex h-6 w-6 shrink-0 items-center justify-center rounded-full focus-visible:opacity-100 transition-colors cursor-pointer"
-                  : isMe && message.tipo === 'texto' && !isEmojiOnly
-                  ? "message-options-trigger flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white/85 hover:text-white hover:bg-black/15 focus-visible:opacity-100 transition-colors cursor-pointer"
-                  : message.tipo === 'imagen' || message.tipo === 'video'
+                message.tipo === 'imagen' || message.tipo === 'video'
                   ? "message-options-trigger flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 focus-visible:opacity-100 transition-colors cursor-pointer"
+                  : isMe && !isEmojiOnly
+                  ? "message-options-trigger flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black/15 text-white hover:bg-black/25 focus-visible:opacity-100 transition-colors cursor-pointer"
+                  : message.reply
+                  ? "message-options-trigger message-options-reply flex h-6 w-6 shrink-0 items-center justify-center rounded-full focus-visible:opacity-100 transition-colors cursor-pointer"
                   : "message-options-trigger flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 focus-visible:opacity-100 transition-colors cursor-pointer bg-white/80 shadow-2xs"
               }
             />
@@ -171,7 +172,11 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                 ? 'bg-brand-500 text-white rounded-tr-xs'
                 : 'bg-white border border-slate-200 text-[#343e48] rounded-tl-xs'
             }`}>
-              <audio controls preload="none" src={message.media_url} className="max-w-full" aria-label={t('Nota de voz')} />
+              <ChatAudioPlayer
+                src={message.media_url}
+                isMe={isMe}
+                duration={message.media_meta?.duration}
+              />
               <div className={`flex items-center justify-end gap-1 mt-1 text-[10px] select-none ${
                 isMe ? 'text-white/85' : 'text-slate-400'
               }`}>

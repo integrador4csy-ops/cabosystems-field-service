@@ -15,7 +15,6 @@ import { LocationTimeline } from './LocationTimeline';
 import { LocationHistoryMap } from './LocationHistoryMap';
 import {
   AlertTriangle,
-  ArrowLeft,
   CalendarDays,
   Clock3,
   ListTree,
@@ -29,7 +28,6 @@ interface LocationHistoryViewProps {
   workers: LiveWorker[];
   selectedWorkerId: string | null;
   onSelectWorker?: (workerId: string) => void;
-  onBackToRadar?: () => void;
 }
 
 function localDateKey(date: Date) {
@@ -55,7 +53,6 @@ export const LocationHistoryView: React.FC<LocationHistoryViewProps> = ({
   workers,
   selectedWorkerId: externalWorkerId,
   onSelectWorker,
-  onBackToRadar,
 }) => {
   const { t, locale } = useLanguage();
   const [currentWorkerId, setCurrentWorkerId] = useState(externalWorkerId || workers[0]?.profile.id || '');
@@ -174,12 +171,6 @@ export const LocationHistoryView: React.FC<LocationHistoryViewProps> = ({
     <section className="location-history operational-panel" aria-label={t('Historial de ubicaciones y rutas')}>
       <header className="location-history-header">
         <div className="location-history-heading">
-          {onBackToRadar && (
-            <button type="button" className="workspace-icon" onClick={onBackToRadar} aria-label={t('Volver al radar')}>
-              <ArrowLeft size={18} />
-            </button>
-          )}
-          <div className="location-history-title-icon" aria-hidden="true"><Route size={19} /></div>
           <div>
             <h1>{t('Historial de rutas')}</h1>
             <p>{activeWorkerName} <span aria-hidden="true">·</span> <span className="location-history-date-label">{selectedDayLabel}</span></p>

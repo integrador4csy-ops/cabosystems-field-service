@@ -1,6 +1,7 @@
 import { getRoleLabel } from '../../lib/uiTranslations';
 import { useTranslation } from '../../context/LanguageContext';
 import { useDialog } from '../ui/useDialog';
+import { ChatAudioPlayer } from './ChatAudioPlayer';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
@@ -52,6 +53,8 @@ interface GroupInfoDrawerProps {
   onGroupDeleted: () => void;
 }
 
+type GroupInfoTab = 'members' | 'tasks' | 'media';
+
 export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
   isOpen,
   onClose,
@@ -66,6 +69,7 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [attachments, setAttachments] = useState<ChatMessage[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [activeTab, setActiveTab] = useState<GroupInfoTab>('members');
   const [mediaFilter, setMediaFilter] = useState<'all' | 'media' | 'docs' | 'audio'>('all');
   const [previewDoc, setPreviewDoc] = useState<{ url: string; fileName?: string; fileSize?: number; mimeType?: string } | null>(null);
   const [lightboxImage, setLightboxImage] = useState<{ url: string; caption?: string | null } | null>(null);
@@ -104,6 +108,7 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
       setIsEditing(false);
       setIsAddingMembers(false);
       setIsConfirmingDelete(false);
+      setActiveTab('members');
       setEditName(group.nombre);
       setEditDesc(group.descripcion || '');
       setEditSoloMulti(group.solo_multimedia);
@@ -443,16 +448,68 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
             </div>
           )}
 
+          <div
+            role="tablist"
+            aria-label={t('Detalles del Grupo')}
+            className="grid grid-cols-3 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1"
+          >
+            {([
+              { id: 'members', label: t('Colaboradores') },
+              { id: 'tasks', label: t('Tareas realizadas') },
+              { id: 'media', label: t('Archivos y multimedia') },
+            ] satisfies { id: GroupInfoTab; label: string }[]).map((tab) => {
+              const isActive = activeTab === tab.id;
+
+              return (
+                <button
+                  key={tab.id}
+                  id={`group-info-${tab.id}-tab`}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-controls={`group-info-${tab.id}-panel`}
+                  tabIndex={isActive ? 0 : -1}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`min-h-11 rounded-lg px-2 py-2 text-[11px] font-semibold leading-tight transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f78c26] ${
+                    isActive
+                      ? 'bg-[#f78c26] text-white shadow-xs'
+                      : 'text-slate-600 hover:bg-white hover:text-[#343e48]'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
           {/* Tareas realizadas de la villa vinculada */}
-          {group.proyecto_id ? (
-            <GroupTaskActivitySection
-              groupId={group.id}
-              onImageClick={(url, caption) => setLightboxImage({ url, caption })}
-            />
+          {activeTab === 'tasks' ? (
+            <div
+              id="group-info-tasks-panel"
+              role="tabpanel"
+              aria-labelledby="group-info-tasks-tab"
+            >
+              {group.proyecto_id ? (
+                <GroupTaskActivitySection
+                  groupId={group.id}
+                  onImageClick={(url, caption) => setLightboxImage({ url, caption })}
+                />
+              ) : (
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-xs font-medium text-slate-500">
+                  {t('Vincula una villa para consultar sus tareas realizadas.')}
+                </div>
+              )}
+            </div>
           ) : null}
 
           {/* Attachments & Media Section */}
-          <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+          {activeTab === 'media' ? (
+          <div
+            id="group-info-media-panel"
+            role="tabpanel"
+            aria-labelledby="group-info-media-tab"
+            className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4"
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Paperclip size={15} className="text-brand-500" />
@@ -567,7 +624,7 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
                                 {new Date(att.created_at).toLocaleDateString()}
                               </p>
                             </div>
-                            <audio controls src={att.media_url!} className="max-w-[140px] h-7" />
+                            <ChatAudioPlayer src={att.media_url!} compact className="max-w-[200px]" />
                           </div>
                         );
                       }
@@ -629,8 +686,16 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
               );
             })()}
           </div>
+          ) : null}
 
           {/* Members List Section */}
+          {activeTab === 'members' ? (
+          <div
+            id="group-info-members-panel"
+            role="tabpanel"
+            aria-labelledby="group-info-members-tab"
+            className="space-y-5"
+          >
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-semibold text-[#343e48] tracking-wider uppercase">
@@ -873,6 +938,8 @@ export const GroupInfoDrawer: React.FC<GroupInfoDrawerProps> = ({
               )}
             </div>
           )}
+          </div>
+          ) : null}
         </div>
       </div>
 

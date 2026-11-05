@@ -44,6 +44,8 @@ export const UI_TRANSLATIONS: Record<string, string> = {
   "Documento": "Document",
   "Nota de voz": "Voice note",
   "Archivos y multimedia": "Files and media",
+  "Integrantes": "Team members",
+  "Vincula una villa para consultar sus tareas realizadas.": "Link a villa to view its completed tasks.",
   "Fotos y videos": "Photos and videos",
   "Documentos": "Documents",
   "Audios": "Audios",

@@ -233,9 +233,10 @@ export default function CompanyAgendaScreen() {
   const controls = <View style={s.fixedControls}>
     <CompanyAgendaControls showCalendar={false} onSyncPress={() => setSyncModalVisible(true)} calendarFilter={<CompanyCalendarFilters key={owner} colors={personalColors.colors} loadingColors={personalColors.loading} colorsFailed={personalColors.failed} onRetryColors={personalColors.reload} onSaveColor={personalColors.save} calendars={calendarFilters} hidden={hiddenCalendars} locale={locale} onToggle={toggleCalendar} />} copy={c} locale={locale} query={query} view={view} anchor={anchor} today={today} days={days} counts={counts} heading={periodHeading(anchor, days)} onSearch={setQuery} onView={setView} onDate={setAnchor} onMove={move} onToday={() => setAnchor(dateKey(new Date()))} />
     {!query.trim() ? <View style={s.birthdays} accessibilityRole="summary" accessibilityLabel={language === 'es' ? `Cumpleaños de ${birthdayMonth}` : `Birthdays in ${birthdayMonth}`}>
-      <View style={s.birthdayHeading}><View style={s.birthdayIcon}><CakeSlice size={18} color="#C2410C" /></View><View style={s.birthdayHeadingText}><Text style={s.birthdayTitle}>{language === 'es' ? `Cumpleaños de ${birthdayMonth}` : `Birthdays in ${birthdayMonth}`}</Text><Text style={s.birthdaySummary}>{birthdays.length > 0 ? (language === 'es' ? `${birthdays.length} este mes` : `${birthdays.length} this month`) : (language === 'es' ? 'Sin cumpleaños este mes' : 'No birthdays this month')}</Text></View></View>
+      <CakeSlice size={12} color={P.accent} />
+      <Text style={s.birthdayTitle}>{language === 'es' ? `Cumpleaños · ${birthdayMonth}` : `Birthdays · ${birthdayMonth}`}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.birthdayList}>
-        {!birthdaysReady ? <Text style={s.birthdayEmpty}>{language === 'es' ? 'Cargando…' : 'Loading…'}</Text> : birthdays.map(birthday => <View key={birthday.id} style={s.birthdayItem}><Text style={s.birthdayDay}>{birthday.day}</Text><Text numberOfLines={1} style={s.birthdayName}>{birthday.name}</Text></View>)}
+        {!birthdaysReady ? <Text style={s.birthdayEmpty}>{language === 'es' ? 'Cargando…' : 'Loading…'}</Text> : birthdays.length > 0 ? birthdays.map(birthday => <View key={birthday.id} style={s.birthdayItem}><Text style={s.birthdayDay}>{birthday.day}</Text><Text numberOfLines={1} style={s.birthdayName}>{birthday.name}</Text></View>) : <Text style={s.birthdayEmpty}>{language === 'es' ? 'Ninguno este mes' : 'None this month'}</Text>}
       </ScrollView>
     </View> : null}
     {!query.trim() && error ? <View accessibilityRole="alert" style={s.error}><Text style={[s.help, s.errorCopy]}>{errorMessage || c.failed}{cached ? `\n${c.cached}` : ''}</Text><Pressable accessibilityRole="button" accessibilityLabel={c.retry} onPress={() => void load(true)} style={s.icon}><RefreshCw size={18} color={P.ink} /></Pressable></View> : null}
@@ -284,17 +285,13 @@ const s = StyleSheet.create({
   boot: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   page: { flex: 1, backgroundColor: P.white },
   fixedControls: { width: '100%', maxWidth: 720, alignSelf: 'center', paddingHorizontal: 20, backgroundColor: P.white },
-  birthdays: { marginTop: 10, marginBottom: 6, paddingVertical: 11, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#FED7AA', backgroundColor: '#FFFAF5' },
-  birthdayHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, marginBottom: 8 },
-  birthdayIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFEDD5' },
-  birthdayHeadingText: { flex: 1 },
-  birthdayTitle: { color: P.ink, fontFamily: 'Outfit_600SemiBold', fontSize: 14, textTransform: 'capitalize' },
-  birthdaySummary: { marginTop: 1, color: P.muted, fontFamily: 'Outfit_400Regular', fontSize: 12 },
-  birthdayList: { minHeight: 38, alignItems: 'center', gap: 8, paddingHorizontal: 12 },
-  birthdayItem: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: 230, paddingRight: 12, borderRightWidth: 1, borderRightColor: '#FED7AA' },
-  birthdayDay: { width: 28, height: 28, borderRadius: 8, overflow: 'hidden', backgroundColor: P.accent, color: P.white, textAlign: 'center', textAlignVertical: 'center', fontFamily: 'Outfit_700Bold', fontSize: 13 },
-  birthdayName: { flexShrink: 1, color: P.slate, fontFamily: 'Outfit_500Medium', fontSize: 13 },
-  birthdayEmpty: { color: P.muted, fontFamily: 'Outfit_400Regular', fontSize: 13 },
+  birthdays: { minHeight: 26, marginTop: 4, marginBottom: 4, paddingHorizontal: 2, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  birthdayTitle: { flexShrink: 0, color: P.muted, fontFamily: 'Outfit_600SemiBold', fontSize: 13, lineHeight: 16, textTransform: 'capitalize' },
+  birthdayList: { alignItems: 'center' },
+  birthdayItem: { flexDirection: 'row', alignItems: 'baseline', gap: 4, maxWidth: 220, paddingHorizontal: 8, borderLeftWidth: 1, borderLeftColor: P.line },
+  birthdayDay: { color: P.accent, fontFamily: 'Outfit_700Bold', fontSize: 13, lineHeight: 16 },
+  birthdayName: { flexShrink: 1, color: P.muted, fontFamily: 'Outfit_400Regular', fontSize: 13, lineHeight: 16 },
+  birthdayEmpty: { paddingLeft: 8, borderLeftWidth: 1, borderLeftColor: P.line, color: P.muted, fontFamily: 'Outfit_400Regular', fontSize: 12.5, lineHeight: 16 },
   calendarEdge: { marginHorizontal: -20 },
   listArea: { flex: 1, width: '100%', maxWidth: 720, alignSelf: 'center' },
   dayHeading: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 24, paddingBottom: 2 },

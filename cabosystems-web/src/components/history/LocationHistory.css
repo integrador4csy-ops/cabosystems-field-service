@@ -35,7 +35,6 @@
 .location-history-heading p { margin: 2px 0 0; overflow: hidden; color: var(--color-slate-500); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .location-history-heading p > span:first-of-type { margin: 0 3px; color: var(--color-slate-300); }
 .location-history-date-label { text-transform: capitalize; }
-.location-history-title-icon { display: grid !important; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border-radius: 10px; background: var(--color-brand-50); color: var(--color-brand-700); }
 
 .location-history-filters { align-items: flex-end; justify-content: flex-end; gap: 8px; }
 .location-history-worker-filter { display: grid; width: min(230px, 22vw); gap: 4px; }
@@ -168,7 +167,6 @@
 @media (max-width: 720px) {
   .location-history-header { padding: 12px; }
   .location-history-heading { width: 100%; }
-  .location-history-title-icon { display: none !important; }
   .location-history-filters { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
   .location-history-worker-filter { grid-column: 1 / -1; width: 100%; }
   .location-history-date-presets { justify-self: start; }

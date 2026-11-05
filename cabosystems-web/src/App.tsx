@@ -426,7 +426,6 @@ function DashboardContent() {
               workers={workers}
               selectedWorkerId={selectedWorkerId}
               onSelectWorker={handleSelectWorker}
-              onBackToRadar={() => setActiveItem('radar')}
             />
           </RetainedView>
           <RetainedView active={!['chat', 'colaboradores', 'invitaciones', 'directorio-proyectos', 'agenda', 'proyectos', 'historial'].includes(activeItem)} fallback={<ViewLoading />}>
