@@ -17,6 +17,12 @@ interface SidebarContextType {
   setAgendaSearchQuery: (query: string) => void;
   agendaCreateVersion: number;
   requestCreateEvent: () => void;
+  directorySearchQuery: string;
+  setDirectorySearchQuery: (query: string) => void;
+  warrantySearchQuery: string;
+  setWarrantySearchQuery: (query: string) => void;
+  warrantyCreateVersion: number;
+  requestCreateWarranty: () => void;
   isExpanded: boolean;
   isHovered: boolean;
   isMobileOpen: boolean;
@@ -58,6 +64,9 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [taskCreateVersion, setTaskCreateVersion] = useState(0);
   const [agendaSearchQuery, setAgendaSearchQuery] = useSessionPreference('csy_company_agenda_search', '', isStringPreference);
   const [agendaCreateVersion, setAgendaCreateVersion] = useState(0);
+  const [directorySearchQuery, setDirectorySearchQuery] = useSessionPreference('csy_directory_search', '', isStringPreference);
+  const [warrantySearchQuery, setWarrantySearchQuery] = useSessionPreference('csy_warranty_search', '', isStringPreference);
+  const [warrantyCreateVersion, setWarrantyCreateVersion] = useState(0);
   const [chatSearchQuery, setChatSearchQuery] = useSessionPreference('csy_chat_search', '', isStringPreference);
   const [chatCreateVersion, setChatCreateVersion] = useState(0);
   const [teamSearchQuery, setTeamSearchQuery] = useSessionPreference('csy_team_search', '', isStringPreference);
@@ -80,6 +89,12 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setAgendaSearchQuery,
         agendaCreateVersion,
         requestCreateEvent: () => setAgendaCreateVersion((version) => version + 1),
+        directorySearchQuery,
+        setDirectorySearchQuery,
+        warrantySearchQuery,
+        setWarrantySearchQuery,
+        warrantyCreateVersion,
+        requestCreateWarranty: () => setWarrantyCreateVersion((version) => version + 1),
         isExpanded,
         isHovered,
         isMobileOpen,

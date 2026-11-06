@@ -447,6 +447,25 @@ export default function ProfileScreen() {
             <ChevronRight size={17} color={Colors.textDisabled} />
           </Pressable>
 
+          <View style={styles.menuDivider} />
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.menuItem,
+              pressed && { opacity: 0.75, transform: [{ scale: Animation.pressScale }] },
+            ]}
+            onPress={() => router.push('/locations')}
+          >
+            <View style={styles.menuIconCircle}>
+              <MapPin size={18} color="#FFFFFF" strokeWidth={2.2} />
+            </View>
+            <View style={styles.menuTexts}>
+              <Text style={styles.menuTitle}>{t('profile.villaLocations')}</Text>
+              <Text style={styles.menuSubtitle}>{t('profile.villaLocationsSub')}</Text>
+            </View>
+            <ChevronRight size={17} color={Colors.textDisabled} />
+          </Pressable>
+
           {!isAdmin && (
             <>
               <View style={styles.menuDivider} />

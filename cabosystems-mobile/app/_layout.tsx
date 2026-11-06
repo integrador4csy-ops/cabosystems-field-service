@@ -171,6 +171,7 @@ function RootLayoutNav() {
         <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="chat/new-group" options={{ headerShown: false }} />
         <Stack.Screen name="chat/group-info/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="locations" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />
       </Stack>
       <FieldSyncStatus owner={session?.user.id || ''} />

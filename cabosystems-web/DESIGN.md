@@ -19,7 +19,7 @@ Todas las vistas web usan el selector existente de español e inglés de Languag
 
 - Barra lateral con iconos, expansión al pasar el cursor o recibir foco y opción de fijarla abierta en escritorio. Los elementos no cambian de posición al expandirse.
 - En móvil, menú lateral con botón de apertura, fondo de separación y foco contenido. Se cierra al elegir una opción, tocar fuera del menú o presionar Escape; no añadir el botón «Cerrar menú».
-- Cabecera adaptada a cada sección y con una altura compartida de 64 px en escritorio, alineada con el borde inferior del logotipo lateral. Radar muestra búsqueda de técnicos e indicadores de flota. Tareas busca por tarea, villa o responsable y muestra «Nueva tarea». Agenda tiene búsqueda independiente por evento, recordatorio o ubicación y muestra «Nuevo evento» para administradores y supervisores activos. Chat busca grupos o proyectos y muestra «Nuevo grupo» a administradores y supervisores. Colaboradores busca por nombre, correo o rol; Equipo muestra «Nueva invitación». En móvil, la búsqueda ocupa otra fila.
+- Cabecera adaptada a cada sección y con una altura compartida de 64 px en escritorio, alineada con el borde inferior del logotipo lateral. Radar muestra búsqueda de técnicos e indicadores de flota. Historial de rutas coloca en esta cabecera el selector de técnico, Hoy/Ayer y un selector de fecha propio, sin repetir título ni metadatos dentro del panel; la campana permanece en una columna independiente al extremo derecho y nunca se superpone a estos controles. Tareas busca por tarea, villa o responsable y muestra «Nueva tarea». Agenda tiene búsqueda independiente por evento, recordatorio o ubicación y muestra «Nuevo evento» para administradores y supervisores activos. Chat busca grupos o proyectos y muestra «Nuevo grupo» a administradores y supervisores. Colaboradores busca por nombre, correo o rol; Equipo muestra «Nueva invitación». En móvil, la búsqueda o los controles de sección ocupan filas adicionales.
 - Radar: el mapa usa el espacio disponible; sus controles quedan dentro de su propia capa y se reajusta cuando cambia el tamaño del contenedor.
 - Tareas por villa: panel dividido en escritorio. A la izquierda, desarrollos con sus villas en listas desplegables, plegadas inicialmente. Pulsar el desarrollo solo despliega sus villas; no hay selección del desarrollo completo ni «Todas las tareas». Siempre se muestra una única villa, recordada si sigue disponible o la primera accesible. Un botón compacto para limpiar filtros aparece junto a los selectores cuando hay filtros activos; conserva la villa. A la derecha, desarrollo y villa en la cabecera. En una misma barra compacta están Tablero/Lista, el contador, Responsable, Estado y un switch con flechas para orden Ascendente/Descendente. Estado se aplica en ambas vistas. El orden compara los títulos con números naturales (2 antes de 10) y recuerda la preferencia de la pestaña. No se muestra el aviso persistente de plantilla aplicada. Hasta 900 px el panel se convierte en un desplegable superior que se cierra al seleccionar; el tablero conserva su desplazamiento horizontal. Conservar el acordeón de subtareas y su estado al actualizar.
 - Chat: una sola superficie dividida contiene lista y conversación en escritorio; en móvil alterna entre lista y conversación con botón para volver. La lista no repite búsqueda ni acción de creación, porque ambas viven en la cabecera global.
@@ -34,6 +34,10 @@ Todas las vistas web usan el selector existente de español e inglés de Languag
 - Respetar la preferencia de movimiento reducido.
 - No añadir gráficos, indicadores o secciones sin una función operativa real.
 - Las skills de diseño apoyan esta referencia y la identidad, sin imponer un estilo ajeno al producto.
+
+## Centro de notificaciones
+
+La cabecera web y la cabecera principal móvil muestran una campana con contador de no leídas. El panel comparte el mismo historial entre plataformas, ordena primero lo más reciente y permite abrir la sección relacionada o marcar todo como leído. Registra asignaciones de tareas, checks de campo y mensajes de chat incluso cuando el usuario no tiene un token push activo. Los estados de carga, vacío y leído/no leído deben permanecer visibles y accesibles. En móvil la campana vive inmediatamente antes de la foto de perfil; la pantalla de Tareas comienza directamente con los filtros y no muestra saludo ni acceso a la encuesta diaria.
 
 ## Tareas y villas
 
@@ -56,6 +60,8 @@ En las tarjetas del tablero, no repetir el estado en una etiqueta: ya lo comunic
 ## Modales minimalistas
 
 Usar fondo blanco, bordes slate-200, campos blancos y radios de 8 px en controles. Roles, estados y acciones secundarias usan grises; la selección se distingue por el borde y el peso del texto. Reservar #f78c26 para la acción principal. Evitar fondos decorativos naranja, verde, amarillo o azul, sombras de color y efectos de escala. Conservar mensajes de error y confirmaciones de peligro reconocibles.
+
+Los campos de cumpleaños en edición de perfil y registro usan el mismo selector visual de fecha que Agenda. Todo el rectángulo del control abre el calendario, no solo el icono, y la fecha se conserva como día local sin conversión de zona horaria.
 
 ## Gestión de equipo
 

@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, House } from 'lucide-react';
+import { Building2, ChevronDown, ChevronRight, House } from 'lucide-react';
 import { useTranslation } from '../../context/LanguageContext';
 import type { Proyecto } from '../../types/projects';
 
@@ -34,7 +34,7 @@ export function TaskLocationNav({ projects, development, projectId, revealProjec
 
   return <aside className={`task-location-panel ${open ? 'is-open' : ''}`} aria-label={t('Desarrollos y villas')}>
     <div className="task-location-heading">
-      <h2>{t('Desarrollos y villas')}</h2>
+      <h2>{t('Desarrollos')}</h2>
       <p className="task-location-summary">{t(projects.length === 1 ? '{value0} villa' : '{value0} villas', { value0: projects.length })}</p>
       <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}><span>{t('Desarrollos y villas')}<span className="task-location-summary">{t(projects.length === 1 ? '{value0} villa' : '{value0} villas', { value0: projects.length })}</span></span><ChevronDown size={16} aria-hidden="true" /></button>
     </div>
@@ -44,10 +44,7 @@ export function TaskLocationNav({ projects, development, projectId, revealProjec
         const expansionKey = `${revealProjectId ?? 'all'}:${name}`;
         const expanded = expandedGroups.get(expansionKey) ?? villas.some(villa => villa.id === revealProjectId);
         return <div className="task-location-group" key={name}>
-          <div className="task-location-development">
-            <button type="button" className="task-location-disclosure" aria-label={t('Mostrar villas de {value0}', { value0: name })} aria-expanded={expanded} aria-controls={`${id}-${index}`} onClick={() => toggle(expansionKey, expanded)}>{expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</button>
-            <button type="button" className={`task-location-name ${development === name ? 'has-selected-villa' : ''}`} aria-expanded={expanded} aria-controls={`${id}-${index}`} onClick={() => toggle(expansionKey, expanded)}><span>{name}</span><span className="task-location-total" aria-label={t(villas.length === 1 ? '{value0} villa' : '{value0} villas', { value0: villas.length })}>{villas.length}</span></button>
-          </div>
+          <button type="button" className={`task-location-development ${development === name ? 'has-selected-villa' : ''}`} aria-label={t('Mostrar villas de {value0}', { value0: name })} aria-expanded={expanded} aria-controls={`${id}-${index}`} onClick={() => toggle(expansionKey, expanded)}><Building2 size={17} aria-hidden="true" /><span>{name}</span><span className="task-location-total" aria-label={t(villas.length === 1 ? '{value0} villa' : '{value0} villas', { value0: villas.length })}>{villas.length}</span>{expanded ? <ChevronDown size={16} aria-hidden="true" /> : <ChevronRight size={16} aria-hidden="true" />}</button>
           <ul id={`${id}-${index}`} hidden={!expanded}>{villas.map(villa => <li key={villa.id}><button type="button" aria-current={projectId === villa.id ? 'true' : undefined} onClick={() => select(name, villa.id)}><House size={15} aria-hidden="true" /><span>{villa.villa}</span></button></li>)}</ul>
         </div>;
       })}

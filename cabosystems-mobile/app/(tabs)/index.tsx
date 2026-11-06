@@ -14,25 +14,15 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { afterTabPaint } from '@/lib/tabPreparation';
 import { useTabStartup } from '@/lib/tabStartup';
 import { HeaderCaboSystems, useHeaderHeight } from '@/components/HeaderCaboSystems';
-import DailyFormCard from '@/components/DailyFormCard';
 import { TaskFilterSelect } from '@/components/TaskFilterSelect';
 import { matchesTaskAssignee, sortTasksByPriority } from '@/lib/taskListFilters';
 import { useLanguage } from '@/lib/i18n';
-import DailyFormModal from '@/components/DailyFormModal';
-import DailyFormConfirmModal from '@/components/DailyFormConfirmModal';
 import { Colors, Spacing, BorderRadius } from '@/constants/Theme';
 
 import { useAuth } from '@/lib/auth';
 import { useProjects } from '@/lib/projects';
 import { supabase } from '@/lib/supabase';
 import { getAccessibleTasks, type TaskWithProject } from '@/lib/api';
-import {
-  getDailyFormStatus,
-  markDailyFormCompleted,
-  getDailyFormUrl,
-  isNativeWebViewAvailable,
-  openDailyFormInBrowser,
-} from '@/lib/dailyForm';
 import type { Project } from '@/types/database';
 
 const STATUS_META: Record<
@@ -160,45 +150,6 @@ export default function DashboardScreen() {
     { value: 'baja', label: en ? 'Low priority' : 'Prioridad baja' },
   ], [en]);
 
-  // Estado del Formulario Diario de Campo
-  const [dailyFormCompleted, setDailyFormCompleted] = useState(false);
-  const [dailyFormCompletedAt, setDailyFormCompletedAt] = useState<string | null>(null);
-  const [showDailyForm, setShowDailyForm] = useState(false);
-  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
-  const [successModalVisible, setSuccessModalVisible] = useState(false);
-
-  const checkDailyForm = useCallback(async () => {
-    if (!profile?.id) return;
-    const status = await getDailyFormStatus(profile.id);
-    setDailyFormCompleted(status.completed);
-    setDailyFormCompletedAt(status.completedAt);
-  }, [profile?.id]);
-
-  useFocusEffect(
-    useCallback(() => {
-      return afterTabPaint(() => { void checkDailyForm(); });
-    }, [checkDailyForm])
-  );
-
-  const handlePressDailyForm = () => {
-    if (!profile) return;
-    if (isNativeWebViewAvailable()) {
-      setShowDailyForm(true);
-    } else {
-      const formUrl = getDailyFormUrl(profile);
-      openDailyFormInBrowser(formUrl);
-      setTimeout(() => {
-        setConfirmModalVisible(true);
-      }, 500);
-    }
-  };
-
-  const handleDailyFormCompleted = async () => {
-    if (!profile?.id) return;
-    await markDailyFormCompleted(profile.id);
-    setDailyFormCompleted(true);
-    setDailyFormCompletedAt(new Date().toISOString());
-  };
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -304,10 +255,6 @@ export default function DashboardScreen() {
     return sortTasksByPriority(visible, sortDirection, en ? 'en' : 'es');
   }, [filteredTasks, statusFilter, sortDirection, en]);
 
-  const rawNombre = profile?.nombre || tr("Técnico");
-  const cleanNombre = rawNombre.includes('@') ? rawNombre.split('@')[0] : rawNombre.split(' ')[0];
-  const firstName = cleanNombre.charAt(0).toUpperCase() + cleanNombre.slice(1);
-
   const handleOpenTask = useCallback(
     (taskId: string) => {
       router.push(`/task/${taskId}` as any);
@@ -333,19 +280,6 @@ export default function DashboardScreen() {
   const ListHeader = useMemo(
     () => (
       <View style={styles.headerContainer}>
-        {/* Saludo Minimalista */}
-        <View style={styles.greetingRow}>
-          <View>
-            <Text style={styles.greetingTitle}>{tr("Hola, ")}{firstName}</Text>
-          </View>
-        <DailyFormCard
-          compact
-          completed={dailyFormCompleted}
-          completedAt={dailyFormCompletedAt}
-          onPress={handlePressDailyForm}
-        />
-        </View>
-
         <View style={styles.workFilters}>
           <HeaderCaboSystems selectorOnly projects={projects} selectedProjectId={selectedProjectId}
             onSelectProject={setSelectedProject} />
@@ -452,7 +386,7 @@ export default function DashboardScreen() {
         </View> : null}
       </View>
     ),
-    [selectedProject, displayedTasks.length, firstName, filteredTasks.length, dailyFormCompleted, dailyFormCompletedAt, statusFilter, stats, handlePressDailyForm, projects, selectedProjectId, setSelectedProject, en, assignee, assigneeOptions, priorityFilter, priorityOptions, sortDirection, tr]
+    [selectedProject, displayedTasks.length, filteredTasks.length, statusFilter, stats, projects, selectedProjectId, setSelectedProject, en, assignee, assigneeOptions, priorityFilter, priorityOptions, sortDirection, tr]
   );
 
   const ListEmpty = useCallback(() => {
@@ -521,38 +455,6 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
       />
 
-      <DailyFormModal
-        visible={showDailyForm}
-        url={getDailyFormUrl(profile)}
-        onClose={() => setShowDailyForm(false)}
-        onComplete={handleDailyFormCompleted}
-      />
-
-      {/* Modal de Confirmación */}
-      <DailyFormConfirmModal
-        visible={confirmModalVisible}
-        type="confirm"
-        title={tr("¿Confirmar Envío?")}
-        message={tr("¿Ya completaste y enviaste tus respuestas en el formulario diario de Google?")}
-        confirmText={tr("SÍ, ENVIADO")}
-        cancelText={tr("AÚN NO")}
-        onConfirm={async () => {
-          setConfirmModalVisible(false);
-          await handleDailyFormCompleted();
-          setSuccessModalVisible(true);
-        }}
-        onCancel={() => setConfirmModalVisible(false)}
-      />
-
-      {/* Modal de Éxito */}
-      <DailyFormConfirmModal
-        visible={successModalVisible}
-        type="success"
-        title={tr("¡Formulario Registrado!")}
-        message={tr("Tu reporte diario de campo ha sido registrado exitosamente para el turno de hoy en CaboSystems.")}
-        confirmText={tr("ENTENDIDO")}
-        onConfirm={() => setSuccessModalVisible(false)}
-      />
     </View>
   );
 }
@@ -574,19 +476,6 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     marginBottom: 0,
-  },
-  greetingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingTop: Spacing.xs,
-  },
-  greetingTitle: {
-    fontFamily: 'Outfit_700Bold',
-    fontSize: 24,
-    color: '#000000',
-    letterSpacing: -0.3,
   },
   filterPillsContainer: {
     flexDirection: 'row',

@@ -8,6 +8,7 @@ import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { useProjects } from '@/lib/projects';
 import type { Project } from '@/types/database';
 import { ProfileNavButton } from './ProfileNavButton';
+import { NotificationCenter } from './NotificationCenter';
 
 interface HeaderProps {
   seamless?: boolean;
@@ -118,7 +119,7 @@ export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
               <ChevronDown color={Colors.primary} size={14} strokeWidth={2.2} />
             </Pressable>
           )}
-          {!selectorOnly && <ProfileNavButton />}
+          {!selectorOnly && <View style={styles.accountActions}><NotificationCenter /><ProfileNavButton /></View>}
         </View>
       </SafeAreaView>
 
@@ -315,6 +316,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     maxWidth: 220,
   },
+  accountActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(16, 24, 40, 0.45)',

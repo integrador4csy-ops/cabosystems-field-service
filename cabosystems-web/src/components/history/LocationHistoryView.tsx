@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { supabase } from '../../lib/supabase';
-import type { LiveWorker } from '../../types/fleet';
 import {
   analyzeLocationHistory,
   type DailyHistoryAnalysis,
@@ -9,13 +8,11 @@ import {
   type HistoryStop,
   formatDurationMs,
 } from '../../lib/locationHistoryAnalytics';
-import { resolveLocationPlace, loadKnownVillas, type KnownVilla } from '../../lib/locationPlacesService';
-import { AppSelect } from '../ui/AppSelect';
+import { resolveLocationPlace, loadKnownVillas } from '../../lib/locationPlacesService';
 import { LocationTimeline } from './LocationTimeline';
 import { LocationHistoryMap } from './LocationHistoryMap';
 import {
   AlertTriangle,
-  CalendarDays,
   Clock3,
   ListTree,
   Map,
@@ -25,16 +22,8 @@ import {
 import './LocationHistory.css';
 
 interface LocationHistoryViewProps {
-  workers: LiveWorker[];
-  selectedWorkerId: string | null;
-  onSelectWorker?: (workerId: string) => void;
-}
-
-function localDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  selectedWorkerId: string;
+  selectedDate: string;
 }
 
 const emptyAnalysis: DailyHistoryAnalysis = {
@@ -50,57 +39,33 @@ const emptyAnalysis: DailyHistoryAnalysis = {
 };
 
 export const LocationHistoryView: React.FC<LocationHistoryViewProps> = ({
-  workers,
-  selectedWorkerId: externalWorkerId,
-  onSelectWorker,
+  selectedWorkerId: currentWorkerId,
+  selectedDate,
 }) => {
-  const { t, locale } = useLanguage();
-  const [currentWorkerId, setCurrentWorkerId] = useState(externalWorkerId || workers[0]?.profile.id || '');
-  const [selectedDate, setSelectedDate] = useState(() => localDateKey(new Date()));
-  const [isLoading, setIsLoading] = useState(false);
+  const { t } = useLanguage();
+  const [isLoading, setIsLoading] = useState(Boolean(currentWorkerId));
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
   const [fetchError, setFetchError] = useState('');
   const [analysis, setAnalysis] = useState<DailyHistoryAnalysis | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<HistoryTimelineEvent | null>(null);
-  const [knownVillas, setKnownVillas] = useState<KnownVilla[]>([]);
+  const [loadedKey, setLoadedKey] = useState('');
   const [mobilePanel, setMobilePanel] = useState<'timeline' | 'map'>('timeline');
+  const villasRequest = useRef<ReturnType<typeof loadKnownVillas> | null>(null);
+  const requestVersion = useRef(0);
+  const requestKey = `${currentWorkerId}:${selectedDate}`;
+  const showLoading = isLoading || Boolean(currentWorkerId && !fetchError && loadedKey !== requestKey);
 
-  const today = localDateKey(new Date());
-  const yesterdayDate = new Date();
-  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-  const yesterday = localDateKey(yesterdayDate);
-
-  useEffect(() => {
-    if (externalWorkerId && externalWorkerId !== currentWorkerId) setCurrentWorkerId(externalWorkerId);
-  }, [externalWorkerId, currentWorkerId]);
-
-  useEffect(() => {
-    if (!currentWorkerId && workers[0]?.profile.id) setCurrentWorkerId(workers[0].profile.id);
-  }, [currentWorkerId, workers]);
-
-  useEffect(() => {
-    void loadKnownVillas().then(setKnownVillas);
-  }, []);
-
-  const activeWorker = useMemo(
-    () => workers.find((worker) => worker.profile.id === currentWorkerId),
-    [workers, currentWorkerId]
-  );
-
-  const activeWorkerName = activeWorker?.profile.nombre || activeWorker?.profile.full_name || t('Técnico');
-  const selectedDayLabel = useMemo(() => {
-    const date = new Date(`${selectedDate}T12:00:00`);
-    return Number.isNaN(date.getTime())
-      ? selectedDate
-      : date.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
-  }, [locale, selectedDate]);
-
-  const fetchDayHistory = useCallback(async () => {
+  const fetchDayHistory = useCallback(async (force = false) => {
+    const nextKey = `${currentWorkerId}:${selectedDate}`;
+    if (!force && loadedKey === nextKey) return;
     if (!currentWorkerId) {
       setAnalysis(emptyAnalysis);
+      setLoadedKey(nextKey);
+      setIsLoading(false);
       return;
     }
 
+    const version = ++requestVersion.current;
     setIsLoading(true);
     setFetchError('');
     setSelectedEvent(null);
@@ -108,17 +73,21 @@ export const LocationHistoryView: React.FC<LocationHistoryViewProps> = ({
     try {
       const startOfDay = new Date(`${selectedDate}T00:00:00`);
       const endOfDay = new Date(`${selectedDate}T23:59:59.999`);
-      const { data, error } = await supabase
+      const historyRequest = supabase
         .from('historial_ubicaciones')
         .select('*')
         .eq('usuario_id', currentWorkerId)
         .gte('created_at', startOfDay.toISOString())
         .lte('created_at', endOfDay.toISOString())
         .order('created_at', { ascending: true });
+      villasRequest.current ??= loadKnownVillas();
+      const [{ data, error }, knownVillas] = await Promise.all([historyRequest, villasRequest.current]);
 
       if (error) throw error;
+      if (version !== requestVersion.current) return;
       if (!data?.length) {
         setAnalysis(emptyAnalysis);
+        setLoadedKey(nextKey);
         return;
       }
 
@@ -146,18 +115,24 @@ export const LocationHistoryView: React.FC<LocationHistoryViewProps> = ({
         }
         setAnalysis((previous) => previous ? { ...previous, events: updatedEvents } : null);
       }
+      if (version === requestVersion.current) setLoadedKey(nextKey);
     } catch (error) {
+      if (version !== requestVersion.current) return;
       console.warn('Error fetching location history:', error);
       setAnalysis(null);
       setFetchError(t('No se pudo cargar el historial de rutas. Revisa tu conexión e intenta de nuevo.'));
     } finally {
-      setIsLoading(false);
-      setIsLoadingPlaces(false);
+      if (version === requestVersion.current) {
+        setIsLoading(false);
+        setIsLoadingPlaces(false);
+      }
     }
-  }, [currentWorkerId, knownVillas, selectedDate, t]);
+  }, [currentWorkerId, loadedKey, selectedDate, t]);
 
   useEffect(() => {
-    void fetchDayHistory();
+    let cancelled = false;
+    queueMicrotask(() => { if (!cancelled) void fetchDayHistory(); });
+    return () => { cancelled = true; };
   }, [fetchDayHistory]);
 
   const metrics = [
@@ -169,53 +144,11 @@ export const LocationHistoryView: React.FC<LocationHistoryViewProps> = ({
 
   return (
     <section className="location-history operational-panel" aria-label={t('Historial de ubicaciones y rutas')}>
-      <header className="location-history-header">
-        <div className="location-history-heading">
-          <div>
-            <h1>{t('Historial de rutas')}</h1>
-            <p>{activeWorkerName} <span aria-hidden="true">·</span> <span className="location-history-date-label">{selectedDayLabel}</span></p>
-          </div>
-        </div>
-
-        <div className="location-history-filters" aria-label={t('Filtros del historial')}>
-          <label className="location-history-worker-filter">
-            <span>{t('Técnico')}</span>
-            <AppSelect
-              aria-label={t('Seleccionar técnico')}
-              value={currentWorkerId}
-              disabled={workers.length === 0}
-              onChange={(event) => {
-                setCurrentWorkerId(event.target.value);
-                onSelectWorker?.(event.target.value);
-              }}
-            >
-              {workers.map((worker) => (
-                <option key={worker.profile.id} value={worker.profile.id}>
-                  {worker.profile.nombre || worker.profile.full_name || t('Técnico')}
-                </option>
-              ))}
-            </AppSelect>
-          </label>
-
-          <div className="location-history-date-presets" aria-label={t('Fechas rápidas')}>
-            <button type="button" aria-pressed={selectedDate === today} onClick={() => setSelectedDate(today)}>{t('Hoy')}</button>
-            <button type="button" aria-pressed={selectedDate === yesterday} onClick={() => setSelectedDate(yesterday)}>{t('Ayer')}</button>
-          </div>
-
-          <label className="location-history-date-input">
-            <CalendarDays size={16} aria-hidden="true" />
-            <span className="sr-only">{t('Seleccionar fecha')}</span>
-            <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
-          </label>
-
-        </div>
-      </header>
-
       <div className="location-history-metrics" aria-label={t('Resumen de la jornada')}>
         {metrics.map(({ label, value, icon: Icon, warning }) => (
           <div key={label} className={`location-history-metric ${warning ? 'is-warning' : ''}`}>
             <Icon size={17} aria-hidden="true" />
-            <div><span>{label}</span><strong>{isLoading ? '—' : value}</strong></div>
+            <div><span>{label}</span><strong>{showLoading ? '—' : value}</strong></div>
           </div>
         ))}
       </div>
@@ -228,7 +161,7 @@ export const LocationHistoryView: React.FC<LocationHistoryViewProps> = ({
       {fetchError && (
         <div className="location-history-error" role="alert">
           <span>{fetchError}</span>
-          <button type="button" onClick={() => void fetchDayHistory()}>{t('Reintentar')}</button>
+          <button type="button" onClick={() => void fetchDayHistory(true)}>{t('Reintentar')}</button>
         </div>
       )}
 
@@ -239,7 +172,7 @@ export const LocationHistoryView: React.FC<LocationHistoryViewProps> = ({
             <span>{analysis?.events.length || 0} {t('eventos')}</span>
           </div>
           <div className="location-history-timeline-scroll">
-            {isLoading ? (
+            {showLoading ? (
               <div className="location-history-loading" role="status" aria-live="polite">
                 <div /><div /><div />
                 <span>{t('Cargando historial de ubicaciones...')}</span>
@@ -261,8 +194,8 @@ export const LocationHistoryView: React.FC<LocationHistoryViewProps> = ({
             events={analysis?.events || []}
             selectedEvent={selectedEvent}
             onSelectEvent={setSelectedEvent}
-            onRefresh={() => void fetchDayHistory()}
-            isRefreshing={isLoading}
+            onRefresh={() => void fetchDayHistory(true)}
+            isRefreshing={showLoading}
           />
         </section>
       </div>

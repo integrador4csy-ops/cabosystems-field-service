@@ -49,11 +49,14 @@ import {
   createFieldRecord,
   getOrCreateCheckInTaskForProject,
   getTaskById,
+  registerMissingVillaGeofence,
 } from '@/lib/api';
 import { getLatestOfflineFieldRecord as getLatestFieldRecord, queueFieldRecord } from '@/lib/fieldSync';
 import { optimizeEvidencePhoto } from '@/lib/evidencePhoto';
 import type { Project } from '@/types/database';
 import { HeaderCaboSystems, useHeaderHeight } from '@/components/HeaderCaboSystems';
+import { VillaGeofenceRegistrationModal, type GeofenceDraft } from '@/components/VillaGeofenceRegistrationModal';
+import { DEFAULT_VILLA_GEOFENCE_RADIUS_METERS, hasVillaCoordinates } from '@/lib/villaGeofence';
 
 function checkNativeModule(moduleName: string): boolean {
   if (Platform.OS === 'web') return false;
@@ -431,6 +434,9 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = useRef(false);
+  const [geofenceStep, setGeofenceStep] = useState<'closed' | 'prompt' | 'map'>('closed');
+  const [pendingSubmissionLocation, setPendingSubmissionLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [geofenceDraft, setGeofenceDraft] = useState<GeofenceDraft>({ latitude: 0, longitude: 0, radiusMeters: DEFAULT_VILLA_GEOFENCE_RADIUS_METERS });
 
   const [feedbackModal, setFeedbackModal] = useState<{
     visible: boolean;
@@ -571,6 +577,74 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
     setFlash((prev) => (prev === 'off' ? 'on' : 'off'));
   };
 
+  const completeSubmission = async (
+    submissionLocation: { latitude: number; longitude: number },
+    geofence?: GeofenceDraft,
+  ) => {
+    if (submittingRef.current || !photoUri || !user?.id || !currentProject?.id) return;
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      if (Platform.OS !== 'web') {
+        await queueFieldRecord({
+          owner: user.id,
+          projectId: currentProject.id,
+          photoUri,
+          tipo: isCheckOut ? 'check_out' : 'check_in',
+          latitude: submissionLocation.latitude,
+          longitude: submissionLocation.longitude,
+          comments: notes.trim() || null,
+          geofence: !isCheckOut ? geofence : undefined,
+        });
+        setFeedbackModal({
+          visible: true,
+          type: 'success',
+          title: tr('Registro guardado en el dispositivo'),
+          message: geofence
+            ? tr('El check-in y la geocerca quedaron guardados. Se enviarán automáticamente cuando la app tenga conexión.')
+            : tr('La foto, la ubicación y la hora quedaron guardadas. Se enviará automáticamente cuando la app esté abierta y tenga conexión. Puedes consultar los pendientes en el aviso de sincronización.'),
+          onClose: leaveCheckin,
+        });
+        return;
+      }
+
+      const taskId = await getOrCreateCheckInTaskForProject(currentProject.id, user.id);
+      const timestamp = Date.now();
+      const prefix = isCheckOut ? 'checkout' : 'checkin';
+      const storagePath = `${prefix}s/${taskId}_${timestamp}.jpg`;
+      const publicUrl = await uploadEvidencePhoto(await optimizeEvidencePhoto(photoUri), storagePath);
+      const created = await createFieldRecord({
+        tarea_id: taskId,
+        tecnico_id: user.id,
+        tipo: isCheckOut ? 'check_out' : 'check_in',
+        latitud: submissionLocation.latitude,
+        longitud: submissionLocation.longitude,
+        foto_url: publicUrl,
+        comentarios: notes.trim() ? notes.trim() : null,
+      });
+      if (!isCheckOut && geofence) {
+        await registerMissingVillaGeofence(created.id, currentProject.id, geofence.latitude, geofence.longitude, geofence.radiusMeters);
+      }
+
+      const projectVilla = currentProject.villa || currentProject.unidad;
+      setFeedbackModal({
+        visible: true,
+        type: 'success',
+        title: isCheckOut ? tr('Check-Out Registrado') : tr('Check-In Registrado'),
+        message: isCheckOut
+          ? tr('Se registró tu salida de {value0} ({value1}) con éxito.', { value0: projectVilla, value1: currentProject.desarrollo })
+          : tr('Se registró tu llegada a {value0} ({value1}) con éxito.', { value0: projectVilla, value1: currentProject.desarrollo }),
+        onClose: leaveCheckin,
+      });
+    } catch (err: any) {
+      console.error('Error submitting field record:', err);
+      setFeedbackModal({ visible: true, type: 'error', title: tr('Error al Guardar'), message: err?.message || tr('Ocurrió un error al registrar en la base de datos.') });
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (submittingRef.current) return;
     if (!photoUri) {
@@ -613,65 +687,58 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
       return;
     }
 
-    submittingRef.current = true;
-    setIsSubmitting(true);
     try {
       const submissionLocation = Date.now() - locationTimestamp.current > 120_000 ? await fetchLocation() : locationCoords;
       if (!submissionLocation) throw new Error(tr("No se pudo validar una ubicación reciente. Comprueba el GPS y vuelve a intentarlo."));
-      if (Platform.OS !== 'web') {
-        await queueFieldRecord({ owner: user.id, projectId: currentProject.id, photoUri,
-          tipo: isCheckOut ? 'check_out' : 'check_in', latitude: submissionLocation.latitude,
-          longitude: submissionLocation.longitude, comments: notes.trim() || null });
-        setFeedbackModal({ visible: true, type: 'success', title: tr("Registro guardado en el dispositivo"),
-          message: tr("La foto, la ubicación y la hora quedaron guardadas. Se enviará automáticamente cuando la app esté abierta y tenga conexión. Puedes consultar los pendientes en el aviso de sincronización."), onClose: leaveCheckin });
+      if (!isCheckOut && !hasVillaCoordinates(currentProject)) {
+        const coordinates = { latitude: submissionLocation.latitude, longitude: submissionLocation.longitude };
+        setPendingSubmissionLocation(coordinates);
+        setGeofenceDraft({ ...coordinates, radiusMeters: DEFAULT_VILLA_GEOFENCE_RADIUS_METERS });
+        setGeofenceStep('prompt');
         return;
       }
-      // Obtener o asociar automáticamente la orden de trabajo para esta villa
-      const taskId = await getOrCreateCheckInTaskForProject(currentProject.id, user.id);
-      const timestamp = Date.now();
-      const prefix = isCheckOut ? 'checkout' : 'checkin';
-      const storagePath = `${prefix}s/${taskId}_${timestamp}.jpg`;
-
-      const publicUrl = await uploadEvidencePhoto(await optimizeEvidencePhoto(photoUri), storagePath);
-
-      await createFieldRecord({
-        tarea_id: taskId,
-        tecnico_id: user.id,
-        tipo: isCheckOut ? 'check_out' : 'check_in',
-        latitud: submissionLocation.latitude,
-        longitud: submissionLocation.longitude,
-        foto_url: publicUrl,
-        comentarios: notes.trim() ? notes.trim() : null,
-      });
-
-      const projectVilla = currentProject.villa || currentProject.unidad;
-      setFeedbackModal({
-        visible: true,
-        type: 'success',
-        title: isCheckOut ? tr("Check-Out Registrado") : tr("Check-In Registrado"),
-        message: isCheckOut
-          ? tr("Se registró tu salida de {value0} ({value1}) con éxito.", { value0: projectVilla, value1: currentProject.desarrollo })
-          : tr("Se registró tu llegada a {value0} ({value1}) con éxito.", { value0: projectVilla, value1: currentProject.desarrollo }),
-        onClose: leaveCheckin,
-      });
+      await completeSubmission(submissionLocation);
     } catch (err: any) {
-      console.error('Error submitting field record:', err);
       setFeedbackModal({
         visible: true,
         type: 'error',
         title: tr("Error al Guardar"),
         message: err?.message || tr("Ocurrió un error al registrar en la base de datos."),
       });
-    } finally {
-      submittingRef.current = false;
-      setIsSubmitting(false);
     }
+  };
+
+  const continueWithoutGeofence = () => {
+    const location = pendingSubmissionLocation;
+    setGeofenceStep('closed');
+    setPendingSubmissionLocation(null);
+    if (location) void completeSubmission(location);
+  };
+
+  const confirmGeofence = () => {
+    const location = pendingSubmissionLocation;
+    setGeofenceStep('closed');
+    setPendingSubmissionLocation(null);
+    if (location) void completeSubmission(location, geofenceDraft);
   };
 
   const submitText = isCheckOut ? tr("Registrar Check-out") : tr("Registrar Check-in");
 
   return (
     <View style={styles.container}>
+      <VillaGeofenceRegistrationModal
+        visible={geofenceStep !== 'closed'}
+        step={geofenceStep === 'map' ? 'map' : 'prompt'}
+        villaName={currentProject ? `${currentProject.villa || currentProject.unidad} · ${currentProject.desarrollo}` : tr('Villa')}
+        draft={geofenceDraft}
+        onDraftChange={setGeofenceDraft}
+        onShowMap={() => setGeofenceStep('map')}
+        onUseCurrentLocation={() => pendingSubmissionLocation && setGeofenceDraft((draft) => ({ ...draft, ...pendingSubmissionLocation }))}
+        onSkip={continueWithoutGeofence}
+        onBack={() => setGeofenceStep('prompt')}
+        onConfirm={confirmGeofence}
+        saving={isSubmitting}
+      />
       <View style={{ height: headerHeight }}><HeaderCaboSystems showProjectSelector={false} /></View>
 
       <KeyboardAvoidingView

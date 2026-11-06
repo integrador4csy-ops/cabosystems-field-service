@@ -8,9 +8,11 @@ const ts = require('typescript');
 // Exercise the actual remote pipeline against a controlled PostgREST adapter.
 // No production data or user session is used by these tests.
 function setup() {
-  const state = { owner: 'alice', active: true, uploads: [], statuses: [], tasks: [], records: [], missingPhoto: false, uncertainRecord: false, uncertainTask: false, deny: false };
+  const state = { owner: 'alice', active: true, uploads: [], statuses: [], tasks: [], records: [], geofences: [], missingPhoto: false, uncertainRecord: false, uncertainTask: false, deny: false };
   const client = {
     auth: { getSession: async () => ({ data: { session: { user: { id: state.owner } } }, error: null }) },
+    functions: { invoke: async (name, input) => { state.notifications ||= []; state.notifications.push([name, input]); return { data: { success: true }, error: null }; } },
+    rpc: async (name, input) => { state.geofences.push([name, input]); return { data: true, error: null }; },
     from(table) {
       const filters = []; const orders = []; let operation = 'select'; let value; let one = false; let limit;
       const builder = {
@@ -87,4 +89,14 @@ test('an older offline arrival does not overwrite the status from a newer depart
   const { state, send, record } = setup(); state.tasks.push({ id: 'task', proyecto_id: 'villa', asignado_a: 'alice', estatus: 'completada' });
   state.records.push({ id: 'newer', tarea_id: 'task', tecnico_id: 'alice', fecha_hora: '2026-10-26T12:00:00.000Z' });
   await send(record); assert.equal(state.statuses.length, 0);
+});
+test('a missing villa geofence syncs only after its technician check-in exists', async () => {
+  const { state, send, record } = setup();
+  record.geofence = { latitude: 22.901, longitude: -109.902, radiusMeters: 175 };
+  await send(record);
+  assert.equal(state.records.length, 1);
+  assert.equal(JSON.stringify(state.geofences), JSON.stringify([['register_missing_villa_geofence', {
+    p_field_record_id: 'operation', p_project_id: 'villa', p_latitude: 22.901,
+    p_longitude: -109.902, p_radius_meters: 175,
+  }]]));
 });

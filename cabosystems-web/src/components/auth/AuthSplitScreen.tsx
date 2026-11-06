@@ -1,12 +1,13 @@
 import { useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect, useCallback } from 'react';
-import { Eye, EyeOff, Lock, Mail, Loader2, MapPin, MessageSquare, ShieldCheck, User, Calendar, CheckCircle2, KeyRound } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, Loader2, MapPin, MessageSquare, ShieldCheck, User, CheckCircle2, KeyRound } from 'lucide-react';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { supabase } from '../../lib/supabase';
 import { getRoleLabel } from '../../lib/uiTranslations';
+import { AgendaDateTimeField } from '../agenda/AgendaDateTimeField';
 
 export const AuthSplitScreen: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { login } = useAdminAuth();
 
   // Mode: login or register
@@ -383,17 +384,15 @@ export const AuthSplitScreen: React.FC = () => {
                       <label htmlFor="reg-birthdate" className="mb-1 block text-xs font-medium text-gray-700">
                         {t("Fecha de nacimiento (Cumpleaños)")}<span className="text-red-500">*</span>
                       </label>
-                      <div className="relative">
-                        <Calendar size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                        <input
-                          id="reg-birthdate"
-                          type="date"
-                          required
-                          value={regBirthDate}
-                          onChange={(e) => setRegBirthDate(e.target.value)}
-                          className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-xs font-normal text-gray-800 focus:border-brand-500 focus:outline-hidden transition-colors"
-                        />
-                      </div>
+                      <AgendaDateTimeField
+                        type="date"
+                        required
+                        min="1900-01-01"
+                        value={regBirthDate}
+                        label={t("Fecha de nacimiento (Cumpleaños)")}
+                        locale={locale}
+                        onChange={setRegBirthDate}
+                      />
                     </div>
 
                     {/* Password */}

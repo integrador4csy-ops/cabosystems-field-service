@@ -2,10 +2,13 @@ export interface Proyecto {
   id: string;
   desarrollo: string;
   villa: string;
+  numero_proyecto?: string | null;
+  cliente?: string | null;
   descripcion: string | null;
-  estatus: 'activo' | 'pausado' | 'finalizado';
+  estatus: 'activo' | 'pausado' | 'en_conciliacion' | 'finalizado';
   latitud?: number | null;
   longitud?: number | null;
+  radio_geocerca_m?: number | null;
   created_at?: string;
 }
 

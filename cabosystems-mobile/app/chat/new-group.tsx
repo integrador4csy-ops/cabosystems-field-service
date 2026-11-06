@@ -486,18 +486,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E4E7EC',
   },
-  villaSection: {
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderColor: '#E4E7EC',
-    gap: 6,
-  },
-  villaLabel: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 13,
-    color: Colors.text,
-  },
   villaHint: {
     fontFamily: 'Outfit_400Regular',
     fontSize: 11,

@@ -29,7 +29,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const [newDesarrollo, setNewDesarrollo] = useState('');
   const [villa, setVilla] = useState('');
   const [descripcion, setDescripcion] = useState('');
-  const [estatus, setEstatus] = useState<'activo' | 'pausado' | 'finalizado'>('activo');
+  const [estatus, setEstatus] = useState<'activo' | 'pausado' | 'en_conciliacion' | 'finalizado'>('activo');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -210,8 +210,8 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
               {t("Estatus del Proyecto")}</label>
-            <div className="grid grid-cols-3 gap-2">
-              {(['activo', 'pausado', 'finalizado'] as const).map((st) => (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {(['activo', 'pausado', 'en_conciliacion', 'finalizado'] as const).map((st) => (
                 <button
                   key={t(st)}
                   type="button"
@@ -222,7 +222,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                     : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
                     }`}
                 >
-                  {t(st)}
+                  {st === 'en_conciliacion' ? t('En conciliación') : st === 'finalizado' ? t('Terminado') : t(st)}
                 </button>
               ))}
             </div>

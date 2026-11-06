@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import {
   ClipboardList,
+  ClipboardCheck,
   Calendar,
   Camera,
   MessageSquare,
@@ -60,6 +61,7 @@ const TasksLabel = ({ children }: any) => <ConnectedTabLabel tab="index">{childr
 const ScheduleLabel = ({ children }: any) => <ConnectedTabLabel tab="schedule">{children}</ConnectedTabLabel>;
 const UsersLabel = ({ children }: any) => <ConnectedTabLabel tab="users">{children}</ConnectedTabLabel>;
 const ChatLabel = ({ children }: any) => <ConnectedTabLabel tab="chat">{children}</ConnectedTabLabel>;
+const ChecksLabel = ({ children }: any) => <ConnectedTabLabel tab="checks">{children}</ConnectedTabLabel>;
 
 const renderTabBarLabel = ({ color, children, focused }: any) => (
   <Text
@@ -88,6 +90,9 @@ const UsersIcon = ({ color, focused }: { color: any; focused: boolean }) => (
 );
 const ChatIcon = ({ color, focused }: { color: any; focused: boolean }) => (
   <TabBarIcon tab="chat" Icon={MessageSquare} color={color} focused={focused} />
+);
+const ChecksIcon = ({ color, focused }: { color: any; focused: boolean }) => (
+  <TabBarIcon tab="checks" Icon={ClipboardCheck} color={color} focused={focused} />
 );
 
 function FloatingActionButton(props: any) {
@@ -166,12 +171,13 @@ function PreparedTabLayout() {
     profile?.rol === 'admin' ||
     profile?.rol === 'supervisor_instalacion' ||
     profile?.rol === 'aux_operaciones';
-  const tabOrder = useMemo(() => isAdmin ? ['index', 'schedule', 'users', 'chat'] : ['fab', 'index', 'schedule', 'chat'], [isAdmin]);
+  const tabOrder = useMemo(() => isAdmin ? ['index', 'checks', 'schedule', 'users', 'chat'] : ['fab', 'index', 'schedule', 'chat'], [isAdmin]);
 
   const currentTab = segments[1] || (
     pathname.includes('schedule') ? 'schedule' :
     pathname.includes('chat') ? 'chat' :
     pathname.includes('users') ? 'users' :
+    pathname.includes('checks') ? 'checks' :
     pathname.includes('fab') ? 'fab' :
     'index'
   );
@@ -296,6 +302,16 @@ function PreparedTabLayout() {
             title: t('nav.team'),
             tabBarIcon: UsersIcon,
             tabBarLabel: UsersLabel,
+            href: isAdmin ? undefined : null,
+          }}
+        />
+        <Tabs.Screen
+          name="checks"
+          activityEnabled={!isAdmin}
+          options={{
+            title: t('nav.checkins'),
+            tabBarIcon: ChecksIcon,
+            tabBarLabel: ChecksLabel,
             href: isAdmin ? undefined : null,
           }}
         />

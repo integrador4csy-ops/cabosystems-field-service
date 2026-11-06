@@ -22,6 +22,6 @@ export function ProfileNavButton() {
 }
 
 const styles = StyleSheet.create({
-  button: { width: 44, height: 44, flexShrink: 0, marginLeft: 8, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.05)' },
+  button: { width: 44, height: 44, flexShrink: 0, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.05)' },
   photo: { width: 38, height: 38, borderRadius: 19 },
 });

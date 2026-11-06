@@ -1,9 +1,14 @@
 import React, { useRef, useEffect } from 'react';
 import { SearchIcon, CloseIcon } from '../../icons';
-import { Car, Menu, MapPin, Plus } from 'lucide-react';
+import { Car, ClipboardPlus, Menu, MapPin, Plus } from 'lucide-react';
 import { useTranslation } from '../../context/LanguageContext';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAdminAuth } from '../../context/AdminAuthContext';
+import type { LiveWorker } from '../../types/fleet';
+import { dateKey, shiftDate } from '../../lib/taskDates';
+import { AppSelect } from '../ui/AppSelect';
+import { NotificationCenter } from './NotificationCenter';
+import { AgendaDateTimeField } from '../agenda/AgendaDateTimeField';
 
 interface AppHeaderProps {
   searchQuery: string;
@@ -11,10 +16,15 @@ interface AppHeaderProps {
   onlineCount: number;
   movingCount: number;
   offlineCount: number;
+  historyWorkers?: LiveWorker[];
+  historyWorkerId?: string;
+  onHistoryWorkerChange?: (workerId: string) => void;
+  historyDate?: string;
+  onHistoryDateChange?: (date: string) => void;
 }
 
-export const AppHeader: React.FC<AppHeaderProps> = ({ searchQuery, onSearchChange, onlineCount, movingCount, offlineCount }) => {
-  const { t } = useTranslation();
+export const AppHeader: React.FC<AppHeaderProps> = ({ searchQuery, onSearchChange, onlineCount, movingCount, offlineCount, historyWorkers = [], historyWorkerId = '', onHistoryWorkerChange, historyDate = '', onHistoryDateChange }) => {
+  const { t, locale } = useTranslation();
   const { isAdmin, user, adminProfile } = useAdminAuth();
   const {
     activeItem, isMobileOpen, setIsMobileOpen,
@@ -22,6 +32,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ searchQuery, onSearchChang
     agendaSearchQuery, setAgendaSearchQuery, requestCreateEvent,
     chatSearchQuery, setChatSearchQuery, requestCreateChatGroup,
     teamSearchQuery, setTeamSearchQuery, requestCreateTeamInvite,
+    directorySearchQuery, setDirectorySearchQuery,
+    warrantySearchQuery, setWarrantySearchQuery, requestCreateWarranty,
   } = useSidebar();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const isRadar = activeItem === 'radar';
@@ -29,16 +41,21 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ searchQuery, onSearchChang
   const isAgenda = activeItem === 'agenda';
   const isChat = activeItem === 'chat';
   const isCollaborators = activeItem === 'colaboradores';
+  const isDirectory = activeItem === 'directorio-proyectos';
+  const isWarranty = activeItem === 'garantias';
   const isTeam = isCollaborators || activeItem === 'invitaciones';
+  const isHistory = activeItem === 'historial';
   const canManageEvents = Boolean(user && adminProfile?.activo && ['admin', 'supervisor_instalacion'].includes(adminProfile.rol || ''));
   const canManageChat = Boolean(user && adminProfile?.activo && ['admin', 'supervisor_instalacion'].includes(adminProfile.rol || ''));
-  const hasSearch = isRadar || isTasks || isChat || isCollaborators;
-  const sectionQuery = isAgenda ? agendaSearchQuery : isTasks ? taskSearchQuery : isChat ? chatSearchQuery : isCollaborators ? teamSearchQuery : searchQuery;
-  const changeSectionQuery = isAgenda ? setAgendaSearchQuery : isTasks ? setTaskSearchQuery : isChat ? setChatSearchQuery : isCollaborators ? setTeamSearchQuery : onSearchChange;
-  const searchLabel = isAgenda ? t('Buscar eventos') : isTasks ? t('Buscar tareas') : isChat ? t('Buscar grupo o proyecto') : isCollaborators ? t('Buscar colaboradores') : t('header.searchPlaceholder');
-  const searchPlaceholder = isAgenda ? t('Buscar evento o ubicación...') : isTasks ? t('Buscar tarea, villa o responsable...') : isChat ? t('Buscar grupo o proyecto...') : isCollaborators ? t('Buscar colaborador por nombre, correo o rol...') : t('header.searchPlaceholder');
+  const hasSearch = isRadar || isTasks || isChat || isCollaborators || isDirectory || isWarranty;
+  const sectionQuery = isAgenda ? agendaSearchQuery : isTasks ? taskSearchQuery : isChat ? chatSearchQuery : isCollaborators ? teamSearchQuery : isDirectory ? directorySearchQuery : isWarranty ? warrantySearchQuery : searchQuery;
+  const changeSectionQuery = isAgenda ? setAgendaSearchQuery : isTasks ? setTaskSearchQuery : isChat ? setChatSearchQuery : isCollaborators ? setTeamSearchQuery : isDirectory ? setDirectorySearchQuery : isWarranty ? setWarrantySearchQuery : onSearchChange;
+  const searchLabel = isAgenda ? t('Buscar eventos') : isTasks ? t('Buscar tareas') : isChat ? t('Buscar grupo o proyecto') : isCollaborators ? t('Buscar colaboradores') : isDirectory ? t('Buscar villas o números de proyecto') : isWarranty ? t('Buscar garantías') : t('header.searchPlaceholder');
+  const searchPlaceholder = isAgenda ? t('Buscar evento o ubicación...') : isTasks ? t('Buscar tarea, villa o responsable...') : isChat ? t('Buscar grupo o proyecto...') : isCollaborators ? t('Buscar colaborador por nombre, correo o rol...') : isDirectory ? t('Buscar villa o número de proyecto...') : isWarranty ? t('Buscar folio, villa, equipo o serie...') : t('header.searchPlaceholder');
   const teamTitles: Record<string, string> = { colaboradores: t('sidebar.collaborators'), invitaciones: t('sidebar.invitations'), 'directorio-proyectos': t('Proyectos') };
-  const title = teamTitles[activeItem] || (activeItem === 'chat' ? t('sidebar.chat') : activeItem === 'agenda' ? t('sidebar.agenda') : activeItem === 'proyectos' ? t('sidebar.projects') : t('sidebar.radar'));
+  const title = teamTitles[activeItem] || (activeItem === 'garantias' ? (locale.startsWith('es') ? 'Garantías' : 'Warranties') : activeItem === 'chat' ? t('sidebar.chat') : activeItem === 'agenda' ? t('sidebar.agenda') : activeItem === 'proyectos' ? t('sidebar.projects') : isHistory ? t('sidebar.history') : t('sidebar.radar'));
+  const today = dateKey(new Date());
+  const yesterday = shiftDate(today, -1);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -67,14 +84,43 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ searchQuery, onSearchChang
           {sectionQuery && <button type="button" onClick={() => changeSectionQuery('')} aria-label={t("Borrar búsqueda")} className="absolute right-1 top-1 flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"><CloseIcon size={16} /></button>}
         </div>
       )}
-      {isTasks && (isAgenda ? canManageEvents : isAdmin) && <div className="header-status flex justify-end"><button type="button" onClick={isAgenda ? requestCreateEvent : requestCreateTask} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{isAgenda ? t('Nuevo evento') : t('Nueva Tarea')}</button></div>}
-      {isChat && canManageChat && <div className="header-status flex justify-end"><button type="button" onClick={requestCreateChatGroup} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{t('Nuevo grupo')}</button></div>}
-      {isTeam && <div className="header-status flex justify-end"><button type="button" onClick={requestCreateTeamInvite} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{t('Nueva invitación')}</button></div>}
-      {isRadar && <div className="header-status flex items-center justify-end gap-3 text-xs tabular-nums">
-        <div className="flex items-center gap-1.5 text-emerald-700" title={t('header.onlineTitle')}><span className="h-2 w-2 rounded-full bg-emerald-500" /><span className="font-semibold">{onlineCount}</span><span className="hidden sm:inline">{t('header.online')}</span></div>
-        {movingCount > 0 && <div className="flex items-center gap-1.5 text-orange-700" title={t('header.inRouteTitle')}><Car size={14} /><span className="font-semibold">{movingCount}</span><span className="hidden xl:inline">{t('header.inRoute')}</span></div>}
-        <div className="flex items-center gap-1.5 text-slate-500" title={t('header.offlineTitle')}><span className="h-2 w-2 rounded-full bg-slate-400" /><span className="font-semibold">{offlineCount}</span><span className="hidden sm:inline">{t('header.offline')}</span></div>
+      {isHistory && <div className="history-header-controls" aria-label={t('Filtros del historial')}>
+        <label className="history-header-worker">
+          <AppSelect
+            aria-label={t('Seleccionar técnico')}
+            value={historyWorkerId}
+            disabled={historyWorkers.length === 0}
+            onChange={(event) => onHistoryWorkerChange?.(event.target.value)}
+          >
+            {historyWorkers.map((worker) => <option key={worker.profile.id} value={worker.profile.id}>{worker.profile.nombre || worker.profile.full_name || t('Técnico')}</option>)}
+          </AppSelect>
+        </label>
+        <div className="history-header-presets" aria-label={t('Fechas rápidas')}>
+          <button type="button" aria-pressed={historyDate === today} onClick={() => onHistoryDateChange?.(today)}>{t('Hoy')}</button>
+          <button type="button" aria-pressed={historyDate === yesterday} onClick={() => onHistoryDateChange?.(yesterday)}>{t('Ayer')}</button>
+        </div>
+        <div className="history-header-date">
+          <AgendaDateTimeField
+            type="date"
+            value={historyDate}
+            label={t('Seleccionar fecha')}
+            locale={locale}
+            onChange={(value) => onHistoryDateChange?.(value)}
+          />
+        </div>
       </div>}
+      <div className="header-status flex items-center justify-end gap-3 text-xs tabular-nums">
+        {isTasks && (isAgenda ? canManageEvents : isAdmin) && <button type="button" onClick={isAgenda ? requestCreateEvent : requestCreateTask} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{isAgenda ? t('Nuevo evento') : t('Nueva Tarea')}</button>}
+        {isChat && canManageChat && <button type="button" onClick={requestCreateChatGroup} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{t('Nuevo grupo')}</button>}
+        {isWarranty && <button type="button" onClick={requestCreateWarranty} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><ClipboardPlus size={16} aria-hidden="true" />{t('Nueva garantía')}</button>}
+        {isTeam && <button type="button" onClick={requestCreateTeamInvite} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{t('Nueva invitación')}</button>}
+        {isRadar && <>
+          <div className="flex items-center gap-1.5 text-emerald-700" title={t('header.onlineTitle')}><span className="h-2 w-2 rounded-full bg-emerald-500" /><span className="font-semibold">{onlineCount}</span><span className="hidden sm:inline">{t('header.online')}</span></div>
+          {movingCount > 0 && <div className="flex items-center gap-1.5 text-orange-700" title={t('header.inRouteTitle')}><Car size={14} /><span className="font-semibold">{movingCount}</span><span className="hidden xl:inline">{t('header.inRoute')}</span></div>}
+          <div className="flex items-center gap-1.5 text-slate-500" title={t('header.offlineTitle')}><span className="h-2 w-2 rounded-full bg-slate-400" /><span className="font-semibold">{offlineCount}</span><span className="hidden sm:inline">{t('header.offline')}</span></div>
+        </>}
+        <NotificationCenter />
+      </div>
     </header>
   );
 };

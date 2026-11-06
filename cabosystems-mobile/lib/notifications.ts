@@ -75,6 +75,16 @@ export async function registerForPushNotificationsAsync(userId: string): Promise
         showBadge: true,
         lockscreenVisibility: NotificationsModule.AndroidNotificationVisibility.PUBLIC,
       });
+      await NotificationsModule.setNotificationChannelAsync('operations', {
+        name: 'Operaciones de Campo',
+        description: 'Asignaciones de tareas y registros de check-in y check-out',
+        importance: NotificationsModule.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 180, 250],
+        lightColor: '#f78c26',
+        enableVibrate: true,
+        showBadge: true,
+        lockscreenVisibility: NotificationsModule.AndroidNotificationVisibility.PUBLIC,
+      });
     }
 
     // 2. Verificar o solicitar permisos al usuario
@@ -155,6 +165,10 @@ export function setupNotificationResponseListener(navigateFn: (path: string) => 
       if (!data) return;
       if (data.target === 'task' && data.taskId) {
         navigateFn(`/task/${data.taskId}`);
+      } else if (data.target === 'tasks') {
+        navigateFn('/(tabs)');
+      } else if (data.target === 'checks') {
+        navigateFn('/(tabs)/checks');
       } else if (data.groupId) {
         navigateFn(`/chat/${data.groupId}`);
       } else if (data.taskId) {

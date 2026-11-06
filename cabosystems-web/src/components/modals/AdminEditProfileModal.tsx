@@ -3,8 +3,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { useLanguage, type SupportedLanguage } from '../../context/LanguageContext';
 import { cn } from '../../utils';
-import { User, X, Check, UploadCloud, Trash2, AlertCircle, Camera, Globe, Calendar } from 'lucide-react';
+import { User, X, Check, UploadCloud, Trash2, AlertCircle, Camera, Globe } from 'lucide-react';
 import '../AdminUsersModal.css';
+import { AgendaDateTimeField } from '../agenda/AgendaDateTimeField';
 
 export const AdminEditProfileModal: React.FC = () => {
   const {
@@ -14,7 +15,7 @@ export const AdminEditProfileModal: React.FC = () => {
     updateAdminProfile,
   } = useAdminAuth();
 
-  const { language, setLanguage, t } = useLanguage();
+  const { language, setLanguage, t, locale } = useLanguage();
 
   const [nombre, setNombre] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -246,14 +247,14 @@ export const AdminEditProfileModal: React.FC = () => {
 
             {/* Birthday Field */}
             <div className="form-field">
-              <label className="flex items-center gap-1.5">
-                <Calendar size={13} className="text-slate-500" />
-                <span>{t('Fecha de nacimiento (Cumpleaños)')}</span>
-              </label>
-              <input
+              <label>{t('Fecha de nacimiento (Cumpleaños)')}</label>
+              <AgendaDateTimeField
                 type="date"
                 value={fechaNacimiento}
-                onChange={(e) => setFechaNacimiento(e.target.value)}
+                label={t('Fecha de nacimiento (Cumpleaños)')}
+                locale={locale}
+                min="1900-01-01"
+                onChange={setFechaNacimiento}
               />
             </div>
 

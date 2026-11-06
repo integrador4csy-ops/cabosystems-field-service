@@ -175,7 +175,7 @@ export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, se
     <div className="task-workspace-content">
     {mode === 'tasks' && (
       <div className="task-location-context">
-        <span>{selectedVilla ? <>{selectedVilla.desarrollo}<ChevronRight size={14} aria-hidden="true" />{selectedVilla.villa}</> : t('Selecciona una villa')}</span>
+        <span>{selectedVilla ? <><span>{selectedVilla.desarrollo}</span><ChevronRight size={14} aria-hidden="true" /><strong>{selectedVilla.villa}</strong></> : <strong>{t('Selecciona una villa')}</strong>}</span>
         <div className="task-location-actions">
           <button type="button" className="workspace-button" onClick={() => setReportOpen(true)}>
             <Download size={15} aria-hidden="true" />

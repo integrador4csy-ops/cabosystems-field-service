@@ -12,9 +12,10 @@ import { AppHeader } from './components/layout/AppHeader';
 import { AuthSplitScreen } from './components/auth/AuthSplitScreen';
 import { RetainedView } from './components/layout/RetainedView';
 import { preloadModules } from './lib/modulePreload';
-import { loadLiveMap, loadChat, loadTasks, loadAgenda, loadDirectory, loadTeam, loadLocationHistory } from './lib/viewModules';
+import { loadLiveMap, loadChat, loadTasks, loadAgenda, loadDirectory, loadTeam, loadLocationHistory, loadWarranties } from './lib/viewModules';
 import { SectionResourcesProvider, useSectionResources, canSpeculate } from './context/SectionResources';
 import { fleetSnapshot } from './lib/fleetSnapshot';
+import { dateKey } from './lib/taskDates';
 import {
   playNotificationSound,
   requestDesktopNotificationPermission,
@@ -37,6 +38,7 @@ const LocationHistoryView = lazy(() => loadLocationHistory().then((module) => ({
 const ProjectDirectoryView = lazy(() => loadDirectory().then((module) => ({ default: module.ProjectDirectoryView })));
 
 const TeamManagementView = lazy(() => loadTeam().then((module) => ({ default: module.TeamManagementView })));
+const WarrantyManagementView = lazy(() => loadWarranties().then((module) => ({ default: module.WarrantyManagementView })));
 
 function DashboardContent() {
   const resources = useSectionResources();
@@ -52,6 +54,7 @@ function DashboardContent() {
   const [chatToasts, setChatToasts] = useState<ChatToastItem[]>([]);
   const [workers, setWorkers] = useState<LiveWorker[]>([]);
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
+  const [historyDate, setHistoryDate] = useState(() => dateKey(new Date()));
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [focusTrigger, setFocusTrigger] = useState(0);
@@ -368,6 +371,9 @@ function DashboardContent() {
         .length,
     [workers]
   );
+  const historyWorkerId = selectedWorkerId && workers.some((worker) => worker.profile.id === selectedWorkerId)
+    ? selectedWorkerId
+    : workers[0]?.profile.id || '';
 
   const handleSelectWorker = (id: string) => {
     setSelectedWorkerId(id ? id : null);
@@ -402,6 +408,11 @@ function DashboardContent() {
           onlineCount={onlineCount}
           movingCount={movingCount}
           offlineCount={offlineCount}
+          historyWorkers={workers}
+          historyWorkerId={historyWorkerId}
+          onHistoryWorkerChange={handleSelectWorker}
+          historyDate={historyDate}
+          onHistoryDateChange={setHistoryDate}
         />
 
         {/* 3. Main View: GPS Radar Map, Team Group Chat or Projects Management */}
@@ -423,12 +434,14 @@ function DashboardContent() {
           </RetainedView>
           <RetainedView active={activeItem === 'historial'} fallback={<ViewLoading />}>
             <LocationHistoryView
-              workers={workers}
-              selectedWorkerId={selectedWorkerId}
-              onSelectWorker={handleSelectWorker}
+              selectedWorkerId={historyWorkerId}
+              selectedDate={historyDate}
             />
           </RetainedView>
-          <RetainedView active={!['chat', 'colaboradores', 'invitaciones', 'directorio-proyectos', 'agenda', 'proyectos', 'historial'].includes(activeItem)} fallback={<ViewLoading />}>
+          <RetainedView active={activeItem === 'garantias'} fallback={<ViewLoading />}>
+            <WarrantyManagementView />
+          </RetainedView>
+          <RetainedView active={!['chat', 'colaboradores', 'invitaciones', 'directorio-proyectos', 'agenda', 'proyectos', 'historial', 'garantias'].includes(activeItem)} fallback={<ViewLoading />}>
             <div className="flex-1 h-full w-full rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden relative isolate">
               <LiveMap
                 workers={filteredWorkers}

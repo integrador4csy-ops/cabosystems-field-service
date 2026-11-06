@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import type { TaskPermissions } from './taskAccess';
-import type { Project, Task, Subtarea, TaskStatus, FieldRecord } from '@/types/database';
+import type { Project, Task, Subtarea, TaskStatus, FieldRecord, CheckInType } from '@/types/database';
 
 export interface TaskProgressActivity {
   id: number;
@@ -42,6 +42,19 @@ export interface TaskDetail extends Task {
   proyectos: (Pick<Project, 'desarrollo'> & { villa?: string; unidad?: string }) | null;
   profiles: { nombre: string } | null;
   subtareas: Subtarea[];
+}
+
+export type VillaLocation = Pick<Project, 'id' | 'desarrollo' | 'villa' | 'latitud' | 'longitud' | 'radio_geocerca_m'> & {
+  villa: string;
+  latitud: number;
+  longitud: number;
+  radio_geocerca_m: number;
+};
+
+export async function getVillaLocations(): Promise<VillaLocation[]> {
+  const { data, error } = await supabase.rpc('list_villa_locations');
+  if (error) throw error;
+  return (data ?? []) as VillaLocation[];
 }
 
 export async function getMyProjects(): Promise<Project[]> {
@@ -336,7 +349,42 @@ export async function createFieldRecord(
     });
   }
 
+  void supabase.functions.invoke('operations-push-notifications', {
+    body: { kind: 'field_check', entityId: data.id },
+  }).then(({ error: notificationError }) => {
+    if (notificationError) console.warn('Could not notify administrators about field check:', notificationError);
+  }).catch((notificationError) => {
+    console.warn('Could not notify administrators about field check:', notificationError);
+  });
+
   return data as FieldRecord;
+}
+
+export interface AdminCheckHistoryItem {
+  id: string;
+  technician_id: string;
+  technician_name: string;
+  technician_avatar_url: string | null;
+  check_type: CheckInType;
+  checked_at: string;
+  local_day: string;
+  latitude: number;
+  longitude: number;
+  photo_url: string;
+  comments: string | null;
+  task_id: string;
+  project_id: string;
+  villa: string;
+  development: string;
+}
+
+export async function getAdminCheckHistory(day: string, userId?: string | null): Promise<AdminCheckHistoryItem[]> {
+  const { data, error } = await supabase.rpc('list_admin_check_history', {
+    p_day: day,
+    p_user_id: userId || null,
+  });
+  if (error) throw error;
+  return (data || []) as AdminCheckHistoryItem[];
 }
 
 export async function getLatestFieldRecord(userId: string): Promise<FieldRecord | null> {
@@ -353,6 +401,24 @@ export async function getLatestFieldRecord(userId: string): Promise<FieldRecord 
     return null;
   }
   return data as FieldRecord | null;
+}
+
+export async function registerMissingVillaGeofence(
+  fieldRecordId: string,
+  projectId: string,
+  latitude: number,
+  longitude: number,
+  radiusMeters: number,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc('register_missing_villa_geofence', {
+    p_field_record_id: fieldRecordId,
+    p_project_id: projectId,
+    p_latitude: latitude,
+    p_longitude: longitude,
+    p_radius_meters: radiusMeters,
+  });
+  if (error) throw error;
+  return Boolean(data);
 }
 
 export async function getOrCreateCheckInTaskForProject(

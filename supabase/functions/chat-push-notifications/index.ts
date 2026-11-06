@@ -137,6 +137,22 @@ serve(async (req) => {
     const memberIds = members.map((m) => m.profile_id);
     console.log('[chat-push] IDs de miembros destinatarios:', memberIds);
 
+    const chatPresentation = buildChatNotification({ ...presentationInput });
+    const notificationRows = memberIds.map((userId) => ({
+      user_id: userId,
+      kind: 'chat_message',
+      title: chatPresentation.title,
+      body: chatPresentation.body,
+      target: 'chat',
+      target_id: grupoId,
+      event_key: `chat:${mensajeId || `${grupoId}:${remitenteId}:${contenido}`}`,
+    }));
+    const stored = await supabaseAdmin.from('app_notifications').upsert(notificationRows, {
+      onConflict: 'user_id,event_key',
+      ignoreDuplicates: true,
+    });
+    if (stored.error) throw stored.error;
+
     // Obtener tokens válidos de esos miembros
     const { data: tokensData, error: tokError } = await supabaseAdmin
       .from('user_push_tokens')

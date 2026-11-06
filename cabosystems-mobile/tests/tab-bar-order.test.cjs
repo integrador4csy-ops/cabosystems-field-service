@@ -2,12 +2,12 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const exp={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname,'../lib/tabBarOrder.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports:exp});
 const {orderTabBarState}=exp;
 test('visual tab order preserves focus, hidden routes and the original registry state',()=>{
- const routes=['index','fab','chat','users','profile','schedule'].map(name=>({name,key:name+'-key'}));const state={routes,index:2,key:'tabs'};
- const admin=orderTabBarState(state,['index','schedule','users','chat']);
- assert.deepEqual(Array.from(admin.routes,r=>r.name),['index','schedule','users','chat','fab','profile']);
+ const routes=['index','fab','chat','users','checks','profile','schedule'].map(name=>({name,key:name+'-key'}));const state={routes,index:2,key:'tabs'};
+ const admin=orderTabBarState(state,['index','checks','schedule','users','chat']);
+ assert.deepEqual(Array.from(admin.routes,r=>r.name),['index','checks','schedule','users','chat','fab','profile']);
  assert.equal(admin.routes[admin.index].key,'chat-key');assert.equal(state.routes,routes);assert.equal(state.index,2);
  const tech=orderTabBarState(state,['fab','index','schedule','chat']);
- assert.deepEqual(Array.from(tech.routes,r=>r.name),['fab','index','schedule','chat','users','profile']);
+ assert.deepEqual(Array.from(tech.routes,r=>r.name),['fab','index','schedule','chat','users','checks','profile']);
  assert.equal(tech.routes[tech.index].key,'chat-key');
 });
 test('declared tabs match Expo seeded route order to avoid stale reconciliation actions',()=>{
@@ -17,6 +17,16 @@ test('declared tabs match Expo seeded route order to avoid stale reconciliation 
  const {sortRoutesWithInitial}=require('../node_modules/expo-router/build/sortRoutes.js');
  const seeded=names.map(route=>({route})).sort(sortRoutesWithInitial('index')).map(n=>n.route);
  assert.deepEqual(names,seeded);
+});
+
+test('villa locations are a standalone stack route reachable from field operations',()=>{
+ const layout=fs.readFileSync(path.join(__dirname,'../app/(tabs)/_layout.tsx'),'utf8');
+ const profile=fs.readFileSync(path.join(__dirname,'../app/(tabs)/profile.tsx'),'utf8');
+ assert.doesNotMatch(layout,/name="locations"/);
+ assert.doesNotMatch(layout,/tabOrder[^\n]*locations/);
+ assert.ok(profile.includes("router.push('/locations')"));
+ const root=fs.readFileSync(path.join(__dirname,'../app/_layout.tsx'),'utf8');
+ assert.match(root,/Stack\.Screen name="locations"/);
 });
 
 test('Android Back returns to Tasks only while a secondary tab is focused',()=>{

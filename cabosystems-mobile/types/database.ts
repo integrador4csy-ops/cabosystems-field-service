@@ -12,7 +12,7 @@ export type UserRole =
   | 'aux_operaciones';
 
 export type TaskStatus = 'pendiente' | 'en_proceso' | 'completada';
-export type ProjectStatus = 'activo' | 'pausado' | 'finalizado';
+export type ProjectStatus = 'activo' | 'pausado' | 'en_conciliacion' | 'finalizado';
 export type CheckInType = 'check_in' | 'check_out';
 export type Prioridad = 'baja' | 'media' | 'alta';
 export type PendienteStatus = 'pendiente' | 'en_proceso' | 'resuelta';
@@ -51,6 +51,9 @@ export interface Project {
   unidad?: string;
   descripcion: string | null;
   estatus: ProjectStatus;
+  latitud?: number | null;
+  longitud?: number | null;
+  radio_geocerca_m?: number | null;
   created_at: string;
 }
 

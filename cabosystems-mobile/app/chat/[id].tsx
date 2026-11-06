@@ -30,6 +30,8 @@ import { ChatDocumentPreviewModal } from '@/components/chat/ChatDocumentPreviewM
 import type { ChatRect } from '@/lib/chatReactionLayout';
 import { prepareChatEmojis } from '@/lib/chatMediaWarmup';
 import { stickerLibrary } from '@/lib/stickerLibrary';
+import { useChatTyping } from '@/lib/useChatTyping';
+import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { getCachedChatRoom, saveChatRoom, forgetChatRoom, loadChatRoom, olderChatMessages, getStoredChatMessage, getSavedChatGroups, persistChatRoom, subscribeChatRooms, removeStoredChatMessage } from '@/lib/chatRoomCache';
 
 const messageKey = (message: ChatMessage) => message.id;
@@ -41,6 +43,7 @@ export default function ChatRoomScreen() {
   const dimensions = useWindowDimensions();
   const chatNow = useChatDayClock();
   const userId = profile?.id || ''; const { language } = useTranslation(); const c = CHAT_COPY[language];
+  const { typingNames, notifyTyping } = useChatTyping(id, userId, profile?.nombre || (language === 'en' ? 'Technician' : 'Técnico'));
   useEffect(() => {
     if (!userId) return;
     void stickerLibrary.prepare(userId);
@@ -272,7 +275,7 @@ export default function ChatRoomScreen() {
 
   const send = useCallback(async (tipo: ChatMessageType, mediaUri?: string, mediaMeta?: ChatMessage['media_meta']) => {
     if (!id || !userId || sendLock.current || (tipo === 'texto' && (!text.trim() || textBlocked))) return;
-    sendLock.current = true; setSending(true); setNotice('');
+    notifyTyping(false); sendLock.current = true; setSending(true); setNotice('');
     const operation = ++sendSequence.current;
     const content = tipo === 'texto' ? text.trim() : undefined;
     try {
@@ -290,7 +293,7 @@ export default function ChatRoomScreen() {
       return true;
     } catch { if (operation === sendSequence.current) setNotice(tipo === 'texto' ? c.sendFailed : c.failed); }
     finally { if (operation === sendSequence.current) { sendLock.current = false; setSending(false); } }
-  }, [id, userId, text, textBlocked, replyTo, refresh, fail, c]);
+  }, [id, userId, text, textBlocked, replyTo, refresh, fail, c, notifyTyping]);
   const capturePhoto = async () => { if (sending) return; try { const uri = await captureImageSafe({ quality: 0.8 }); if (uri) await send('imagen', uri); } catch { fail(); } };
   const recordVideo = async () => {
     if (sending) return;
@@ -329,7 +332,7 @@ export default function ChatRoomScreen() {
   }, []);
   const chooseEmoji = (emoji: string) => {
     if (tools?.kind === 'actions') { void reaction(tools.message.id, emoji); return; }
-    const next = insertEmoji(text, emoji, selection); setText(next.text); setSelection({ start: next.cursor, end: next.cursor });
+    const next = insertEmoji(text, emoji, selection); setText(next.text); notifyTyping(Boolean(next.text.trim())); setSelection({ start: next.cursor, end: next.cursor });
   };
   const renderMessage = useCallback(({ item, index }: { item: ChatMessage; index: number }) => <View>
     {(index === 0 || chatDayKey(messages[index - 1].created_at) !== chatDayKey(item.created_at)) ? <View style={{ alignItems: 'center', paddingVertical: 12 }}><Text style={{ backgroundColor: P.white, color: 'rgba(52,62,72,0.75)', borderWidth: 1, borderColor: 'rgba(52,62,72,0.15)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8, fontSize: 12, fontFamily: 'Outfit_500Medium' }}>{chatDayLabel(item.created_at, language, chatNow)}</Text></View> : null}
@@ -369,6 +372,7 @@ export default function ChatRoomScreen() {
       {loading || dataOwner !== roomKey ? <View style={styles.center}><ActivityIndicator color={P.accent} /><Text style={styles.empty}>{c.loading}</Text></View> : !group ? <View style={styles.center}><Text style={styles.empty}>{c.unavailable}</Text><Pressable onPress={() => { setLoading(true); Promise.all([getChatGroupDetails(id, userId), refresh()]).then(([details]) => setGroup(details)).catch(fail).finally(() => setLoading(false)); }} style={styles.retry}><Text style={styles.pinTitle}>{c.retry}</Text></Pressable></View> : <FlashList ref={listRef} data={messages} renderItem={renderMessage} keyExtractor={messageKey} getItemType={messageType} extraData={feedExtra} onStartReached={() => { void loadOlder().catch(fail); }} onStartReachedThreshold={0.2} onScroll={event => { atHistoryStart.current = event.nativeEvent.contentOffset.y < 80; measureSelection(); }} scrollEventThrottle={16}
         maintainVisibleContentPosition={{ startRenderingFromBottom: true, autoscrollToBottomThreshold: 0.2 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.feed} ListEmptyComponent={<Text style={styles.empty}>{c.emptyChat}</Text>} />}
       </View>
+      <TypingIndicator names={typingNames} language={language} />
       {replyTo ? <View style={styles.replyComposer}><View style={styles.flex}><ReplyPreview message={replyTo} userId={userId} /></View><Pressable accessibilityRole="button" accessibilityLabel={c.cancelReply} style={styles.iconButton} onPress={() => setReplyTo(null)}><X size={20} color={P.slate} /></Pressable></View> : null}
       {textBlocked ? <Text style={styles.restricted}>{c.restricted}</Text> : null}
       {group ? <View style={[styles.inputArea, { paddingBottom: mediaPanelOpen ? 8 : Math.max(insets.bottom, Platform.OS === 'android' ? 24 : 12) }]}>
@@ -378,7 +382,7 @@ export default function ChatRoomScreen() {
           <Pressable accessibilityRole="button" accessibilityLabel={voice.recording ? c.stopAudio : c.sendAudio} disabled={sending} style={styles.send} onPress={() => { if (voice.recording) void voice.finish(); else if (voice.draft) void send('audio', voice.draft.uri, { duration: voice.draft.duration, mimeType: 'audio/mp4', fileName: 'nota-de-voz.m4a' }).then(sent => { if (sent) void voice.cancel(); }); }}>{sending ? <ActivityIndicator color={P.white} /> : voice.recording ? <Square size={18} color={P.white} /> : <Send size={19} color={P.white} />}</Pressable>
         </View> : <View style={styles.inputRow}>
           <Pressable accessibilityRole="button" accessibilityLabel={mediaPanelOpen ? c.keyboard : c.mediaPicker} disabled={sending} style={styles.iconButton} onPress={() => { if (mediaPanelOpen) { setMediaPanelOpen(false); focusComposer(); } else { Keyboard.dismiss(); setSelectedId(null); setAttachMenuOpen(false); setMediaPanelOpen(true); } }}>{mediaPanelOpen ? <KeyboardIcon size={23} color={P.slate} /> : <Smile size={23} color={P.slate} />}</Pressable>
-          <TextInput ref={inputRef} accessibilityLabel={c.message} style={styles.input} placeholder={textBlocked ? c.restricted : c.placeholder} placeholderTextColor={P.muted} multiline editable={!textBlocked && !sending} value={text} onChangeText={setText} onFocus={() => { setMediaPanelOpen(false); setAttachMenuOpen(false); }} selection={selection} onSelectionChange={(event) => setSelection(event.nativeEvent.selection)} />
+          <TextInput ref={inputRef} accessibilityLabel={c.message} style={styles.input} placeholder={textBlocked ? c.restricted : c.placeholder} placeholderTextColor={P.muted} multiline editable={!textBlocked && !sending} value={text} onChangeText={(value) => { setText(value); notifyTyping(Boolean(value.trim())); }} onFocus={() => { setMediaPanelOpen(false); setAttachMenuOpen(false); }} selection={selection} onSelectionChange={(event) => setSelection(event.nativeEvent.selection)} />
           <Pressable accessibilityRole="button" accessibilityLabel={c.attachments} disabled={sending} style={styles.attachmentIcon} onPress={toggleAttachMenu}><Paperclip size={20} color={attachMenuOpen ? P.accent : P.slate} /></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={c.camera} disabled={sending} style={styles.iconButton} onPress={() => void capturePhoto()}><Camera size={22} color={P.slate} /></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={text.trim() ? c.send : c.recordAudio} disabled={sending || voice.starting || (textBlocked && Boolean(text.trim()))} onPress={() => { if (text.trim()) void send('texto'); else { Keyboard.dismiss(); setMediaPanelOpen(false); setAttachMenuOpen(false); void voice.start(); } }} style={[styles.send, (sending || voice.starting) && styles.disabled]}>{sending || voice.starting ? <ActivityIndicator size="small" color={P.white} /> : text.trim() ? <Send size={19} color={P.white} /> : <Mic size={21} color={P.white} />}</Pressable>

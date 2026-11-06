@@ -22,6 +22,7 @@ interface ChatInputProps {
   isAdmin: boolean;
   soloMultimedia: boolean;
   onMessageSent: () => void;
+  onTypingChange: (typing: boolean) => void;
   replyTo: ChatMessage | null;
   onCancelReply: () => void;
 }
@@ -33,7 +34,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   currentUserId,
   isAdmin,
   soloMultimedia,
-  onMessageSent, replyTo, onCancelReply,
+  onMessageSent, onTypingChange, replyTo, onCancelReply,
 }) => {
   const { t } = useTranslation();
   const [text, setText] = useState('');
@@ -48,7 +49,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [recordError, setRecordError] = useState(false);
   const [audioDuration, setAudioDuration] = useState<number | undefined>();
   const voice = useVoiceNote((file, duration) => { setMediaFile(file); setMediaType('audio'); setAudioDuration(duration); }, () => setRecordError(true));
-  useEffect(() => { voice.cancel(); setMediaFile(null); setText(''); setRecordError(false); setSendError(false); }, [groupId, currentUserId, voice.cancel]);
+  useEffect(() => {
+    voice.cancel(); setMediaFile(null); setText(''); setRecordError(false); setSendError(false);
+    return () => onTypingChange(false);
+  }, [groupId, currentUserId, voice.cancel, onTypingChange]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -99,6 +103,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
 
     try {
+      onTypingChange(false);
       sendLock.current = true;
       setSending(true);
       setSendError(false);
@@ -257,6 +262,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             value={text}
             onChange={(e) => {
               setText(e.target.value);
+              onTypingChange(Boolean(e.target.value.trim()));
               // Auto-grow height up to 100px
               e.target.style.height = 'auto';
               e.target.style.height = `${Math.min(e.target.scrollHeight, 100)}px`;

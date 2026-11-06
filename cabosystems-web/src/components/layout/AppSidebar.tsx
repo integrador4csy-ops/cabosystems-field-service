@@ -19,6 +19,7 @@ import {
   ListTodo,
   CalendarDays,
   Building2,
+  ShieldCheck,
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useSectionResources, canSpeculate } from '../../context/SectionResources';
@@ -113,6 +114,12 @@ export const AppSidebar: React.FC = () => {
       name: t('sidebar.agenda'),
       icon: <CalendarDays size={20} className="shrink-0" />,
       action: () => setActiveItem('agenda'),
+    },
+    {
+      id: 'garantias',
+      name: language === 'es' ? 'Garantías' : 'Warranties',
+      icon: <ShieldCheck size={20} className="shrink-0" />,
+      action: () => setActiveItem('garantias'),
     },
     {
       id: 'colaboradores',

@@ -28,10 +28,13 @@ import { DocumentPreviewModal } from './DocumentPreviewModal';
 import { useSectionResources } from '../../context/SectionResources';
 import { chatSnapshot } from '../../lib/chatSnapshot';
 import { createChatRefreshQueue } from '../../lib/chatRefreshQueue';
+import { useChatTyping } from '../../lib/useChatTyping';
+import { TypingIndicator } from './TypingIndicator';
 
 interface ChatConversationProps {
   group: ChatGroup;
   currentUserId: string;
+  currentUserName: string;
   isGlobalAdmin: boolean;
   onBack: () => void;
   onOpenInfo: () => void;
@@ -41,12 +44,14 @@ interface ChatConversationProps {
 export const ChatConversation: React.FC<ChatConversationProps> = ({
   group,
   currentUserId,
+  currentUserName,
   isGlobalAdmin,
   onBack,
   onOpenInfo,
   onGroupChanged,
 }) => {
   const { t, language } = useTranslation();
+  const { typingNames, notifyTyping } = useChatTyping(group.id, currentUserId, currentUserName);
   const chatNow = useChatDayClock();
   const resources = useSectionResources();
   const cached = resources.queries.read<Awaited<ReturnType<typeof chatSnapshot>>>(`conversation:${group.id}`);
@@ -372,11 +377,14 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
         )}
       </div>
 
+      <TypingIndicator names={typingNames} language={language} />
+
       {/* 3. Input Bar */}
       <ChatInput
         key={group.id}
         groupId={group.id}
         currentUserId={currentUserId}
+        onTypingChange={notifyTyping}
         isAdmin={isGlobalAdmin || group.mi_rol === 'admin'}
         soloMultimedia={group.solo_multimedia}
         replyTo={replyTo}

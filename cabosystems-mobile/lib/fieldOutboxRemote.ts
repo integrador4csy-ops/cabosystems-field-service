@@ -50,6 +50,24 @@ export async function sendPendingFieldRecord(record: PendingFieldRecord, assertA
       if (confirmed.error) throw confirmed.error;
     }
   }
+  if (record.tipo === 'check_in' && record.geofence) {
+    await guard();
+    const geofence = await supabase.rpc('register_missing_villa_geofence', {
+      p_field_record_id: record.id,
+      p_project_id: record.projectId,
+      p_latitude: record.geofence.latitude,
+      p_longitude: record.geofence.longitude,
+      p_radius_meters: record.geofence.radiusMeters,
+    });
+    if (geofence.error) throw geofence.error;
+  }
+  supabase.functions.invoke('operations-push-notifications', {
+    body: { kind: 'field_check', entityId: record.id },
+  }).then(({ error }) => {
+    if (error) console.warn('Could not notify administrators about field check:', error);
+  }).catch((error) => {
+    console.warn('Could not notify administrators about field check:', error);
+  });
   await guard();
   const taskId = existing.data?.tarea_id || record.taskId!;
   // Do not let an old offline event regress a task that already has a newer event.

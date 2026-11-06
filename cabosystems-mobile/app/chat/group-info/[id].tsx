@@ -1287,15 +1287,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 8,
   },
-  editVillaBox: {
-    gap: 4,
-    marginTop: 2,
-  },
-  editVillaLabel: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 11.5,
-    color: Colors.textSecondary,
-  },
   nameInput: {
     backgroundColor: '#F9FAFB',
     borderRadius: 10,

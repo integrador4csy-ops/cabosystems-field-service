@@ -53,10 +53,13 @@ export async function getProjects(): Promise<Proyecto[]> {
     id: p.id,
     desarrollo: p.desarrollo || 'Sin Desarrollo',
     villa: p.villa || p.unidad || 'Sin Villa',
+    numero_proyecto: p.numero_proyecto ?? null,
+    cliente: p.cliente ?? null,
     descripcion: p.descripcion,
     estatus: p.estatus || 'activo',
     latitud: p.latitud ?? null,
     longitud: p.longitud ?? null,
+    radio_geocerca_m: p.radio_geocerca_m ?? 150,
     created_at: p.created_at,
   }));
 }
@@ -68,9 +71,10 @@ export async function createProject(payload: {
   desarrollo: string;
   villa: string;
   descripcion?: string;
-  estatus?: 'activo' | 'pausado' | 'finalizado';
+  estatus?: 'activo' | 'pausado' | 'en_conciliacion' | 'finalizado';
   latitud?: number | null;
   longitud?: number | null;
+  radio_geocerca_m?: number | null;
 }): Promise<Proyecto> {
   const insertPayload: any = {
     desarrollo: payload.desarrollo.trim(),
@@ -84,6 +88,9 @@ export async function createProject(payload: {
   }
   if (payload.longitud !== undefined && payload.longitud !== null) {
     insertPayload.longitud = payload.longitud;
+  }
+  if (payload.radio_geocerca_m !== undefined && payload.radio_geocerca_m !== null) {
+    insertPayload.radio_geocerca_m = payload.radio_geocerca_m;
   }
 
   const { data, error } = await supabase
@@ -243,6 +250,12 @@ export async function createTask(payload: {
     throw error;
   }
 
+  if (data.asignado_a) {
+    void supabase.functions.invoke('operations-push-notifications', {
+      body: { kind: 'task_assigned', entityId: data.id, eventKey: `task-created:${data.id}:${data.asignado_a}` },
+    }).catch((notificationError) => console.warn('Task assignment notification failed:', notificationError));
+  }
+
   return {
     ...data,
     subtareas: [],
@@ -256,6 +269,9 @@ export async function updateTask(
   id: string,
   payload: Partial<Omit<Tarea, 'id' | 'created_at' | 'profiles' | 'subtareas'>>
 ): Promise<Tarea> {
+  const previousAssignee = payload.asignado_a !== undefined
+    ? await supabase.from('tareas').select('asignado_a').eq('id', id).single()
+    : null;
   const { data, error } = await supabase
     .from('tareas')
     .update(payload)
@@ -274,6 +290,12 @@ export async function updateTask(
   if (error) {
     console.error('Error updating task:', error);
     throw error;
+  }
+
+  if (payload.asignado_a && previousAssignee?.data?.asignado_a !== data.asignado_a) {
+    void supabase.functions.invoke('operations-push-notifications', {
+      body: { kind: 'task_assigned', entityId: data.id, eventKey: `task-assigned:${data.id}:${data.asignado_a}:${Date.now()}` },
+    }).catch((notificationError) => console.warn('Task assignment notification failed:', notificationError));
   }
 
   return data;

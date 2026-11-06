@@ -134,6 +134,7 @@ export const ChatView: React.FC = () => {
             key={selectedGroup.id}
             group={selectedGroup}
             currentUserId={currentUserId}
+            currentUserName={adminProfile?.nombre || adminProfile?.full_name || user?.email?.split('@')[0] || t('Técnico')}
             isGlobalAdmin={isGlobalAdmin}
             onBack={() => setMobileConversationOpen(false)}
             onOpenInfo={() => setIsInfoDrawerOpen(true)}

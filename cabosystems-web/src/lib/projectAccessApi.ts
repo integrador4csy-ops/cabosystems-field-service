@@ -32,15 +32,75 @@ export async function createDevelopment(nombre: string) {
   return data as Development;
 }
 
-export async function createVilla(development: Development, villa: string, descripcion: string) {
-  const { data, error } = await supabase.from('proyectos').insert({ desarrollo_id: development.id, desarrollo: development.nombre, villa: villa.trim(), descripcion: descripcion.trim() || null, estatus: 'activo' }).select('*').single();
+export async function deleteDevelopment(developmentId: string) {
+  const { data, error } = await supabase
+    .from('desarrollos')
+    .delete()
+    .eq('id', developmentId)
+    .select('id');
+  if (error) throw error;
+  if (!data?.length) throw Object.assign(new Error('Development was not deleted.'), { code: 'DELETE_NOT_FOUND' });
+}
+
+export async function createVilla(
+  development: Development,
+  input: { villa: string; numeroProyecto: string; cliente: string; descripcion: string; estatus: ProjectVilla['estatus'] },
+) {
+  const { data, error } = await supabase.from('proyectos').insert({
+    desarrollo_id: development.id,
+    desarrollo: development.nombre,
+    villa: input.villa.trim(),
+    numero_proyecto: input.numeroProyecto.trim(),
+    cliente: input.cliente.trim(),
+    descripcion: input.descripcion.trim() || null,
+    estatus: input.estatus,
+  }).select('*').single();
   if (error) throw error;
   return data as ProjectVilla;
+}
+
+export async function updateVillaDetails(
+  projectId: string,
+  input: { villa: string; numeroProyecto: string; cliente: string; descripcion: string; estatus: ProjectVilla['estatus'] },
+) {
+  const { data, error } = await supabase.from('proyectos').update({
+    villa: input.villa.trim(),
+    numero_proyecto: input.numeroProyecto.trim() || null,
+    cliente: input.cliente.trim() || null,
+    descripcion: input.descripcion.trim() || null,
+    estatus: input.estatus,
+  }).eq('id', projectId).select('*').single();
+  if (error) throw error;
+  return data as ProjectVilla;
+}
+
+export async function deleteVilla(projectId: string) {
+  const { data, error } = await supabase.from('proyectos').delete().eq('id', projectId).select('id');
+  if (error) throw error;
+  if (!data?.length) throw Object.assign(new Error('Villa was not deleted.'), { code: 'DELETE_NOT_FOUND' });
 }
 
 export async function saveProjectTeam(villa: ProjectVilla, integrador: string, tecnico: string, participants: string[], allTasksParticipants: string[] = []) {
   const { error } = await supabase.rpc('save_project_team', { p_project_id: villa.id, p_integrador_id: integrador || null, p_tecnico_id: tecnico || null, p_participants: [...new Set(participants)], p_revision: villa.equipo_revision, p_all_tasks_participants: [...new Set(allTasksParticipants)] });
   if (error) throw error;
+}
+
+export async function updateVillaGeofence(
+  projectId: string,
+  geofence: { latitude: number | null; longitude: number | null; radiusMeters: number },
+) {
+  const { data, error } = await supabase
+    .from('proyectos')
+    .update({
+      latitud: geofence.latitude,
+      longitud: geofence.longitude,
+      radio_geocerca_m: geofence.radiusMeters,
+    })
+    .eq('id', projectId)
+    .select('id,latitud,longitud,radio_geocerca_m')
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 export async function grantProjectAccess(userId: string, developmentId?: string) {

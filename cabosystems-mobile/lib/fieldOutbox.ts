@@ -12,6 +12,11 @@ export interface PendingFieldRecord {
   latitude: number;
   longitude: number;
   comments: string | null;
+  geofence?: {
+    latitude: number;
+    longitude: number;
+    radiusMeters: number;
+  };
 }
 export interface OutboxEntry {
   record: PendingFieldRecord;
