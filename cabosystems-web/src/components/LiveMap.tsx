@@ -99,7 +99,15 @@ export const LiveMap: React.FC<LiveMapProps> = ({
           backgroundColor: '#e9eef2',
         });
         mapInstanceRef.current = map;
-        infoWindowRef.current = new google.maps.InfoWindow({ disableAutoPan: true });
+        const infoWindow = new google.maps.InfoWindow({ disableAutoPan: false });
+        infoWindow.addListener('closeclick', () => {
+          onSelectWorker('');
+        });
+        map.addListener('click', () => {
+          onSelectWorker('');
+          infoWindow.close();
+        });
+        infoWindowRef.current = infoWindow;
         resizeObserver = new ResizeObserver(() => google.maps.event.trigger(map, 'resize'));
         resizeObserver.observe(mapContainerRef.current);
         setMapError('');
@@ -199,17 +207,28 @@ export const LiveMap: React.FC<LiveMapProps> = ({
           content,
         });
         const onMouseEnter = () => {
+          if (selectedWorkerIdRef.current) return;
           if (closeTimer) window.clearTimeout(closeTimer);
           const current = markersRef.current.get(id);
           infoWindow.setContent(current?.lastHoverCardHtml || hoverCardHtml);
           infoWindow.open({ map, anchor: marker, shouldFocus: false });
         };
         const onMouseLeave = () => {
-          closeTimer = window.setTimeout(() => infoWindow.close(), 180);
+          if (selectedWorkerIdRef.current === id) return;
+          closeTimer = window.setTimeout(() => {
+            if (selectedWorkerIdRef.current === id) return;
+            infoWindow.close();
+          }, 180);
         };
         content.addEventListener('mouseenter', onMouseEnter);
         content.addEventListener('mouseleave', onMouseLeave);
-        const clickListener = marker.addListener('click', () => onSelectWorker(id));
+        const clickListener = marker.addListener('click', () => {
+          if (closeTimer) window.clearTimeout(closeTimer);
+          onSelectWorker(id);
+          const current = markersRef.current.get(id);
+          infoWindow.setContent(current?.lastHoverCardHtml || hoverCardHtml);
+          infoWindow.open({ map, anchor: marker, shouldFocus: false });
+        });
         markersRef.current.set(id, {
           marker,
           content,
@@ -232,6 +251,9 @@ export const LiveMap: React.FC<LiveMapProps> = ({
           existingState.content.innerHTML = iconHtml;
         }
         existingState.lastHoverCardHtml = hoverCardHtml;
+        if (selectedWorkerIdRef.current === id && infoWindowRef.current) {
+          infoWindowRef.current.setContent(hoverCardHtml);
+        }
         if (existingState.toLat !== targetLat || existingState.toLng !== targetLng) animateMarker(id, targetLat, targetLng);
       }
 
@@ -259,11 +281,22 @@ export const LiveMap: React.FC<LiveMapProps> = ({
 
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!mapReady || !selectedWorkerId || !map) return;
+    const infoWindow = infoWindowRef.current;
+    if (!mapReady || !map) return;
+    if (!selectedWorkerId) {
+      infoWindow?.close();
+      return;
+    }
     const worker = workers.find((item) => item.profile.id === selectedWorkerId);
     if (!worker) return;
     map.panTo({ lat: worker.location.latitud, lng: worker.location.longitud });
     if ((map.getZoom() || 0) < 13) map.setZoom(15);
+
+    const state = markersRef.current.get(selectedWorkerId);
+    if (state && infoWindow) {
+      infoWindow.setContent(state.lastHoverCardHtml);
+      infoWindow.open({ map, anchor: state.marker, shouldFocus: false });
+    }
   }, [focusTrigger, mapReady, selectedWorkerId, workers]);
 
   const handleCenterAll = () => {
