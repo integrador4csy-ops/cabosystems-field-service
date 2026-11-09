@@ -4,7 +4,6 @@ import type { Project } from '@/types/database';
 const unavailable = () => { throw new Error('La cola de registros sin conexión está disponible en la app móvil.'); };
 export async function savePendingFieldRecord(_record: PendingFieldRecord): Promise<void> { unavailable(); }
 export async function firstPendingFieldRecord(_owner: string): Promise<OutboxEntry | null> { return null; }
-export async function saveFieldTask(_record: PendingFieldRecord, _taskId: string): Promise<void> { unavailable(); }
 export async function markFieldComplete(_record: PendingFieldRecord): Promise<void> { unavailable(); }
 export async function markFieldFailed(_record: PendingFieldRecord, _attempts: number, _next: number, _blocked: boolean, _message: string): Promise<void> { unavailable(); }
 export async function latestLocalFieldRecord(_owner: string): Promise<PendingFieldRecord | null> { return null; }

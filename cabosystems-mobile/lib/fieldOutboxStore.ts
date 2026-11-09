@@ -28,10 +28,6 @@ export async function firstPendingFieldRecord(owner: string): Promise<OutboxEntr
     "SELECT payload, attempts, next_attempt, state FROM field_outbox WHERE owner = ? AND state != 'synced' ORDER BY sequence LIMIT 1", owner);
   return row ? { record: JSON.parse(row.payload), attempts: row.attempts, nextAttempt: row.next_attempt, blocked: row.state === 'blocked' } : null;
 }
-export async function saveFieldTask(record: PendingFieldRecord, taskId: string) {
-  record.taskId = taskId;
-  await (await db()).runAsync('UPDATE field_outbox SET payload = ? WHERE id = ? AND owner = ?', JSON.stringify(record), record.id, record.owner);
-}
 export async function markFieldComplete(record: PendingFieldRecord) {
   const connection = await db();
   await connection.runAsync("UPDATE field_outbox SET state = 'synced', payload = ?, last_error = NULL WHERE id = ? AND owner = ?", JSON.stringify(record), record.id, record.owner);

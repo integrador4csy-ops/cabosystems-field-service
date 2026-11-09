@@ -11,7 +11,7 @@ export const WEB_TRANSLATIONS = {
     'invite.emailBody': 'Hola,\n\nHas sido registrado e invitado para unirte al equipo de operaciones de CaboSystems con rol: {role}.\n\nPara activar tu cuenta y configurar tu contraseña y foto de perfil en la aplicación móvil, haz clic en el siguiente enlace desde tu teléfono móvil:\n\n{link}\n\nSi abres la app manualmente, puedes validar tu registro con tu código de invitación:\n{token}\n\nAtentamente,\nDirección de Operaciones · CaboSystems',
     // Sidebar
     'sidebar.operationsAndStaff': 'Operaciones y Personal',
-    'sidebar.radar': 'Radar Satelital',
+    'sidebar.radar': 'Seguimiento',
     'sidebar.history': 'Historial GPS',
     'sidebar.projects': 'Tareas por villa',
     'sidebar.agenda': 'Agenda',
@@ -78,7 +78,7 @@ export const WEB_TRANSLATIONS = {
     'invite.emailBody': 'Hello,\n\nYou have been invited to join the CaboSystems operations team as: {role}.\n\nTo activate your account and set your password and profile photo in the mobile app, open this link on your phone:\n\n{link}\n\nIf you open the app manually, use your invitation code to complete registration:\n{token}\n\nBest regards,\nCaboSystems Operations',
     // Sidebar
     'sidebar.operationsAndStaff': 'Operations & Personnel',
-    'sidebar.radar': 'Satellite Radar',
+    'sidebar.radar': 'Tracking',
     'sidebar.history': 'Route History',
     'sidebar.projects': 'Villa tasks',
     'sidebar.agenda': 'Schedule',

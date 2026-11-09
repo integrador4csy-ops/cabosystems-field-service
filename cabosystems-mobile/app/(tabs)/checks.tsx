@@ -56,7 +56,7 @@ const CheckCard = React.memo(function CheckCard({ item, onPhoto, en }: { item: A
   );
 });
 
-export default function ChecksHistoryScreen() {
+export function ChecksHistoryContent({ embedded = false }: { embedded?: boolean }) {
   const { profile } = useAuth();
   const { t: tr } = useTranslation();
   const { language } = useLanguage();
@@ -114,7 +114,7 @@ export default function ChecksHistoryScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={{ height: headerHeight }}><HeaderCaboSystems showProjectSelector={false} /></View>
+      {!embedded ? <View style={{ height: headerHeight }}><HeaderCaboSystems showProjectSelector={false} /></View> : null}
       <View style={styles.titleBlock}>
         <Text style={styles.title}>{tr('Historial de checks')}</Text>
         <Text style={styles.subtitle}>{tr('Evidencias de check-in y check-out por técnico y día.')}</Text>
@@ -140,6 +140,10 @@ export default function ChecksHistoryScreen() {
       </Modal>
     </View>
   );
+}
+
+export default function ChecksHistoryScreen() {
+  return <ChecksHistoryContent />;
 }
 
 const styles = StyleSheet.create({

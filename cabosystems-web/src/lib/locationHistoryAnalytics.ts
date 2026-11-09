@@ -50,6 +50,12 @@ export interface HistoryMovement {
   path: [number, number][]; // [lat, lng] array
 }
 
+export interface TimedHistoryPoint {
+  lat: number;
+  lng: number;
+  time: number;
+}
+
 export type HistoryTimelineEvent = HistoryStop | HistoryMovement;
 
 export interface DailyHistoryAnalysis {
@@ -62,11 +68,76 @@ export interface DailyHistoryAnalysis {
   lastTimestamp: number | null;
   events: HistoryTimelineEvent[];
   fullPath: [number, number][];
+  timelinePath: TimedHistoryPoint[];
 }
 
 const PROLONGED_STOP_THRESHOLD_MS = 20 * 60 * 1000; // 20 minutes
 const STOP_RADIUS_METERS = 90; // Group points within 90m
 const MIN_STOP_DURATION_MS = 3 * 60 * 1000; // 3 minutes minimum to consider a stop
+const MAX_GPS_NOISE_RADIUS_METERS = 110;
+
+function reportedAccuracy(record: LocationHistoryRecord): number {
+  const accuracy = Number(record.precision);
+  return Number.isFinite(accuracy) && accuracy > 0 ? Math.min(accuracy, 150) : 25;
+}
+
+function hasReliableMovement(record: LocationHistoryRecord): boolean {
+  const speed = Math.max(0, Number(record.velocidad) || 0);
+  const accuracy = reportedAccuracy(record);
+  if (record.actividad === 'conduciendo' || speed >= 12) return accuracy <= 80;
+  if (record.actividad === 'caminando' || speed >= 2.5) return accuracy <= 25;
+  return false;
+}
+
+/**
+ * Holds the last trustworthy coordinate while readings remain inside their own
+ * GPS uncertainty circle. This prevents a stationary phone from drawing loops.
+ */
+function stabilizeGpsDrift<T extends LocationHistoryRecord & { time: number }>(records: T[]): T[] {
+  if (records.length < 2) return records;
+
+  const withoutSpikes = records.map((record) => ({ ...record }));
+  for (let index = 1; index < withoutSpikes.length - 1; index += 1) {
+    const previous = withoutSpikes[index - 1];
+    const current = withoutSpikes[index];
+    const next = withoutSpikes[index + 1];
+    if (hasReliableMovement(current)) continue;
+
+    const uncertainty = Math.min(
+      MAX_GPS_NOISE_RADIUS_METERS,
+      Math.max(12, reportedAccuracy(previous), reportedAccuracy(current), reportedAccuracy(next)),
+    );
+    const previousToNext = calculateHaversineDistance(previous.latitud, previous.longitud, next.latitud, next.longitud);
+    const previousToCurrent = calculateHaversineDistance(previous.latitud, previous.longitud, current.latitud, current.longitud);
+    const currentToNext = calculateHaversineDistance(current.latitud, current.longitud, next.latitud, next.longitud);
+
+    if (previousToNext <= uncertainty && previousToCurrent > uncertainty && currentToNext > uncertainty) {
+      current.latitud = previous.latitud;
+      current.longitud = previous.longitud;
+    }
+  }
+
+  const stabilized: T[] = [];
+  let anchor = withoutSpikes[0];
+  stabilized.push(anchor);
+  for (let index = 1; index < withoutSpikes.length; index += 1) {
+    const point = withoutSpikes[index];
+    const uncertainty = Math.min(
+      MAX_GPS_NOISE_RADIUS_METERS,
+      Math.max(12, reportedAccuracy(anchor), reportedAccuracy(point)),
+    );
+    const distance = calculateHaversineDistance(anchor.latitud, anchor.longitud, point.latitud, point.longitud);
+
+    if (!hasReliableMovement(point) && distance <= uncertainty) {
+      stabilized.push({ ...point, latitud: anchor.latitud, longitud: anchor.longitud });
+      continue;
+    }
+
+    anchor = point;
+    stabilized.push(point);
+  }
+  return stabilized;
+}
 
 /**
  * Haversine distance in meters between two lat/lng coordinates
@@ -133,6 +204,7 @@ export function analyzeLocationHistory(
       lastTimestamp: null,
       events: [],
       fullPath: [],
+      timelinePath: [],
     };
   }
 
@@ -156,15 +228,32 @@ export function analyzeLocationHistory(
       lastTimestamp: null,
       events: [],
       fullPath: [],
+      timelinePath: [],
     };
   }
 
-  const fullPath: [number, number][] = sorted.map((r) => [r.latitud, r.longitud]);
+  const stabilized = stabilizeGpsDrift(sorted);
+  const timelinePath: TimedHistoryPoint[] = [];
+  for (const point of stabilized) {
+    const previous = timelinePath[timelinePath.length - 1];
+    if (!previous || previous.lat !== point.latitud || previous.lng !== point.longitud) {
+      timelinePath.push({ lat: point.latitud, lng: point.longitud, time: point.time });
+    } else if (timelinePath.length === 1 || timelinePath[timelinePath.length - 2].lat !== point.latitud || timelinePath[timelinePath.length - 2].lng !== point.longitud) {
+      timelinePath.push({ lat: point.latitud, lng: point.longitud, time: point.time });
+    } else {
+      previous.time = point.time;
+    }
+  }
+  const fullPath: [number, number][] = [];
+  for (const point of timelinePath) {
+    const previous = fullPath[fullPath.length - 1];
+    if (!previous || previous[0] !== point.lat || previous[1] !== point.lng) fullPath.push([point.lat, point.lng]);
+  }
   const events: HistoryTimelineEvent[] = [];
 
-  let currentCluster: typeof sorted = [];
-  let clusterCenter = { lat: sorted[0].latitud, lng: sorted[0].longitud };
-  let movementBuffer: typeof sorted = [];
+  let currentCluster: typeof stabilized = [];
+  let clusterCenter = { lat: stabilized[0].latitud, lng: stabilized[0].longitud };
+  let movementBuffer: typeof stabilized = [];
 
   function flushMovement() {
     if (movementBuffer.length < 2) {
@@ -264,8 +353,8 @@ export function analyzeLocationHistory(
     currentCluster = [];
   }
 
-  for (let i = 0; i < sorted.length; i++) {
-    const pt = sorted[i];
+  for (let i = 0; i < stabilized.length; i++) {
+    const pt = stabilized[i];
 
     if (currentCluster.length === 0) {
       currentCluster.push(pt);
@@ -336,5 +425,6 @@ export function analyzeLocationHistory(
     lastTimestamp: sorted[sorted.length - 1].time,
     events,
     fullPath,
+    timelinePath,
   };
 }

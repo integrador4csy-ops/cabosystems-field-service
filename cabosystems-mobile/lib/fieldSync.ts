@@ -86,7 +86,7 @@ export function startFieldSync(owner: string) {
   };
 }
 
-export async function queueFieldRecord(input: Omit<PendingFieldRecord, 'id' | 'taskId' | 'capturedAt'>) {
+export async function queueFieldRecord(input: Omit<PendingFieldRecord, 'id' | 'capturedAt'>) {
   if (!input.owner || !input.projectId || !input.photoUri || !Number.isFinite(input.latitude) || !Number.isFinite(input.longitude) || Math.abs(input.latitude) > 90 || Math.abs(input.longitude) > 180) throw new Error('Faltan la foto, el GPS o la villa del registro.');
   if (!FileSystem.documentDirectory) throw new Error('No se puede guardar el registro en este dispositivo.');
   const id = Crypto.randomUUID();
@@ -97,7 +97,7 @@ export async function queueFieldRecord(input: Omit<PendingFieldRecord, 'id' | 't
   const optimized = await optimizeEvidencePhoto(input.photoUri);
   try {
     await FileSystem.copyAsync({ from: optimized, to: photoUri });
-    await savePendingFieldRecord({ ...input, id, taskId: null, photoUri, capturedAt });
+    await savePendingFieldRecord({ ...input, id, photoUri, capturedAt });
   } catch (error) {
     await FileSystem.deleteAsync(photoUri, { idempotent: true }).catch(() => {});
     throw error;
@@ -110,7 +110,7 @@ export async function queueFieldRecord(input: Omit<PendingFieldRecord, 'id' | 't
 export async function retryFieldSync(owner: string) { await retryPendingFieldRecords(owner); notify(); wake?.(); }
 export async function getLatestOfflineFieldRecord(owner: string): Promise<FieldRecord | null> {
   let local = Platform.OS === 'web' ? null : await latestLocalFieldRecord(owner).catch(() => null);
-  const asRecord = (saved: PendingFieldRecord): FieldRecord => ({ id: saved.id, tarea_id: saved.taskId || '', tecnico_id: owner, tipo: saved.tipo, latitud: saved.latitude, longitud: saved.longitude, foto_url: saved.remotePhotoUrl || saved.photoUri, comentarios: saved.comments, fecha_hora: saved.capturedAt });
+  const asRecord = (saved: PendingFieldRecord): FieldRecord => ({ id: saved.id, proyecto_id: saved.projectId, tarea_id: null, tecnico_id: owner, tipo: saved.tipo, latitud: saved.latitude, longitud: saved.longitude, foto_url: saved.remotePhotoUrl || saved.photoUri, comentarios: saved.comments, fecha_hora: saved.capturedAt });
   if (local && !local.synced) return asRecord(local);
   let timer: ReturnType<typeof setTimeout> | undefined;
   let remote: FieldRecord | null;

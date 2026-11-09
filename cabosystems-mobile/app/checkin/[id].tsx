@@ -47,7 +47,6 @@ import { useProjects } from '@/lib/projects';
 import {
   uploadEvidencePhoto,
   createFieldRecord,
-  getOrCreateCheckInTaskForProject,
   getTaskById,
   registerMissingVillaGeofence,
 } from '@/lib/api';
@@ -608,13 +607,13 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
         return;
       }
 
-      const taskId = await getOrCreateCheckInTaskForProject(currentProject.id, user.id);
       const timestamp = Date.now();
       const prefix = isCheckOut ? 'checkout' : 'checkin';
-      const storagePath = `${prefix}s/${taskId}_${timestamp}.jpg`;
+      const storagePath = `${prefix}s/${currentProject.id}_${user.id}_${timestamp}.jpg`;
       const publicUrl = await uploadEvidencePhoto(await optimizeEvidencePhoto(photoUri), storagePath);
       const created = await createFieldRecord({
-        tarea_id: taskId,
+        proyecto_id: currentProject.id,
+        tarea_id: null,
         tecnico_id: user.id,
         tipo: isCheckOut ? 'check_out' : 'check_in',
         latitud: submissionLocation.latitude,

@@ -13,7 +13,7 @@ function load(file, imports = {}) {
   return module.exports;
 }
 const { createFieldOutboxWorker, isPermanentFieldError } = load('lib/fieldOutbox.ts');
-const record = (id, owner = 'alice') => ({ id, owner, projectId: 'villa', taskId: null, photoUri: `file:///photo-${id}.jpg`, capturedAt: '2026-10-26T10:00:00.000Z', tipo: 'check_in', latitude: 22, longitude: -109, comments: null });
+const record = (id, owner = 'alice') => ({ id, owner, projectId: 'villa', photoUri: `file:///photo-${id}.jpg`, capturedAt: '2026-10-26T10:00:00.000Z', tipo: 'check_in', latitude: 22, longitude: -109, comments: null });
 test('one FIFO worker survives an uncertain send without dropping or duplicating queued operations', async () => {
   const queue = [record('arrival'), record('departure')]; const sent = []; let fail = true; let release;
   const worker = createFieldOutboxWorker({
@@ -45,7 +45,7 @@ test('retry delays are capped and permission errors stay available for review', 
   assert.equal(isPermanentFieldError({ statusCode: '503' }), false);
   assert.equal(isPermanentFieldError({ statusCode: '403' }), true);
 });
-test('SQLite persists operations across restarts, isolates accounts and retains original time and task identity', async () => {
+test('SQLite persists operations across restarts, isolates accounts and retains original villa identity', async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'csy-outbox-test-'));
   const file = path.join(directory, 'outbox.db'); const connections = [];
   const reopen = () => load('lib/fieldOutboxStore.ts', { 'expo-sqlite': { openDatabaseAsync: async () => {
@@ -56,10 +56,9 @@ test('SQLite persists operations across restarts, isolates accounts and retains 
     const first = reopen(); const arrival = record('arrival');
     await first.savePendingFieldRecord(arrival); await first.savePendingFieldRecord(record('departure'));
     await first.savePendingFieldRecord(record('private', 'bob'));
-    await first.saveFieldTask(arrival, 'stable-task');
     await first.markFieldFailed(arrival, 1, 5000, true, 'Review permissions');
     const restarted = reopen(); const saved = await restarted.firstPendingFieldRecord('alice');
-    assert.equal(saved.record.id, 'arrival'); assert.equal(saved.record.taskId, 'stable-task');
+    assert.equal(saved.record.id, 'arrival'); assert.equal(saved.record.projectId, 'villa');
     assert.equal(saved.record.capturedAt, arrival.capturedAt); assert.equal(saved.blocked, true);
     assert.equal((await restarted.firstPendingFieldRecord('bob')).record.id, 'private');
     await restarted.retryPendingFieldRecords('alice'); assert.equal((await restarted.firstPendingFieldRecord('alice')).blocked, false);

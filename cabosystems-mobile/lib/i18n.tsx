@@ -16,6 +16,9 @@ export const TRANSLATIONS = {
     'nav.team': 'Equipo',
     'nav.chat': 'Chat',
     'nav.maps': 'Mapas',
+    'nav.tracking': 'Seguimiento',
+    'tracking.liveMap': 'Mapa en vivo',
+    'tracking.checks': 'Checks',
     'nav.locations': 'Villas',
     'nav.profile': 'Perfil',
 
@@ -32,7 +35,7 @@ export const TRANSLATIONS = {
     'maps.center': 'Mostrar todo el equipo',
     'maps.close': 'Cerrar detalle',
     'maps.webTitle': 'Radar disponible en la app móvil',
-    'maps.webHelp': 'Abre la app en iOS o Android para consultar el mapa satelital en vivo.',
+    'maps.webHelp': 'Abre la app en iOS o Android para consultar el mapa en vivo.',
     'maps.people': 'personas con ubicación',
 
     'locations.title': 'Ubicación de villas',
@@ -154,6 +157,9 @@ export const TRANSLATIONS = {
     'nav.team': 'Team',
     'nav.chat': 'Chat',
     'nav.maps': 'Maps',
+    'nav.tracking': 'Tracking',
+    'tracking.liveMap': 'Live map',
+    'tracking.checks': 'Checks',
     'nav.locations': 'Villas',
     'nav.profile': 'Profile',
 

@@ -4,7 +4,6 @@ export interface PendingFieldRecord {
   id: string;
   owner: string;
   projectId: string;
-  taskId: string | null;
   photoUri: string;
   remotePhotoUrl?: string;
   capturedAt: string;

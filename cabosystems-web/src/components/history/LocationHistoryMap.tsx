@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MapPinned, Navigation, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react';
+import { MapPinned, Navigation, Pause, Play, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { loadGoogleMaps } from '../../lib/googleMapsLoader';
-import type { HistoryTimelineEvent, HistoryStop, HistoryMovement } from '../../lib/locationHistoryAnalytics';
+import type { HistoryTimelineEvent, HistoryStop, HistoryMovement, TimedHistoryPoint } from '../../lib/locationHistoryAnalytics';
 import { formatTimeOfDay, formatDurationMs } from '../../lib/locationHistoryAnalytics';
 
 interface LocationHistoryMapProps {
   fullPath: [number, number][];
+  timelinePath: TimedHistoryPoint[];
   events: HistoryTimelineEvent[];
   selectedEvent: HistoryTimelineEvent | null;
   onSelectEvent: (event: HistoryTimelineEvent) => void;
@@ -28,6 +29,7 @@ function historyBounds(path: [number, number][]) {
 
 export const LocationHistoryMap: React.FC<LocationHistoryMapProps> = ({
   fullPath,
+  timelinePath,
   events,
   selectedEvent,
   onSelectEvent,
@@ -39,11 +41,34 @@ export const LocationHistoryMap: React.FC<LocationHistoryMapProps> = ({
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const routePolylineRef = useRef<google.maps.Polyline | null>(null);
   const highlightPolylineRef = useRef<google.maps.Polyline | null>(null);
+  const progressPolylineRef = useRef<google.maps.Polyline | null>(null);
+  const personMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const markerListenersRef = useRef<google.maps.MapsEventListener[]>([]);
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState('');
+  const [playbackIndex, setPlaybackIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  useEffect(() => {
+    setPlaybackIndex(0);
+    setIsPlaying(false);
+  }, [timelinePath]);
+
+  useEffect(() => {
+    if (!isPlaying || timelinePath.length < 2) return;
+    const timer = window.setInterval(() => {
+      setPlaybackIndex((current) => {
+        if (current >= timelinePath.length - 1) {
+          setIsPlaying(false);
+          return current;
+        }
+        return current + 1;
+      });
+    }, 650);
+    return () => window.clearInterval(timer);
+  }, [isPlaying, timelinePath.length]);
 
   useEffect(() => {
     let active = true;
@@ -89,6 +114,9 @@ export const LocationHistoryMap: React.FC<LocationHistoryMapProps> = ({
 
     routePolylineRef.current?.setMap(null);
     routePolylineRef.current = null;
+    progressPolylineRef.current?.setMap(null);
+    progressPolylineRef.current = null;
+    personMarkerRef.current = null;
     highlightPolylineRef.current?.setMap(null);
     highlightPolylineRef.current = null;
     for (const marker of markersRef.current) marker.map = null;
@@ -101,32 +129,29 @@ export const LocationHistoryMap: React.FC<LocationHistoryMapProps> = ({
       routePolylineRef.current = new google.maps.Polyline({
         map,
         path: fullPath.map(([lat, lng]) => ({ lat, lng })),
-        strokeColor: '#343e48',
-        strokeWeight: 4,
-        strokeOpacity: 0.82,
+        strokeColor: '#94a3b8',
+        strokeWeight: 3,
+        strokeOpacity: 0.7,
         geodesic: true,
       });
       map.fitBounds(historyBounds(fullPath), 50);
 
-      const start = fullPath[0];
-      const end = fullPath[fullPath.length - 1];
-      markersRef.current.push(
-        new google.maps.marker.AdvancedMarkerElement({
-          map,
-          position: { lat: start[0], lng: start[1] },
-          title: `${t('Punto de inicio')} (${formatTimeOfDay(events[0]?.startTime || Date.now())})`,
-          content: markerContent(`<div class="route-map-endpoint is-start"><span></span>${t('Inicio')}</div>`),
-        }),
-        new google.maps.marker.AdvancedMarkerElement({
-          map,
-          position: { lat: end[0], lng: end[1] },
-          title: `${t('Último punto registrado')} (${formatTimeOfDay(events[events.length - 1]?.endTime || Date.now())})`,
-          content: markerContent(`<div class="route-map-endpoint is-end"><span></span>${t('Fin')}</div>`),
-        })
-      );
     } else if (fullPath.length === 1) {
       map.setCenter({ lat: fullPath[0][0], lng: fullPath[0][1] });
       map.setZoom(16);
+    }
+
+    if (timelinePath.length > 0) {
+      const firstPoint = timelinePath[0];
+      const personMarker = new google.maps.marker.AdvancedMarkerElement({
+        map,
+        position: { lat: firstPoint.lat, lng: firstPoint.lng },
+        title: t('Posición del técnico en la línea de tiempo'),
+        zIndex: 20,
+        content: markerContent('<div class="route-map-person" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"></circle><path d="M6.8 20c.7-4 2.4-6 5.2-6s4.5 2 5.2 6"></path></svg></div>'),
+      });
+      personMarkerRef.current = personMarker;
+      markersRef.current.push(personMarker);
     }
 
     for (const event of events) {
@@ -162,10 +187,34 @@ export const LocationHistoryMap: React.FC<LocationHistoryMapProps> = ({
     return () => {
       routePolylineRef.current?.setMap(null);
       highlightPolylineRef.current?.setMap(null);
+      progressPolylineRef.current?.setMap(null);
       for (const marker of markersRef.current) marker.map = null;
       for (const listener of markerListenersRef.current) listener.remove();
     };
-  }, [events, fullPath, mapReady, onSelectEvent, t]);
+  }, [events, fullPath, mapReady, onSelectEvent, t, timelinePath]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const marker = personMarkerRef.current;
+    const point = timelinePath[playbackIndex];
+    if (!mapReady || !map || !marker || !point) return;
+
+    marker.position = { lat: point.lat, lng: point.lng };
+    marker.title = `${t('Ubicación registrada')} · ${formatTimeOfDay(point.time)}`;
+    progressPolylineRef.current?.setMap(null);
+    progressPolylineRef.current = null;
+    if (playbackIndex > 0) {
+      progressPolylineRef.current = new google.maps.Polyline({
+        map,
+        path: timelinePath.slice(0, playbackIndex + 1).map(({ lat, lng }) => ({ lat, lng })),
+        strokeColor: '#f78c26',
+        strokeWeight: 5,
+        strokeOpacity: 0.95,
+        geodesic: true,
+        zIndex: 5,
+      });
+    }
+  }, [mapReady, playbackIndex, t, timelinePath]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -234,6 +283,35 @@ export const LocationHistoryMap: React.FC<LocationHistoryMapProps> = ({
           </button>
         ) : null}
       </div>
+
+      {timelinePath.length > 0 ? (
+        <div className="route-history-playback" aria-label={t('Línea de tiempo de la ruta')}>
+          <button
+            type="button"
+            onClick={() => {
+              if (playbackIndex >= timelinePath.length - 1) setPlaybackIndex(0);
+              setIsPlaying((playing) => !playing);
+            }}
+            disabled={timelinePath.length < 2}
+            aria-label={isPlaying ? t('Pausar recorrido') : t('Reproducir recorrido')}
+          >
+            {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+          </button>
+          <span>{formatTimeOfDay(timelinePath[playbackIndex]?.time || timelinePath[0].time)}</span>
+          <input
+            type="range"
+            min="0"
+            max={Math.max(0, timelinePath.length - 1)}
+            value={playbackIndex}
+            onChange={(event) => {
+              setIsPlaying(false);
+              setPlaybackIndex(Number(event.target.value));
+            }}
+            aria-label={t('Momento del recorrido')}
+          />
+          <span>{formatTimeOfDay(timelinePath[timelinePath.length - 1].time)}</span>
+        </div>
+      ) : null}
     </div>
   );
 };

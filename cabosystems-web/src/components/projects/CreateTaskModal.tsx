@@ -23,7 +23,6 @@ interface CreateTaskModalProps {
   onClose: () => void;
   onSuccess: () => void;
   project: Proyecto;
-  projects?: Proyecto[];
   defaultDate?: string;
   taskToEdit?: Tarea | null;
   staffList: Profile[];
@@ -34,7 +33,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   onClose,
   onSuccess,
   project,
-  projects,
   defaultDate,
   taskToEdit,
   staffList,
@@ -45,16 +43,13 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const [asignadoA, setAsignadoA] = useState('');
   const [estatus, setEstatus] = useState<'pendiente' | 'en_proceso' | 'completada'>('pendiente');
   const [prioridad, setPrioridad] = useState<'baja' | 'media' | 'alta'>('media');
-  const [projectId, setProjectId] = useState(project.id);
   const [scheduledDate, setScheduledDate] = useState('');
-  const selectedProject = projects?.find((item) => item.id === projectId) || project;
   const [initialSubtasks, setInitialSubtasks] = useState<string[]>(['']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (taskToEdit) {
-      setProjectId(taskToEdit.proyecto_id);
       setScheduledDate(taskToEdit.fecha_programada || '');
       setTitulo(taskToEdit.titulo);
       setDescripcion(taskToEdit.descripcion || '');
@@ -63,7 +58,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       setPrioridad(taskToEdit.prioridad || 'media');
       setInitialSubtasks([]);
     } else {
-      setProjectId(project.id);
       setScheduledDate(defaultDate || '');
       setTitulo('');
       setDescripcion('');
@@ -116,7 +110,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         });
       } else {
         const createdTask = await createTask({
-          proyecto_id: selectedProject.id,
+          proyecto_id: project.id,
           asignado_a: assigneeId,
           titulo: titulo.trim(),
           descripcion: descripcion.trim() || undefined,
@@ -151,7 +145,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t("Tarea")} tabIndex={-1}
-        className="task-editor minimal-modal w-full max-w-xl operational-panel rounded-2xl bg-white shadow-theme-md border border-slate-200 overflow-hidden flex flex-col max-h-[calc(var(--app-viewport-height)-32px)]">
+        className="task-editor minimal-modal w-full max-w-lg operational-panel rounded-2xl bg-white shadow-theme-md border border-slate-200 overflow-hidden flex flex-col max-h-[calc(var(--app-viewport-height)-24px)]">
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5 bg-white">
           <div className="flex items-center gap-3">
@@ -163,7 +157,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 {taskToEdit ? t("Editar Tarea") : t("Nueva Tarea")}
               </h3>
               <p className="text-xs text-slate-500">
-                {selectedProject.desarrollo} • <span className="font-semibold text-slate-700">{selectedProject.villa}</span>
+                {project.desarrollo} • <span className="font-semibold text-slate-700">{project.villa}</span>
               </p>
             </div>
           </div>
@@ -200,34 +194,26 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             />
           </div>
 
-          <div className="task-editor-schedule grid grid-cols-1 gap-4">
-            {!taskToEdit && projects && <label className="block text-xs font-semibold text-slate-700">
-              {t('Villa')}
-              <AppSelect aria-label={t('Villa')} value={projectId} onChange={(event) => setProjectId(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm" required>
-                {projects.map((item) => <option key={item.id} value={item.id}>{item.desarrollo} · {item.villa}</option>)}
-              </AppSelect>
-            </label>}
+          <div className="task-editor-schedule grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <div className="task-editor-date-label"><span>{t('Fecha programada')} <span className="font-normal text-slate-500">{t('(Opcional)')}</span></span>{scheduledDate && <button type="button" disabled={loading} onClick={() => setScheduledDate('')}>{locale.startsWith('en') ? 'Clear date' : 'Quitar fecha'}</button>}</div>
+              <div className="task-editor-date-label"><span className="inline-flex items-baseline gap-1"><span>{t('Fecha programada')}</span><span className="font-normal text-slate-500">{t('(Opcional)')}</span></span>{scheduledDate && <button type="button" disabled={loading} onClick={() => setScheduledDate('')}>{locale.startsWith('en') ? 'Clear date' : 'Quitar fecha'}</button>}</div>
               <AgendaDateTimeField type="date" label={t('Fecha programada')} locale={locale} value={scheduledDate} onChange={setScheduledDate} disabled={loading} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700" htmlFor="task-assignee">
+                <span className="inline-flex items-baseline gap-1"><span>{t('Técnico Asignado')}</span><span className="text-[11px] font-normal text-slate-400">{t('(Opcional)')}</span></span>
+              </label>
+              <AppSelect id="task-assignee" aria-label={t('Técnico Asignado')} value={asignadoA} onChange={(event) => setAsignadoA(event.target.value)} className="h-11">
+                <option value="">{t('No asignado')}</option>
+                {staffList.map((person) => <option key={person.id} value={person.id}>{person.nombre || person.full_name || person.email || t('Técnico')} · {getRoleLabel(person.rol, t)}{person.email ? ` · ${person.email}` : ''}</option>)}
+              </AppSelect>
             </div>
           </div>
 
-          {/* Técnico Asignado (Selector con diseño personalizado) */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-slate-700" htmlFor="task-assignee">
-              {t('Técnico Asignado')} <span className="text-[11px] font-normal text-slate-400">{t('(Opcional)')}</span>
-            </label>
-            <AppSelect id="task-assignee" aria-label={t('Técnico Asignado')} value={asignadoA} onChange={(event) => setAsignadoA(event.target.value)} className="h-11">
-              <option value="">{t('No asignado')}</option>
-              {staffList.map((person) => <option key={person.id} value={person.id}>{person.nombre || person.full_name || person.email || t('Técnico')} · {getRoleLabel(person.rol, t)}{person.email ? ` · ${person.email}` : ''}</option>)}
-            </AppSelect>
-          </div>
-          {/* Estatus */}
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-slate-700">
               {t("Estatus")}</label>
-            <div className="task-editor-status grid grid-cols-3 gap-2.5" role="group" aria-label={t('Estatus')}>
+            <div className="task-editor-status grid grid-cols-3 gap-2" role="group" aria-label={t('Estatus')}>
               {(['pendiente', 'en_proceso', 'completada'] as const).map((st) => (
                 <button
                   key={st}
@@ -271,7 +257,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
 
           {/* Subtareas iniciales (solo al crear) */}
           {!taskToEdit && (
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-4">
+            <div className="rounded-xl border border-slate-200/80 bg-white p-3">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-semibold text-slate-700">
                   {t("Subtareas / Pasos de control (Checklist)")}</label>
@@ -282,7 +268,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 >
                   {t("Añadir paso")}</button>
               </div>
-              <p className="text-xs text-slate-500 mb-3">
+              <p className="text-xs text-slate-500 mb-2">
                 {t("Puedes agregar pasos iniciales o crearlos directamente desde la tarjeta de la tarea.")}</p>
               <div className="space-y-2">
                 {initialSubtasks.map((sub, idx) => (

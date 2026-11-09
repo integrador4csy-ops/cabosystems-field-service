@@ -16,6 +16,8 @@ import { loadLiveMap, loadChat, loadTasks, loadAgenda, loadDirectory, loadTeam, 
 import { SectionResourcesProvider, useSectionResources, canSpeculate } from './context/SectionResources';
 import { fleetSnapshot } from './lib/fleetSnapshot';
 import { dateKey } from './lib/taskDates';
+import { TrackingView, type TrackingSection } from './components/tracking/TrackingView';
+import { CheckHistoryView } from './components/tracking/CheckHistoryView';
 import {
   playNotificationSound,
   requestDesktopNotificationPermission,
@@ -58,6 +60,16 @@ function DashboardContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [focusTrigger, setFocusTrigger] = useState(0);
+  const [trackingSection, setTrackingSection] = useState<TrackingSection>('map');
+  const [checkTechnicianId, setCheckTechnicianId] = useState('');
+  const [checkDate, setCheckDate] = useState(() => dateKey(new Date()));
+  const [checkTechnicians, setCheckTechnicians] = useState<Array<{ id: string; name: string }>>([]);
+  const [isChecksLoading, setIsChecksLoading] = useState(false);
+  const [checkRefreshTrigger, setCheckRefreshTrigger] = useState(0);
+
+  const handleRefreshChecks = useCallback(() => {
+    setCheckRefreshTrigger((prev) => prev + 1);
+  }, []);
   const fleetRequest = useRef(0);
   const fleetLoaded = useRef(false);
 
@@ -337,13 +349,13 @@ function DashboardContent() {
   }, [fetchFleet, resources]);
 
   useEffect(() => {
-    if (activeItem !== 'radar') return;
+    if (activeItem !== 'radar' || trackingSection !== 'map') return;
     const refresh = () => { if (document.visibilityState === 'visible') void fetchFleet(); };
     void fetchFleet(false, false);
     const interval = setInterval(refresh, 15_000);
     window.addEventListener('focus', refresh);
     return () => { clearInterval(interval); window.removeEventListener('focus', refresh); };
-  }, [activeItem, fetchFleet]);
+  }, [activeItem, trackingSection, fetchFleet]);
 
   // Filtered workers based on search query
   const filteredWorkers = useMemo(() => {
@@ -403,6 +415,7 @@ function DashboardContent() {
       <div className={`flex flex-1 flex-col h-dvh min-w-0 overflow-hidden transition-[padding] duration-200 ${isExpanded ? 'md:pl-64' : 'md:pl-[72px]'}`}>
         {/* Top Minimalist Header */}
         <AppHeader
+          trackingSection={trackingSection}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onlineCount={onlineCount}
@@ -413,6 +426,13 @@ function DashboardContent() {
           onHistoryWorkerChange={handleSelectWorker}
           historyDate={historyDate}
           onHistoryDateChange={setHistoryDate}
+          checkTechnicians={checkTechnicians}
+          checkTechnicianId={checkTechnicianId}
+          onCheckTechnicianChange={setCheckTechnicianId}
+          checkDate={checkDate}
+          onCheckDateChange={setCheckDate}
+          onRefreshChecks={handleRefreshChecks}
+          isChecksLoading={isChecksLoading}
         />
 
         {/* 3. Main View: GPS Radar Map, Team Group Chat or Projects Management */}
@@ -432,18 +452,15 @@ function DashboardContent() {
           <RetainedView active={activeItem === 'proyectos'} fallback={<ViewLoading />}>
             <ProjectsManagementView mode="tasks" />
           </RetainedView>
-          <RetainedView active={activeItem === 'historial'} fallback={<ViewLoading />}>
-            <LocationHistoryView
-              selectedWorkerId={historyWorkerId}
-              selectedDate={historyDate}
-            />
-          </RetainedView>
           <RetainedView active={activeItem === 'garantias'} fallback={<ViewLoading />}>
             <WarrantyManagementView />
           </RetainedView>
-          <RetainedView active={!['chat', 'colaboradores', 'invitaciones', 'directorio-proyectos', 'agenda', 'proyectos', 'historial', 'garantias'].includes(activeItem)} fallback={<ViewLoading />}>
-            <div className="flex-1 h-full w-full rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden relative isolate">
-              <LiveMap
+          <RetainedView active={activeItem === 'radar'} fallback={<ViewLoading />}>
+            <TrackingView
+              section={trackingSection}
+              onSectionChange={setTrackingSection}
+              map={<div className="h-full w-full overflow-hidden relative isolate">
+                <LiveMap
                 workers={filteredWorkers}
                 selectedWorkerId={selectedWorkerId}
                 onSelectWorker={handleSelectWorker}
@@ -452,10 +469,24 @@ function DashboardContent() {
                 isRefreshing={isRefreshing}
                 onOpenHistory={(id) => {
                   handleSelectWorker(id);
-                  setActiveItem('historial');
+                  setTrackingSection('history');
                 }}
-              />
-            </div>
+                />
+              </div>}
+              checks={<CheckHistoryView
+                day={checkDate}
+                onDayChange={setCheckDate}
+                technicianId={checkTechnicianId}
+                onTechnicianIdChange={setCheckTechnicianId}
+                refreshTrigger={checkRefreshTrigger}
+                onLoadingChange={setIsChecksLoading}
+                onTechniciansChange={setCheckTechnicians}
+              />}
+              history={<LocationHistoryView
+                selectedWorkerId={historyWorkerId}
+                selectedDate={historyDate}
+              />}
+            />
           </RetainedView>
         </main>
       </div>

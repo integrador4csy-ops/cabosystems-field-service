@@ -300,7 +300,7 @@ function PreparedTabLayout() {
           name="maps"
           activityEnabled={!isAdmin}
           options={{
-            title: t('nav.maps'),
+            title: t('nav.tracking'),
             tabBarIcon: MapsIcon,
             tabBarLabel: MapsLabel,
             href: isAdmin ? undefined : null,

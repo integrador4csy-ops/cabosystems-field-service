@@ -81,7 +81,8 @@ export interface Subtarea {
 
 export interface FieldRecord {
   id: string;
-  tarea_id: string;
+  proyecto_id: string;
+  tarea_id: string | null;
   tecnico_id: string;
   tipo: CheckInType;
   latitud: number;

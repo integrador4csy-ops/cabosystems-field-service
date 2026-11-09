@@ -8,7 +8,7 @@ const ts = require('typescript');
 // Exercise the actual remote pipeline against a controlled PostgREST adapter.
 // No production data or user session is used by these tests.
 function setup() {
-  const state = { owner: 'alice', active: true, uploads: [], statuses: [], tasks: [], records: [], geofences: [], missingPhoto: false, uncertainRecord: false, uncertainTask: false, deny: false };
+  const state = { owner: 'alice', active: true, uploads: [], records: [], geofences: [], missingPhoto: false, uncertainRecord: false, deny: false };
   const client = {
     auth: { getSession: async () => ({ data: { session: { user: { id: state.owner } } }, error: null }) },
     functions: { invoke: async (name, input) => { state.notifications ||= []; state.notifications.push([name, input]); return { data: { success: true }, error: null }; } },
@@ -22,13 +22,12 @@ function setup() {
         insert(input) { operation = 'insert'; value = input; return this; },
         then(resolve, reject) {
           return Promise.resolve().then(() => {
-            const rows = table === 'tareas' ? state.tasks : state.records;
+            const rows = state.records;
             if (operation === 'insert') {
               if (state.deny) return { data: null, error: { code: '42501', message: 'Not allowed' } };
               if (rows.some(row => row.id === value.id)) return { data: null, error: { code: '23505' } };
               rows.push({ ...value });
-              const flag = table === 'tareas' ? 'uncertainTask' : 'uncertainRecord';
-              if (state[flag]) { state[flag] = false; return { data: null, error: { message: 'Response lost after commit' } }; }
+              if (state.uncertainRecord) { state.uncertainRecord = false; return { data: null, error: { message: 'Response lost after commit' } }; }
               return { data: null, error: null };
             }
             let found = rows.filter(row => filters.every(([key, expected]) => row[key] === expected));
@@ -46,34 +45,32 @@ function setup() {
   };
   const imports = {
     './supabase': { supabase: client },
-    './api': { uploadEvidencePhoto: async (uri, key) => { state.uploads.push({ uri, key }); state.onUpload?.(); return `https://storage.invalid/${key}`; }, updateTaskStatus: async (id, status) => { state.statuses.push([id, status]); } },
-    './fieldOutboxStore': { saveFieldTask: async (record, taskId) => { record.taskId = taskId; } },
+    './api': { uploadEvidencePhoto: async (uri, key) => { state.uploads.push({ uri, key }); state.onUpload?.(); return `https://storage.invalid/${key}`; } },
     'expo-file-system/legacy': { getInfoAsync: async () => ({ exists: !state.missingPhoto }) },
   };
   const module = { exports: {} };
   const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../lib/fieldOutboxRemote.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   vm.runInNewContext(source, { module, exports: module.exports, require: name => { if (!(name in imports)) throw Error(name); return imports[name]; }, Error });
   const send = record => module.exports.sendPendingFieldRecord(record, () => { if (!state.active) throw Error('paused'); });
-  const record = { id: 'operation', owner: 'alice', projectId: 'villa', taskId: null, photoUri: 'file:///photo.jpg', capturedAt: '2026-10-26T10:00:00.000Z', tipo: 'check_in', latitude: 22, longitude: -109, comments: 'original' };
+  const record = { id: 'operation', owner: 'alice', projectId: 'villa', photoUri: 'file:///photo.jpg', capturedAt: '2026-10-26T10:00:00.000Z', tipo: 'check_in', latitude: 22, longitude: -109, comments: 'original' };
   return { state, send, record };
 }
 test('lost insert response can be retried without duplicate records or repeated photo upload', async () => {
   const { state, send, record } = setup(); state.uncertainRecord = true;
   await assert.rejects(() => send(record));
-  assert.equal(state.records.length, 1); assert.equal(record.taskId, 'operation');
+  assert.equal(state.records.length, 1);
   await send(record); await send(record);
-  assert.equal(state.records.length, 1); assert.equal(state.tasks.length, 1); assert.equal(state.uploads.length, 1);
+  assert.equal(state.records.length, 1); assert.equal(state.uploads.length, 1);
   assert.equal(state.records[0].fecha_hora, record.capturedAt);
   assert.equal(state.records[0].latitud, 22); assert.equal(state.records[0].comentarios, 'original');
 });
-test('task creation uses stable identity even when its response is lost', async () => {
-  const { state, send, record } = setup(); state.uncertainTask = true;
-  await assert.rejects(() => send(record)); await send(record);
-  assert.equal(state.tasks.length, 1); assert.equal(state.tasks[0].id, record.id); assert.equal(state.records.length, 1);
+test('a field check belongs directly to a villa and does not require a task', async () => {
+  const { state, send, record } = setup(); await send(record);
+  assert.equal(state.records[0].proyecto_id, 'villa'); assert.equal(state.records[0].tarea_id, null);
 });
 test('account switches and background transitions never send the next stage', async () => {
   const { state, send, record } = setup(); state.owner = 'bob';
-  await assert.rejects(() => send(record)); assert.equal(state.tasks.length, 0); assert.equal(state.uploads.length, 0);
+  await assert.rejects(() => send(record)); assert.equal(state.uploads.length, 0);
   state.owner = 'alice'; state.onUpload = () => { state.active = false; };
   await assert.rejects(() => send(record)); assert.equal(state.records.length, 0);
 });
@@ -84,11 +81,6 @@ test('missing photos and denied writes remain errors rather than false success',
   state.missingPhoto = false; state.deny = true;
   await assert.rejects(() => send(record), error => error.code === '42501');
   assert.equal(state.records.length, 0);
-});
-test('an older offline arrival does not overwrite the status from a newer departure', async () => {
-  const { state, send, record } = setup(); state.tasks.push({ id: 'task', proyecto_id: 'villa', asignado_a: 'alice', estatus: 'completada' });
-  state.records.push({ id: 'newer', tarea_id: 'task', tecnico_id: 'alice', fecha_hora: '2026-10-26T12:00:00.000Z' });
-  await send(record); assert.equal(state.statuses.length, 0);
 });
 test('a missing villa geofence syncs only after its technician check-in exists', async () => {
   const { state, send, record } = setup();

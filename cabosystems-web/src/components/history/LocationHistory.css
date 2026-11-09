@@ -110,6 +110,15 @@
 .route-map-info-window strong { color: var(--color-slate-900); font-size: 13px; }
 .route-map-info-window span { color: var(--color-slate-500); font-size: 11px; font-variant-numeric: tabular-nums; }
 .route-map-info-window b { margin-top: 2px; color: #b45309; font-size: 10.5px; }
+.route-map-person { position: relative; display: grid; width: 36px; height: 36px; place-items: center; border: 3px solid #fff; border-radius: 50%; color: #fff; background: var(--color-brand-600); box-shadow: 0 3px 10px rgb(15 23 42 / 28%); transform: translateY(-4px); }
+.route-map-person::after { position: absolute; bottom: -6px; width: 9px; height: 9px; content: ''; background: var(--color-brand-600); transform: rotate(45deg); }
+.route-map-person svg { position: relative; z-index: 1; width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
+.route-history-playback { position: absolute; z-index: 1000; right: 12px; bottom: 12px; left: 12px; display: grid; grid-template-columns: 36px 44px minmax(80px, 1fr) 44px; align-items: center; gap: 9px; min-height: 48px; border: 1px solid rgb(226 232 240 / 94%); border-radius: 12px; padding: 6px 10px 6px 6px; background: rgb(255 255 255 / 94%); box-shadow: 0 3px 12px rgb(15 23 42 / 14%); backdrop-filter: blur(8px); }
+.route-history-playback button { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 9px; color: #fff; background: var(--color-brand-600); }
+.route-history-playback button:hover { background: var(--color-brand-700); }
+.route-history-playback button:disabled { color: var(--color-slate-400); background: var(--color-slate-100); }
+.route-history-playback span { color: var(--color-slate-600); font-size: 11px; font-variant-numeric: tabular-nums; text-align: center; }
+.route-history-playback input { width: 100%; height: 4px; accent-color: var(--color-brand-600); cursor: pointer; }
 
 @media (max-width: 1180px) {
   .location-history-body { grid-template-columns: minmax(280px, 330px) minmax(0, 1fr); }

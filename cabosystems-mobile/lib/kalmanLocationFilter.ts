@@ -100,6 +100,17 @@ export class KalmanLocationFilter {
     const distDeltaMeters = this.distanceMeters(this.lat, this.lng, rawLat, rawLng);
     const maxPossibleMeters = (activity === 'conduciendo' ? 60 : 15) * deltaSeconds;
 
+    // While sensors report no physical movement, keep the last position if the
+    // new reading is still inside Android's own uncertainty radius.
+    const stationaryNoiseRadius = Math.min(Math.max(validAccuracy, 8), 80);
+    if (activity === 'detenido' && distDeltaMeters <= stationaryNoiseRadius) {
+      return {
+        latitude: Number(this.lat.toFixed(6)),
+        longitude: Number(this.lng.toFixed(6)),
+        accuracy: Math.round(Math.max(validAccuracy, Math.sqrt(this.varianceLat) / this.METERS_TO_LAT_DEG)),
+      };
+    }
+
     if (distDeltaMeters > maxPossibleMeters && validAccuracy > 20) {
       // Salto no creíble con baja precisión: descartar o atenuar fuertemente
       return {

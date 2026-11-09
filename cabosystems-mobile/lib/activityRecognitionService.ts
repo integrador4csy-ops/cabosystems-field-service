@@ -98,19 +98,19 @@ export function stopActivityRecognition() {
  *    muestra oscilaciones de impacto corporal (> 0.18) -> 'caminando'.
  * 3. Si la velocidad GPS es < 2.5 km/h y la varianza es muy baja (< 0.05) -> 'detenido' (filtra drift del GPS en interiores).
  */
-export function classifyActivity(gpsSpeedKmH: number): ActivityType {
+export function classifyActivity(gpsSpeedKmH: number, gpsAccuracyMeters = Number.POSITIVE_INFINITY): ActivityType {
   const now = Date.now();
   const hasRecentSteps = (now - lastStepTimestamp) < 4000 && recentStepCount > 0;
 
   // A. Conduciendo
-  if (gpsSpeedKmH > 12) {
+  if (gpsSpeedKmH > 12 && gpsAccuracyMeters <= 80) {
     currentActivity = 'conduciendo';
     return currentActivity;
   }
 
   // B. Caminando a pie
   // Ya sea que el GPS marque entre 2.5 y 12 km/h, o que el podómetro/acelerómetro detecte pasos en una habitación
-  if (hasRecentSteps || (currentVariance >= 0.16 && gpsSpeedKmH >= 1.5) || (gpsSpeedKmH >= 2.5 && gpsSpeedKmH <= 12)) {
+  if (hasRecentSteps || (currentVariance >= 0.16 && gpsSpeedKmH >= 1.5) || (gpsAccuracyMeters <= 25 && gpsSpeedKmH >= 2.5 && gpsSpeedKmH <= 12)) {
     currentActivity = 'caminando';
     return currentActivity;
   }

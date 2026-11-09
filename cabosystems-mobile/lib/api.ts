@@ -339,16 +339,6 @@ export async function createFieldRecord(
 
   if (error) throw error;
 
-  if (record.tipo === 'check_in') {
-    await updateTaskStatus(record.tarea_id, 'en_proceso').catch(() => {
-      // Ignorar error no crítico de actualización de estado
-    });
-  } else if (record.tipo === 'check_out') {
-    await updateTaskStatus(record.tarea_id, 'completada').catch(() => {
-      // Ignorar error no crítico de actualización de estado
-    });
-  }
-
   void supabase.functions.invoke('operations-push-notifications', {
     body: { kind: 'field_check', entityId: data.id },
   }).then(({ error: notificationError }) => {
@@ -372,7 +362,7 @@ export interface AdminCheckHistoryItem {
   longitude: number;
   photo_url: string;
   comments: string | null;
-  task_id: string;
+  task_id: string | null;
   project_id: string;
   villa: string;
   development: string;
@@ -421,64 +411,3 @@ export async function registerMissingVillaGeofence(
   return Boolean(data);
 }
 
-export async function getOrCreateCheckInTaskForProject(
-  projectId: string,
-  userId: string
-): Promise<string> {
-  // 1. Try to find an active task in this project assigned to this technician
-  const { data: userTasks, error: errUser } = await supabase
-    .from('tareas')
-    .select('id, estatus')
-    .eq('proyecto_id', projectId)
-    .eq('asignado_a', userId)
-    .order('created_at', { ascending: false });
-
-  if (!errUser && userTasks && userTasks.length > 0) {
-    const inProgress = userTasks.find((t) => t.estatus === 'en_proceso');
-    return inProgress ? inProgress.id : userTasks[0].id;
-  }
-
-  // 2. Try to find any task in this project
-  const { data: projectTasks, error: errProj } = await supabase
-    .from('tareas')
-    .select('id')
-    .eq('proyecto_id', projectId)
-    .order('created_at', { ascending: false })
-    .limit(1);
-
-  if (!errProj && projectTasks && projectTasks.length > 0) {
-    return projectTasks[0].id;
-  }
-
-  // 3. If no task exists at all for this project, create a default check-in task
-  const { data: newTask, error: errInsert } = await supabase
-    .from('tareas')
-    .insert([
-      {
-        proyecto_id: projectId,
-        asignado_a: userId,
-        titulo: 'Servicio en Villa',
-        descripcion: 'Registro de actividades en sitio',
-        estatus: 'en_proceso',
-      },
-    ])
-    .select('id')
-    .maybeSingle();
-
-  if (newTask?.id) {
-    return newTask.id;
-  }
-
-  // 4. Safe fallback if role cannot insert tasks
-  const { data: fallbackTask } = await supabase
-    .from('tareas')
-    .select('id')
-    .limit(1)
-    .maybeSingle();
-
-  if (fallbackTask?.id) {
-    return fallbackTask.id;
-  }
-
-  throw new Error('No se pudo encontrar o asociar una orden de trabajo a esta villa.');
-}

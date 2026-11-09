@@ -157,7 +157,7 @@ async function transmitLocation(
   try {
     const battery = await getBatteryTelemetry();
     const heading = location.coords.heading && location.coords.heading >= 0 ? location.coords.heading : null;
-    const detectedActivity = classifyActivity(speedKmH);
+    const detectedActivity = classifyActivity(speedKmH, location.coords.accuracy || 999);
 
     // Filtrar coordenadas con el Filtro de Kalman Adaptativo (suprime temblor en reposo/interiores)
     const filteredCoords = globalKalmanFilter.filter(
@@ -197,7 +197,8 @@ async function transmitLocation(
       // Enviar al historial de manera segura
       try {
         const capturedAt = location.timestamp || Date.now();
-        if (shouldRecordLocationHistory(historyLastCaptured.get(userId), capturedAt, speedKmH)) {
+        const reliableHistorySpeed = detectedActivity === 'detenido' ? 0 : speedKmH;
+        if (shouldRecordLocationHistory(historyLastCaptured.get(userId), capturedAt, reliableHistorySpeed)) {
         const { error: historyError } = await supabase.from('historial_ubicaciones').insert({
           usuario_id: userId,
           latitud: filteredCoords.latitude,

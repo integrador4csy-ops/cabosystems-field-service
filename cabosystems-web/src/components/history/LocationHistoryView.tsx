@@ -36,6 +36,7 @@ const emptyAnalysis: DailyHistoryAnalysis = {
   lastTimestamp: null,
   events: [],
   fullPath: [],
+  timelinePath: [],
 };
 
 export const LocationHistoryView: React.FC<LocationHistoryViewProps> = ({
@@ -191,6 +192,7 @@ export const LocationHistoryView: React.FC<LocationHistoryViewProps> = ({
         <section className={`location-history-map-panel ${mobilePanel === 'map' ? 'is-mobile-active' : ''}`} aria-label={t('Mapa de la ruta')}>
           <LocationHistoryMap
             fullPath={analysis?.fullPath || []}
+            timelinePath={analysis?.timelinePath ?? emptyAnalysis.timelinePath}
             events={analysis?.events || []}
             selectedEvent={selectedEvent}
             onSelectEvent={setSelectedEvent}

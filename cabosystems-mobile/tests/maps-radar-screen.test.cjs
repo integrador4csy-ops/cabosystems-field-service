@@ -5,15 +5,21 @@ const path = require('node:path');
 
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 
-test('admin Maps tab renders the live fleet on a standard street map', () => {
+test('admin Tracking tab combines a light street map with check history', () => {
   const screen = read('app/(tabs)/maps.tsx');
+  const layout = read('app/(tabs)/_layout.tsx');
   const source = read('lib/fleetMap.ts');
   const nativeMap = read('components/LiveFleetMap.native.tsx');
   assert.match(screen, /getFleetMapWorkers/);
   assert.match(screen, /mobile-radar-ubicaciones-en-vivo/);
+  assert.match(screen, /ChecksHistoryContent embedded/);
+  assert.match(screen, /tracking\.liveMap/);
+  assert.match(screen, /tracking\.checks/);
+  assert.match(layout, /title: t\('nav\.tracking'\)/);
   assert.match(source, /from\('ubicaciones_usuarios'\)/);
   assert.match(source, /from\('profiles'\)/);
   assert.match(nativeMap, /mapType="standard"/);
+  assert.match(nativeMap, /userInterfaceStyle="light"/);
   assert.match(nativeMap, /workers\.map/);
   assert.match(nativeMap, /fitToCoordinates/);
 });

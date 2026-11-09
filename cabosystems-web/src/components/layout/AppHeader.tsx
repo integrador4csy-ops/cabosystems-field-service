@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { SearchIcon, CloseIcon } from '../../icons';
-import { Car, ClipboardPlus, Menu, MapPin, Plus } from 'lucide-react';
+import { CalendarDays, Car, ChevronLeft, ChevronRight, ClipboardPlus, Menu, MapPin, Plus, RefreshCw } from 'lucide-react';
 import { useTranslation } from '../../context/LanguageContext';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAdminAuth } from '../../context/AdminAuthContext';
@@ -11,6 +11,7 @@ import { NotificationCenter } from './NotificationCenter';
 import { AgendaDateTimeField } from '../agenda/AgendaDateTimeField';
 
 interface AppHeaderProps {
+  trackingSection?: 'map' | 'checks' | 'history';
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onlineCount: number;
@@ -21,9 +22,35 @@ interface AppHeaderProps {
   onHistoryWorkerChange?: (workerId: string) => void;
   historyDate?: string;
   onHistoryDateChange?: (date: string) => void;
+  checkTechnicians?: Array<{ id: string; name: string }>;
+  checkTechnicianId?: string;
+  onCheckTechnicianChange?: (workerId: string) => void;
+  checkDate?: string;
+  onCheckDateChange?: (date: string) => void;
+  onRefreshChecks?: () => void;
+  isChecksLoading?: boolean;
 }
 
-export const AppHeader: React.FC<AppHeaderProps> = ({ searchQuery, onSearchChange, onlineCount, movingCount, offlineCount, historyWorkers = [], historyWorkerId = '', onHistoryWorkerChange, historyDate = '', onHistoryDateChange }) => {
+export const AppHeader: React.FC<AppHeaderProps> = ({
+  trackingSection = 'map',
+  searchQuery,
+  onSearchChange,
+  onlineCount,
+  movingCount,
+  offlineCount,
+  historyWorkers = [],
+  historyWorkerId = '',
+  onHistoryWorkerChange,
+  historyDate = '',
+  onHistoryDateChange,
+  checkTechnicians = [],
+  checkTechnicianId = '',
+  onCheckTechnicianChange,
+  checkDate = '',
+  onCheckDateChange,
+  onRefreshChecks,
+  isChecksLoading = false,
+}) => {
   const { t, locale } = useTranslation();
   const { isAdmin, user, adminProfile } = useAdminAuth();
   const {
@@ -36,7 +63,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ searchQuery, onSearchChang
     warrantySearchQuery, setWarrantySearchQuery, requestCreateWarranty,
   } = useSidebar();
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const isRadar = activeItem === 'radar';
+  const isTracking = activeItem === 'radar';
+  const isRadar = isTracking && trackingSection === 'map';
+  const isChecks = isTracking && trackingSection === 'checks';
   const isTasks = activeItem === 'proyectos' || activeItem === 'agenda';
   const isAgenda = activeItem === 'agenda';
   const isChat = activeItem === 'chat';
@@ -44,7 +73,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ searchQuery, onSearchChang
   const isDirectory = activeItem === 'directorio-proyectos';
   const isWarranty = activeItem === 'garantias';
   const isTeam = isCollaborators || activeItem === 'invitaciones';
-  const isHistory = activeItem === 'historial';
+  const isHistory = activeItem === 'historial' || (activeItem === 'radar' && trackingSection === 'history');
   const canManageEvents = Boolean(user && adminProfile?.activo && ['admin', 'supervisor_instalacion'].includes(adminProfile.rol || ''));
   const canManageChat = Boolean(user && adminProfile?.activo && ['admin', 'supervisor_instalacion'].includes(adminProfile.rol || ''));
   const hasSearch = isRadar || isTasks || isChat || isCollaborators || isDirectory || isWarranty;
@@ -53,7 +82,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ searchQuery, onSearchChang
   const searchLabel = isAgenda ? t('Buscar eventos') : isTasks ? t('Buscar tareas') : isChat ? t('Buscar grupo o proyecto') : isCollaborators ? t('Buscar colaboradores') : isDirectory ? t('Buscar villas o números de proyecto') : isWarranty ? t('Buscar garantías') : t('header.searchPlaceholder');
   const searchPlaceholder = isAgenda ? t('Buscar evento o ubicación...') : isTasks ? t('Buscar tarea, villa o responsable...') : isChat ? t('Buscar grupo o proyecto...') : isCollaborators ? t('Buscar colaborador por nombre, correo o rol...') : isDirectory ? t('Buscar villa o número de proyecto...') : isWarranty ? t('Buscar folio, villa, equipo o serie...') : t('header.searchPlaceholder');
   const teamTitles: Record<string, string> = { colaboradores: t('sidebar.collaborators'), invitaciones: t('sidebar.invitations'), 'directorio-proyectos': t('Proyectos') };
-  const title = teamTitles[activeItem] || (activeItem === 'garantias' ? (locale.startsWith('es') ? 'Garantías' : 'Warranties') : activeItem === 'chat' ? t('sidebar.chat') : activeItem === 'agenda' ? t('sidebar.agenda') : activeItem === 'proyectos' ? t('sidebar.projects') : isHistory ? t('sidebar.history') : t('sidebar.radar'));
+  const title = isChecks ? t('Historial de checks') : isHistory ? t('sidebar.history') : isTracking ? t('sidebar.radar') : teamTitles[activeItem] || (activeItem === 'garantias' ? (locale.startsWith('es') ? 'Garantías' : 'Warranties') : activeItem === 'chat' ? t('sidebar.chat') : activeItem === 'agenda' ? t('sidebar.agenda') : activeItem === 'proyectos' ? t('sidebar.projects') : isHistory ? t('sidebar.history') : t('sidebar.radar'));
   const today = dateKey(new Date());
   const yesterday = shiftDate(today, -1);
 
@@ -108,6 +137,54 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ searchQuery, onSearchChang
             onChange={(value) => onHistoryDateChange?.(value)}
           />
         </div>
+      </div>}
+      {isChecks && <div className="history-header-controls" aria-label={t('Filtros del historial')}>
+        <label className="history-header-worker">
+          <AppSelect
+            aria-label={t('Filtrar por técnico')}
+            value={checkTechnicianId}
+            onChange={(event) => onCheckTechnicianChange?.(event.target.value)}
+          >
+            <option value="">{t('Todos los técnicos')}</option>
+            {checkTechnicians.map((worker) => <option key={worker.id} value={worker.id}>{worker.name}</option>)}
+          </AppSelect>
+        </label>
+        <div className="flex h-9 items-center rounded-lg border border-slate-200 bg-white shadow-2xs">
+          <button
+            type="button"
+            onClick={() => onCheckDateChange?.(shiftDate(checkDate, -1))}
+            className="flex h-full w-8 items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors"
+            aria-label={t('Día anterior')}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onCheckDateChange?.(today)}
+            className="flex h-full items-center gap-1.5 border-x border-slate-200 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <CalendarDays size={14} />
+            {checkDate === today ? t('Hoy') : checkDate}
+          </button>
+          <button
+            type="button"
+            disabled={checkDate >= today}
+            onClick={() => onCheckDateChange?.(shiftDate(checkDate, 1))}
+            className="flex h-full w-8 items-center justify-center text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 transition-colors"
+            aria-label={t('Día siguiente')}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => onRefreshChecks?.()}
+          disabled={isChecksLoading}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 shadow-2xs transition-colors"
+          aria-label={t('Actualizar checks')}
+        >
+          <RefreshCw size={15} className={isChecksLoading ? 'animate-spin' : ''} />
+        </button>
       </div>}
       <div className="header-status flex items-center justify-end gap-3 text-xs tabular-nums">
         {isTasks && (isAgenda ? canManageEvents : isAdmin) && <button type="button" onClick={isAgenda ? requestCreateEvent : requestCreateTask} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{isAgenda ? t('Nuevo evento') : t('Nueva Tarea')}</button>}

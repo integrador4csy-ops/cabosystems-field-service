@@ -93,6 +93,8 @@ export const LiveMap: React.FC<LiveMapProps> = ({
           center: savedView.current?.center || { lat: 23.0626, lng: -109.7036 },
           zoom: savedView.current?.zoom ?? 14,
           mapId: import.meta.env.VITE_GOOGLE_MAP_ID || 'DEMO_MAP_ID',
+          mapTypeId: google.maps.MapTypeId.ROADMAP,
+          colorScheme: google.maps.ColorScheme.LIGHT,
           disableDefaultUI: true,
           clickableIcons: false,
           gestureHandling: 'greedy',

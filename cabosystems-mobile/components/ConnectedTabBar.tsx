@@ -58,7 +58,7 @@ export function ConnectedTabLabel({ tab, children }: { tab: string; children: Re
   const { position, tabs, visible } = useMotion();
   const index = tabs.indexOf(tab);
   const motionStyle = useAnimatedStyle(() => ({ color: interpolateColor(visible ? tabCoverage(position.value, index) : 0, [0, 1], [INK, '#FFFFFF']) }));
-  return <Animated.Text testID={`tab-label-${tab}`} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={[s.label, motionStyle]}>{children}</Animated.Text>;
+  return <Animated.Text testID={`tab-label-${tab}`} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.68} style={[s.label, motionStyle]}>{children}</Animated.Text>;
 }
 
 export function ConnectedTabButton(props: PressableProps) {
