@@ -176,16 +176,6 @@ export const AuthSplitScreen: React.FC = () => {
   return (
     <div className="relative min-h-dvh w-full bg-white font-outfit text-gray-800 antialiased flex">
       <div className="flex w-full lg:w-1/2 flex-col px-6 py-8 sm:px-12 sm:py-10 lg:px-14">
-        <div className="flex w-full shrink-0 justify-center">
-          <div className="flex items-center gap-3">
-            <img src="/logo-cabosystems-icon.svg" alt="CaboSystems" width={48} height={48} className="h-12 w-12 object-contain" />
-            <div className="flex flex-col text-left">
-              <span className="font-outfit text-2xl font-bold text-gray-900 leading-tight">CaboSystems</span>
-              <span className="text-xs font-bold text-[#f78c26] uppercase tracking-widest">Field Service</span>
-            </div>
-          </div>
-        </div>
-
         {/* Center: Auth Form Card */}
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-10 sm:py-14">
           <div>
