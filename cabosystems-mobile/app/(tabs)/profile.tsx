@@ -125,11 +125,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const isAdmin =
-    profile?.rol === 'admin' ||
-    profile?.rol === 'supervisor_instalacion' ||
-    profile?.rol === 'aux_operaciones';
-
   // Subida de Foto de Perfil
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
@@ -438,7 +433,7 @@ export default function ProfileScreen() {
             onPress={() => router.push('/(tabs)/' as any)}
           >
             <View style={styles.menuIconCircle}>
-              <ClipboardList size={18} color="#FFFFFF" strokeWidth={2.2} />
+              <ClipboardList size={20} color={Colors.primary} strokeWidth={2.2} />
             </View>
             <View style={styles.menuTexts}>
               <Text style={styles.menuTitle}>{t('profile.myWorkOrders')}</Text>
@@ -457,7 +452,7 @@ export default function ProfileScreen() {
             onPress={() => router.push('/locations')}
           >
             <View style={styles.menuIconCircle}>
-              <MapPin size={18} color="#FFFFFF" strokeWidth={2.2} />
+              <MapPin size={20} color={Colors.primary} strokeWidth={2.2} />
             </View>
             <View style={styles.menuTexts}>
               <Text style={styles.menuTitle}>{t('profile.villaLocations')}</Text>
@@ -466,28 +461,6 @@ export default function ProfileScreen() {
             <ChevronRight size={17} color={Colors.textDisabled} />
           </Pressable>
 
-          {!isAdmin && (
-            <>
-              <View style={styles.menuDivider} />
-
-              <Pressable
-                style={({ pressed }) => [
-                  styles.menuItem,
-                  pressed && { opacity: 0.75, transform: [{ scale: Animation.pressScale }] },
-                ]}
-                onPress={() => router.navigate('/(tabs)/fab')}
-              >
-                <View style={styles.menuIconCircle}>
-                  <MapPin size={18} color="#FFFFFF" strokeWidth={2.2} />
-                </View>
-                <View style={styles.menuTexts}>
-                  <Text style={styles.menuTitle}>{t('profile.checkinCheckout')}</Text>
-                  <Text style={styles.menuSubtitle}>{t('profile.checkinCheckoutSub')}</Text>
-                </View>
-                <ChevronRight size={17} color={Colors.textDisabled} />
-              </Pressable>
-            </>
-          )}
         </View>
 
         {/* Sección: AJUSTES DE LA APLICACIÓN */}
@@ -501,7 +474,7 @@ export default function ProfileScreen() {
             onPress={() => setLanguageModalVisible(true)}
           >
             <View style={styles.menuIconCircle}>
-              <Globe size={18} color="#FFFFFF" strokeWidth={2.2} />
+              <Globe size={20} color={Colors.primary} strokeWidth={2.2} />
             </View>
             <View style={styles.menuTexts}>
               <Text style={styles.menuTitle}>{t('profile.language')}</Text>
@@ -524,7 +497,7 @@ export default function ProfileScreen() {
             <>
               <View style={styles.menuItem}>
                 <View style={styles.menuIconCircle}>
-                  <Fingerprint size={18} color="#FFFFFF" strokeWidth={2.2} />
+                  <Fingerprint size={20} color={Colors.primary} strokeWidth={2.2} />
                 </View>
                 <View style={styles.menuTexts}>
                   <Text style={styles.menuTitle}>{tr(biometricLabel)}</Text>
@@ -556,7 +529,7 @@ export default function ProfileScreen() {
             }}
           >
             <View style={styles.menuIconCircle}>
-              <KeyRound size={18} color="#FFFFFF" strokeWidth={2.2} />
+              <KeyRound size={20} color={Colors.primary} strokeWidth={2.2} />
             </View>
             <View style={styles.menuTexts}>
               <Text style={styles.menuTitle}>{t('profile.changePassword')}</Text>
@@ -575,7 +548,7 @@ export default function ProfileScreen() {
             onPress={() => setSupportModalVisible(true)}
           >
             <View style={styles.menuIconCircle}>
-              <HelpCircle size={18} color="#FFFFFF" strokeWidth={2.2} />
+              <HelpCircle size={20} color={Colors.primary} strokeWidth={2.2} />
             </View>
             <View style={styles.menuTexts}>
               <Text style={styles.menuTitle}>{t('profile.support')}</Text>
@@ -595,7 +568,7 @@ export default function ProfileScreen() {
             onPress={() => setLogoutModalVisible(true)}
           >
             <View style={[styles.menuIconCircle, styles.logoutIconCircle]}>
-              <LogOut size={18} color="#FFFFFF" strokeWidth={2.2} />
+              <LogOut size={20} color={Colors.primary} strokeWidth={2.2} />
             </View>
             <View style={styles.menuTexts}>
               <Text style={styles.logoutText}>{t('profile.logout')}</Text>
@@ -1181,10 +1154,12 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   menuIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.primary,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.primaryLight,
+    borderWidth: 1,
+    borderColor: Colors.borderBrand,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1211,7 +1186,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
   },
   logoutIconCircle: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.borderBrand,
   },
   logoutText: {
     fontFamily: 'Outfit_600SemiBold',

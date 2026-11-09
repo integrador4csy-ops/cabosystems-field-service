@@ -107,10 +107,28 @@ export async function registerForPushNotificationsAsync(userId: string): Promise
       Constants?.easConfig?.projectId ??
       '51b20f76-64c1-4f2a-a237-7e270229467c';
 
-    // 4. Generar el token oficial de Expo Push
-    const tokenResponse = await NotificationsModule.getExpoPushTokenAsync({
-      projectId,
-    });
+    // 4. Generar el token oficial de Expo Push (con reintento en caso de fallo temporal de red)
+    let tokenResponse;
+    try {
+      tokenResponse = await NotificationsModule.getExpoPushTokenAsync({
+        projectId,
+      });
+    } catch (err: any) {
+      const isNetworkErr =
+        err?.code === 'ERR_NOTIFICATIONS_NETWORK_ERROR' ||
+        err?.message?.includes('UnknownHostException') ||
+        err?.message?.includes('fetch failed');
+      
+      if (isNetworkErr) {
+        // Reintentar una vez tras 2.5s por si el dispositivo estaba reconectando WiFi/datos
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+        tokenResponse = await NotificationsModule.getExpoPushTokenAsync({
+          projectId,
+        });
+      } else {
+        throw err;
+      }
+    }
 
     const pushToken = tokenResponse.data;
     if (!pushToken) return null;
@@ -137,12 +155,23 @@ export async function registerForPushNotificationsAsync(userId: string): Promise
 
     return pushToken;
   } catch (error: any) {
+    const isNetworkError =
+      error?.code === 'ERR_NOTIFICATIONS_NETWORK_ERROR' ||
+      error?.message?.includes('UnknownHostException') ||
+      error?.message?.includes('fetch failed') ||
+      error?.message?.includes('Network request failed');
+
     if (
       error?.message?.includes('Firebase Messaging') ||
       error?.message?.includes('Default FirebaseApp is not initialized')
     ) {
       console.warn(
         '⚠️ [Notifications] Para recibir notificaciones push en Android nativo, se requiere colocar el archivo google-services.json de Firebase en cabosystems-mobile/.'
+      );
+    } else if (isNetworkError) {
+      console.warn(
+        '⚠️ [Notifications] Dispositivo sin conexión o no pudo contactar con exp.host. Se omitió el registro de push tokens temporalmente:',
+        error.message || error
       );
     } else {
       console.error('Error registrando notificaciones push:', error);

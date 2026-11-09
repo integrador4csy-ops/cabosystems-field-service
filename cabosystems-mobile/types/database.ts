@@ -36,6 +36,7 @@ export interface UbicacionUsuario {
   rumbo?: number | null;
   bateria?: number | null;
   esta_cargando?: boolean;
+  actividad?: 'detenido' | 'caminando' | 'conduciendo' | string | null;
   en_linea?: boolean;
   updated_at: string;
 }

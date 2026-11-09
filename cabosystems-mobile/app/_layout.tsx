@@ -8,7 +8,6 @@ import {
   Outfit_800ExtraBold,
 } from '@expo-google-fonts/outfit';
 import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
 import React, { useState, useEffect } from 'react';
 import { Linking } from 'react-native';
 import { AuthProvider, useAuth } from '@/lib/auth';
@@ -31,8 +30,6 @@ export {
 export const unstable_settings = {
   anchor: '(tabs)',
 };
-
-SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
   const { session, profile, loading } = useAuth();
@@ -146,8 +143,6 @@ function RootLayoutNav() {
     // Evitar navegación si el árbol de navegación no se ha montado aún o auth está cargando
     if (!rootNavigationState?.key || loading) return;
 
-    void SplashScreen.hideAsync().catch(() => {});
-
     const inAuthGroup = segments[0] === '(auth)';
     const isResettingPassword = segments[1] === 'reset-password';
 
@@ -206,16 +201,6 @@ export default function RootLayout() {
   useEffect(() => {
     if (error) throw error;
   }, [error]);
-
-  useEffect(() => {
-    if (loaded) {
-      // Fallback de seguridad en caso de que la navegación demore en resolver
-      const timer = setTimeout(() => {
-        void SplashScreen.hideAsync().catch(() => {});
-      }, 3500);
-      return () => clearTimeout(timer);
-    }
-  }, [loaded]);
 
   if (!loaded) {
     return null;

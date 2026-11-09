@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "cabosystemsmobile",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cabosystems.fieldservice",
@@ -51,12 +51,6 @@
       "./plugins/withChatNotifications",
       "expo-router",
       "expo-font",
-      [
-        "expo-splash-screen",
-        {
-          "backgroundColor": "#ffffff"
-        }
-      ],
       "expo-status-bar",
       "expo-web-browser",
       "expo-image",

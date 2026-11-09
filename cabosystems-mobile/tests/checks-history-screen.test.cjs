@@ -5,15 +5,15 @@ const path = require('node:path');
 
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 
-test('administrator Checks tab groups evidence by person and filters one local day', () => {
+test('check history remains notification-accessible but is hidden from the tab bar', () => {
   const screen = read('app/(tabs)/checks.tsx');
   const layout = read('app/(tabs)/_layout.tsx');
   assert.match(screen, /getAdminCheckHistory\(dayKey\(day\)\)/);
   assert.match(screen, /groups = new Map/);
   assert.match(screen, /item\.technician_id === selectedUser/);
   assert.match(screen, /<Image source=\{\{ uri: item\.photo_url \}\}/);
-  assert.match(layout, /\['index', 'checks', 'schedule', 'users', 'chat'\]/);
-  assert.match(layout, /href: isAdmin \? undefined : null/);
+  assert.match(layout, /name="checks"[\s\S]*?options=\{\{ href: null \}\}/);
+  assert.match(layout, /\['index', 'maps', 'schedule', 'users', 'chat'\]/);
 });
 
 test('operational pushes open authenticated task or check destinations without exposing evidence', () => {

@@ -1068,8 +1068,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     paddingHorizontal: 13,
     paddingVertical: 7.5,
-    borderRadius: BorderRadius.full,
+    borderRadius: BorderRadius.sm,
     gap: 5,
+    marginRight: 10,
     ...Shadow.xs,
   },
   inviteNavBtnText: {

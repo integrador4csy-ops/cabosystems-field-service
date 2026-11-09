@@ -149,7 +149,7 @@ function VillaTeam({ villa, data, admin, c, close, saved, deleted, onDirty }: { 
     }
     return acc;
   });
-  const [personId, setPersonId] = useState(''); const [query, setQuery] = useState('');
+  const [personId, setPersonId] = useState('');
   const [activeTab, setActiveTab] = useState<VillaDetailTab>('team');
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false); const [deleting, setDeleting] = useState(false); const [deleteError, setDeleteError] = useState('');
@@ -163,7 +163,7 @@ function VillaTeam({ villa, data, admin, c, close, saved, deleted, onDirty }: { 
   const active = data.staff.filter(p => p.activo);
   const integratorOptions = data.staff.filter(person => isEligibleProjectLead(person, 'integrator'));
   const technicianOptions = data.staff.filter(person => isEligibleProjectLead(person, 'technician'));
-  const available = active.filter(p => !participants.includes(p.id) && p.id !== integrator && p.id !== technician && normalize(personName(p)).includes(normalize(query)));
+  const available = active.filter(p => !participants.includes(p.id) && p.id !== integrator && p.id !== technician);
   const labelFor = (id: string) => { const p = data.staff.find(person => person.id === id); return p ? personName(p) : c.unassigned; };
   const useCurrentLocation = () => {
     if (!navigator.geolocation || gettingLocation) return;
@@ -301,7 +301,6 @@ function VillaTeam({ villa, data, admin, c, close, saved, deleted, onDirty }: { 
         }) : <p className="pd-muted">{c.noParticipants}</p>}
         {admin && (
           <div className="pd-add-person">
-            <label>{c.peopleSearch}<input type="search" value={query} onChange={event => { setQuery(event.target.value); setPersonId(''); }} disabled={busy} /></label>
             <div className="pd-add-row">
               <AppSelect aria-label={c.addParticipant} value={personId} disabled={busy} onChange={event => setPersonId(event.target.value)}>
                 <option value="">{c.addParticipant}</option>
@@ -309,17 +308,16 @@ function VillaTeam({ villa, data, admin, c, close, saved, deleted, onDirty }: { 
               </AppSelect>
               <button
                 type="button"
-                className="pd-icon"
-                aria-label={c.addParticipant}
+                className="pd-primary"
                 disabled={busy || !personId || !available.some(p => p.id === personId)}
                 onClick={() => {
                   setParticipants(previous => [...previous, personId]);
                   setParticipantAccess(prev => ({ ...prev, [personId]: 'mis_tareas' }));
                   setPersonId('');
-                  setQuery('');
                 }}
               >
-                <Plus size={18} />
+                <Plus size={16} aria-hidden="true" />
+                <span>{c.add}</span>
               </button>
             </div>
           </div>

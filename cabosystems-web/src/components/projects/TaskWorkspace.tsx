@@ -154,13 +154,78 @@ export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, se
     try { await onDeleteProject(project); } catch { setActionError('No se pudo eliminar la villa. Intenta de nuevo.'); } finally { setDeletingId(null); }
   };
 
+  const relevantScopeTasks = useMemo(() => {
+    if (mode === 'tasks') {
+      const villaId = selectedVilla?.id || effectiveProject;
+      return villaId && villaId !== 'all'
+        ? tasks.filter((t) => t.proyecto_id === villaId)
+        : tasks;
+    }
+    return tasks.filter((t) => {
+      if (development !== 'all') {
+        const project = projects.find((p) => p.id === t.proyecto_id);
+        if (project?.desarrollo !== development) return false;
+      }
+      if (effectiveProject !== 'all' && t.proyecto_id !== effectiveProject) return false;
+      return true;
+    });
+  }, [mode, selectedVilla?.id, effectiveProject, tasks, development, projects]);
+
+  const assignedCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const t of relevantScopeTasks) {
+      if (t.asignado_a) {
+        counts.set(t.asignado_a, (counts.get(t.asignado_a) || 0) + 1);
+      }
+    }
+    return counts;
+  }, [relevantScopeTasks]);
+
+  // Colaboradores con al menos una tarea asignada en esta villa / ámbito
+  const activeStaff = useMemo(() => {
+    const staffMap = new Map(staff.map((s) => [s.id, s]));
+    const result: { id: string; name: string }[] = [];
+
+    for (const [userId, count] of assignedCounts.entries()) {
+      if (userId === user?.id) continue;
+      if (count > 0) {
+        const member = staffMap.get(userId);
+        if (member) {
+          result.push({
+            id: member.id,
+            name: member.nombre || member.full_name || member.email || userId,
+          });
+        } else {
+          const taskProfile = relevantScopeTasks.find((t) => t.asignado_a === userId)?.profiles;
+          result.push({
+            id: userId,
+            name: taskProfile?.nombre || userId,
+          });
+        }
+      }
+    }
+
+    return result.sort((a, b) => a.name.localeCompare(b.name));
+  }, [staff, assignedCounts, user?.id, relevantScopeTasks]);
+
+  useEffect(() => {
+    if (assignee !== 'all' && assignee !== 'unassigned') {
+      const count = assignedCounts.get(assignee) || 0;
+      if (count === 0) {
+        setAssignee('all');
+      }
+    }
+  }, [assignee, assignedCounts, setAssignee]);
+
+  const userHasTasks = user?.id ? (assignedCounts.get(user.id) || 0) > 0 : false;
+
   const assigneeSelect = (
     <AppSelect aria-label={t('Responsable')} value={assignee} onChange={(event) => setAssignee(event.target.value)}>
-      <option value="all">{t('Todas las tareas de la villa')}</option>
-      {user?.id && <option value={user.id}>{t('Mis tareas')}</option>}
+      <option value="all">{mode === 'tasks' ? t('Todas las tareas de la villa') : t('Todas las tareas')}</option>
+      {user?.id && (userHasTasks || !isAdmin) && <option value={user.id}>{t('Mis tareas')}</option>}
       <option value="unassigned">{t('Sin asignar')}</option>
-      {staff.filter((person) => person.id !== user?.id).map((person) => (
-        <option key={person.id} value={person.id}>{person.nombre || person.full_name || person.email}</option>
+      {activeStaff.map((person) => (
+        <option key={person.id} value={person.id}>{person.name}</option>
       ))}
     </AppSelect>
   );

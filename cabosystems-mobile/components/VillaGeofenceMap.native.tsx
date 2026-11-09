@@ -24,6 +24,7 @@ export function VillaGeofenceMap({ coordinates, radiusMeters, onChange }: Props)
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         initialRegion={{ ...coordinates, latitudeDelta: 0.006, longitudeDelta: 0.006 }}
+        userInterfaceStyle="light"
         onPress={update}
         showsUserLocation
         showsMyLocationButton={false}
