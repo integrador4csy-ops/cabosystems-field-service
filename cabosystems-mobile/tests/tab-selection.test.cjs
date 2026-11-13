@@ -44,8 +44,8 @@ test('one position drives the capsule, icon and label without JS renders between
   try {
     await React.act(async () => { renderer = Renderer.create(render('index')); });
     assert.equal(style('tab-icon-light-index').opacity, 1);
-    // La palabra se mantiene siempre en tinta para no quedar ilegible fuera de la burbuja.
-    assert.equal(style('tab-label-index').color, '#343e48');
+    // El texto activo pasa a blanco al quedar envuelto por la cápsula naranja.
+    assert.equal(style('tab-label-index').color, '#FFFFFF');
     api.values[0].value = 0.5;
     assert.equal(style('tab-icon-light-index').opacity, 0);
     assert.equal(style('tab-icon-light-schedule').opacity, 0);
@@ -54,17 +54,17 @@ test('one position drives the capsule, icon and label without JS renders between
     await React.act(async () => { renderer.update(render('chat')); });
     assert.equal(style('connected-tab-capsule').transform[0].translateX, 267);
     assert.equal(style('tab-icon-light-chat').opacity, 1);
-    assert.equal(style('tab-label-chat').color, '#343e48');
+    assert.equal(style('tab-label-chat').color, '#FFFFFF');
     assert.equal(style('tab-label-index').color, '#343e48');
-    // La burbuja se desliza con un muelle: se detiene sin tirón.
+    // La cápsula se desliza con un muelle: se detiene sin tirón.
     assert.ok(api.animations.length > 0);
     assert.ok(api.animations.every(animation => animation.config.reduceMotion === 'system' && typeof animation.config.damping === 'number'));
     assert.equal(renderer.root.findByProps({ testID: 'connected-tab-capsule' }).props.style[0].backgroundColor, '#f78c26');
-    // La burbuja es un círculo pequeño centrado en el icono, no una cápsula ancha.
-    const capsule = renderer.root.findByProps({ testID: 'connected-tab-capsule' }).props.style[1];
-    assert.equal(capsule.width, capsule.height);
-    assert.equal(capsule.borderRadius, capsule.width / 2);
-    assert.ok(capsule.width < 44);
+    assert.equal(renderer.root.findByProps({ testID: 'connected-tab-capsule' }).props.style[0].borderRadius, 26);
+    assert.equal(renderer.root.findByProps({ testID: 'connected-tab-capsule' }).props.style[0].top, 5);
+    // La cápsula envuelve todo el botón (icono y texto).
+    const dynamicStyle = renderer.root.findByProps({ testID: 'connected-tab-capsule' }).props.style[1];
+    assert.ok(dynamicStyle.width > 50);
   } finally { if (renderer) await React.act(async () => renderer.unmount()); }
 });
 
