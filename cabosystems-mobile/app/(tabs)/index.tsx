@@ -62,7 +62,9 @@ const TaskRow = React.memo(function TaskRow({ item, onPress, en }: {
   const status = en ? meta.label : item.estatus === 'completada' ? tr("Completada") : item.estatus === 'en_proceso' ? tr("En proceso") : tr("Pendiente");
   const handlePress = useCallback(() => onPress(item.id), [item.id, onPress]);
   return <Pressable accessibilityRole="button" accessibilityLabel={`${item.titulo}, ${en ? priority.en : priority.es}, ${status}`}
-    onPress={handlePress} style={({ pressed }) => [styles.taskRow, pressed && styles.taskRowPressed]}>
+    onPress={handlePress}
+    android_ripple={{ color: 'rgba(247, 140, 38, 0.12)' }}
+    style={({ pressed }) => [styles.taskRow, Platform.OS !== 'android' && pressed && styles.taskRowPressed]}>
     <View style={styles.taskBody}>
       <Text style={styles.taskTitle} numberOfLines={2}>{item.titulo}</Text>
       {!!item.descripcion && <Text style={styles.taskDescription} numberOfLines={2}>{item.descripcion}</Text>}

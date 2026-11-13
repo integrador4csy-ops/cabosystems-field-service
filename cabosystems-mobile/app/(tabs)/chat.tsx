@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { afterTabPaint } from '@/lib/tabPreparation';
@@ -152,7 +153,8 @@ const ChatGroupItem = React.memo(function ChatGroupItem({
   return (
     <Pressable
       accessibilityRole="button" accessibilityLabel={tr('Abrir chat ') + item.nombre}
-      style={({ pressed }) => [styles.groupCard, pressed && styles.groupCardPressed]}
+      android_ripple={{ color: 'rgba(247, 140, 38, 0.12)' }}
+      style={({ pressed }) => [styles.groupCard, Platform.OS !== 'android' && pressed && styles.groupCardPressed]}
       onPressIn={handlePressIn}
       onPress={handlePress}
     >

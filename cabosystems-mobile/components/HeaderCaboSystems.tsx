@@ -1,6 +1,6 @@
 import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Modal, ScrollView, useWindowDimensions, Image } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal, ScrollView, useWindowDimensions, Image, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MapPin, X, ChevronDown, Check } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
@@ -148,15 +148,18 @@ export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
         </View>
       </SafeAreaView>
 
-      {/* Modal TailAdmin Minimalista */}
+      {/* Bottom Sheet Material 3 Nativo */}
       <Modal
         visible={visible}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setVisible(false)}
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setVisible(false)}>
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.sheetHandleContainer}>
+              <View style={styles.sheetHandle} />
+            </View>
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitle}>{tr("Ubicación Activa")}</Text>
@@ -175,7 +178,12 @@ export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
               {onSelectAllProjects ? <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ selected: allProjectsSelected }}
-                style={[styles.unitRow, allProjectsSelected && styles.unitRowSelected]}
+                android_ripple={{ color: 'rgba(247, 140, 38, 0.16)' }}
+                style={({ pressed }) => [
+                  styles.unitRow,
+                  allProjectsSelected && styles.unitRowSelected,
+                  Platform.OS !== 'android' && pressed && { opacity: 0.8 },
+                ]}
                 onPress={() => { onSelectAllProjects(); setVisible(false); }}
               >
                 <Text style={[styles.unitCode, allProjectsSelected && styles.unitCodeSelected]}>{tr("Todas las villas")}</Text>
@@ -192,10 +200,11 @@ export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
                         key={unit.id}
                         accessibilityRole="button"
                         accessibilityState={{ selected: isSelected }}
+                        android_ripple={{ color: 'rgba(247, 140, 38, 0.16)' }}
                         style={({ pressed }) => [
                           styles.unitRow,
                           isSelected && styles.unitRowSelected,
-                          pressed && { opacity: 0.8 },
+                          Platform.OS !== 'android' && pressed && { opacity: 0.8 },
                         ]}
                         onPress={() => {
                           onSelectProject?.(unit);
@@ -344,20 +353,35 @@ const styles = StyleSheet.create({
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(16, 24, 40, 0.45)',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    padding: Spacing.lg,
+    padding: 0,
   },
   modalContent: {
     width: '100%',
-    maxWidth: 420,
-    maxHeight: '75%',
+    maxWidth: 640,
+    maxHeight: '82%',
     backgroundColor: '#FFFFFF',
-    borderRadius: BorderRadius['2xl'],
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     borderWidth: 1,
     borderColor: Colors.border,
     overflow: 'hidden',
+    paddingBottom: 20,
     ...Shadow.lg,
+  },
+  sheetHandleContainer: {
+    alignItems: 'center',
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.22)',
   },
   modalHeader: {
     flexDirection: 'row',

@@ -168,16 +168,24 @@ function RootLayoutNav() {
 
   return (
     <>
-      <Stack screenOptions={{ headerShown: false, freezeOnBlur: true }}>
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="pending" options={{ headerShown: false }} />
-        <Stack.Screen name="task/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="checkin/[id]" options={{ headerShown: false, presentation: 'modal' }} />
-        <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="chat/new-group" options={{ headerShown: false }} />
-        <Stack.Screen name="chat/group-info/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="locations" options={{ headerShown: false }} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          freezeOnBlur: true,
+          animation: 'slide_from_right',
+          animationDuration: 220,
+          gestureEnabled: true,
+        }}
+      >
+        <Stack.Screen name="(auth)" options={{ headerShown: false, animation: 'fade' }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'fade' }} />
+        <Stack.Screen name="pending" options={{ headerShown: false, animation: 'fade' }} />
+        <Stack.Screen name="task/[id]" options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }} />
+        <Stack.Screen name="checkin/[id]" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="chat/[id]" options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }} />
+        <Stack.Screen name="chat/new-group" options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }} />
+        <Stack.Screen name="chat/group-info/[id]" options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }} />
+        <Stack.Screen name="locations" options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }} />
         <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />
       </Stack>
       <FieldSyncStatus owner={session?.user.id || ''} />
