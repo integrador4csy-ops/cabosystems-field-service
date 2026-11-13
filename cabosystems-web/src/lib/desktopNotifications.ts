@@ -81,7 +81,7 @@ export function showDesktopNotification(
     try {
       const options: any = {
         body,
-        icon: '/apple-touch-icon.png',
+        icon: '/favicon-192x192.png',
         badge: '/favicon-32x32.png',
         tag: 'cabosystems-chat-alert',
         renotify: true,
