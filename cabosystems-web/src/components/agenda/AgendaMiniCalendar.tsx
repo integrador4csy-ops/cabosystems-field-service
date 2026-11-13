@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { dateKey, parseDateKey, shiftDate, shiftMonth, weekDates } from '../../lib/taskDates';
 
 export function AgendaMiniCalendar({ selected, locale, onSelect }: { selected: string; locale: string; onSelect: (day: string) => void }) {
@@ -66,6 +66,7 @@ export function AgendaMiniCalendar({ selected, locale, onSelect }: { selected: s
           className="agenda-mini-title-btn"
           aria-expanded={pickerOpen}
           aria-label={en ? 'Select month and year' : 'Seleccionar mes y año'}
+          title={en ? 'Select month and year' : 'Seleccionar mes y año'}
           onClick={() => {
             if (!pickerOpen) setPickerYear(currentYear);
             setPickerOpen(open => !open);
@@ -74,7 +75,6 @@ export function AgendaMiniCalendar({ selected, locale, onSelect }: { selected: s
           <span className="agenda-mini-title-text">
             {parseDateKey(first).toLocaleDateString(locale, { month: 'long', year: 'numeric' })}
           </span>
-          <ChevronDown size={14} className={`agenda-mini-title-chevron ${pickerOpen ? 'is-open' : ''}`} />
         </button>
         <button
           type="button"
