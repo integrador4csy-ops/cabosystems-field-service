@@ -10,9 +10,6 @@ import {
   CheckSquare,
   AlertCircle,
   Loader2,
-  Circle,
-  Clock3,
-  CircleCheck,
 } from 'lucide-react';
 import { createTask, updateTask, createSubtask } from '../../lib/projectsApi';
 import type { Proyecto, Tarea } from '../../types/projects';
@@ -213,7 +210,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-slate-700">
               {t("Estatus")}</label>
-            <div className="task-editor-status grid grid-cols-3 gap-2" role="group" aria-label={t('Estatus')}>
+            <div className="flex w-full items-center gap-[3px] rounded-[9px] border border-slate-200 bg-slate-100 p-[3px]" role="group" aria-label={t('Estatus')}>
               {(['pendiente', 'en_proceso', 'completada'] as const).map((st) => (
                 <button
                   key={st}
@@ -221,25 +218,39 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                   disabled={loading}
                   aria-pressed={estatus === st}
                   onClick={() => setEstatus(st)}
-                  className={`h-10 rounded-lg text-xs font-semibold capitalize transition-all border ${
+                  className={`flex flex-1 min-w-0 h-[32px] sm:h-[34px] items-center justify-center whitespace-nowrap rounded-[7px] px-3 text-xs sm:text-[13px] capitalize transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${
                     estatus === st
-                      ? 'border-slate-600 bg-slate-50 text-slate-800'
-                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                      ? 'bg-brand-500 font-semibold text-white shadow-xs'
+                      : 'font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-900'
                   }`}
                 >
-                  {st === 'pendiente' ? <Circle size={15} aria-hidden="true" /> : st === 'en_proceso' ? <Clock3 size={15} aria-hidden="true" /> : <CircleCheck size={15} aria-hidden="true" />}{getTaskStatusLabel(st, t)}
+                  {getTaskStatusLabel(st, t)}
                 </button>
               ))}
             </div>
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-slate-700" htmlFor="task-priority">{t('Prioridad')}</label>
-            <AppSelect id="task-priority" aria-label={t('Prioridad')} value={prioridad} onChange={(event) => setPrioridad(event.target.value as typeof prioridad)} className="h-11">
-              <option value="alta">{t('Alta')}</option>
-              <option value="media">{t('Media')}</option>
-              <option value="baja">{t('Baja')}</option>
-            </AppSelect>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+              {t('Prioridad')}</label>
+            <div className="flex w-full items-center gap-[3px] rounded-[9px] border border-slate-200 bg-slate-100 p-[3px]" role="group" aria-label={t('Prioridad')}>
+              {(['alta', 'media', 'baja'] as const).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  disabled={loading}
+                  aria-pressed={prioridad === p}
+                  onClick={() => setPrioridad(p)}
+                  className={`flex flex-1 min-w-0 h-[32px] sm:h-[34px] items-center justify-center whitespace-nowrap rounded-[7px] px-3 text-xs sm:text-[13px] capitalize transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${
+                    prioridad === p
+                      ? 'bg-brand-500 font-semibold text-white shadow-xs'
+                      : 'font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                  }`}
+                >
+                  {p === 'alta' ? t('Alta') : p === 'media' ? t('Media') : t('Baja')}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Descripción */}

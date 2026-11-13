@@ -11,8 +11,6 @@
 .task-editor-date-label button { color: var(--color-slate-500); font-size: 12px; font-weight: 400; text-decoration: underline; text-underline-offset: 3px; }
 .task-editor-date-label button:hover { color: var(--color-slate-800); }
 .task-editor-schedule { padding-top: 0; }
-.task-editor-status > button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; height: 38px; font-weight: 500; }
-.task-editor-status > button[aria-pressed="true"] { border-color: var(--color-brand-500); background: var(--color-brand-500); color: white; }
 .task-editor textarea { min-height: 70px; resize: vertical; }
 .task-editor form > div:last-child { padding: 11px 18px; }
 .task-editor form > div:last-child button { height: 40px; }
@@ -21,6 +19,4 @@
 .task-editor .agenda-picker-panel button.is-selected { font-weight: 600; }
 @media (max-width: 480px) {
   .task-editor > div:first-child, .task-editor form > div:first-child { padding: 16px; }
-  .task-editor-status { gap: 6px; }
-  .task-editor-status > button { gap: 4px; font-size: 11px; }
 }
