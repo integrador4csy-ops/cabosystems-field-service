@@ -20,6 +20,7 @@ function fixture() {
     },
     withTiming: (target, config) => { animations.push({ target, config }); return target; },
     withSpring: (target, config) => { animations.push({ target, config }); return target; },
+    cancelAnimation: () => {},
     interpolateColor: (value, _, colors) => value === 1 ? colors[1] : colors[0],
   };
   const exports = {};

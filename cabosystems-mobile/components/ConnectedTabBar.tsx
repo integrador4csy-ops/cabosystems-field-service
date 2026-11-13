@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, 
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   ReduceMotion,
+  cancelAnimation,
   interpolateColor,
   useAnimatedStyle,
   useSharedValue,
@@ -25,6 +26,7 @@ const Context = createContext<Motion | null>(null);
 
 export function tabCoverage(position: number, index: number) {
   'worklet';
+  if (!Number.isFinite(position)) return 0;
   return Math.max(0, Math.min(1, (0.5 - Math.abs(position - index)) / 0.25));
 }
 
@@ -42,15 +44,19 @@ export function ConnectedTabBarProvider({
 
   useLayoutEffect(() => {
     if (index < 0) return;
-    // Muelle ultra ágil e instantáneo (~130ms): se dispara antes del renderizado de la pantalla
-    // sin retraso perceptible y frena en seco en el destino (overshootClamping).
+    if (typeof cancelAnimation === 'function') {
+      cancelAnimation(position);
+    }
+    // Muelle estable y reactivo: velocidad inicial reiniciada a 0 para no acumular inercia
+    // en cambios rápidos de pestañas, evitando picos de aceleración y cierres inesperados.
     position.value = withSpring(index, {
-      damping: 26,
-      stiffness: 420,
-      mass: 0.2,
+      damping: 25,
+      stiffness: 280,
+      mass: 0.35,
+      velocity: 0,
       overshootClamping: true,
-      restDisplacementThreshold: 0.01,
-      restSpeedThreshold: 0.01,
+      restDisplacementThreshold: 0.005,
+      restSpeedThreshold: 0.005,
       reduceMotion: ReduceMotion.System,
     });
   }, [index, position]);
@@ -78,9 +84,13 @@ export function ConnectedTabBackground() {
   // La cápsula envuelve todo el slot (icono y texto) con un margen horizontal sutil
   const capsuleWidth = Math.max(0, slot - 4);
 
-  const motionStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: position.value * slot }],
-  }));
+  const motionStyle = useAnimatedStyle(() => {
+    const raw = Number.isFinite(position.value) ? position.value : 0;
+    const clamped = Math.max(0, Math.min(tabs.length - 1, raw));
+    return {
+      transform: [{ translateX: clamped * slot }],
+    };
+  });
 
   return (
     <View
@@ -153,13 +163,17 @@ export function ConnectedTabLabel({
   const { position, tabs, visible } = useMotion();
   const index = tabs.indexOf(tab);
 
-  const motionStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(
-      visible ? tabCoverage(position.value, index) : 0,
-      [0, 1],
-      [INK, '#FFFFFF']
-    ),
-  }));
+  const motionStyle = useAnimatedStyle(() => {
+    const coverage = visible ? tabCoverage(position.value, index) : 0;
+    const safeCoverage = Number.isFinite(coverage) ? Math.max(0, Math.min(1, coverage)) : 0;
+    return {
+      color: interpolateColor(
+        safeCoverage,
+        [0, 1],
+        [INK, '#FFFFFF']
+      ),
+    };
+  });
 
   return (
     <Animated.Text
