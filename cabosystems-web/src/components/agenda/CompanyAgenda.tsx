@@ -9,7 +9,6 @@ import { getCompanyBirthdays, getCompanyEvents, getGoogleCalendars, getLocalEven
 import { dateKey, parseDateKey, shiftDate, shiftMonth } from '../../lib/taskDates';
 import { supabase } from '../../lib/supabase';
 import type { AgendaGoogleCalendar, CompanyEvent } from '../../types/agenda';
-import { AppSelect } from '../ui/AppSelect';
 import { EventDialog } from './EventDialog';
 import { AgendaSearchClient } from '../../lib/agendaSearchClient';
 import { AgendaSearchResults } from './AgendaSearchResults';
@@ -196,7 +195,23 @@ export function CompanyAgenda() {
     <div className="company-agenda-main">
     {!searching && <div className="agenda-toolbar">
       <div className="agenda-period-heading"><button className="workspace-button" onClick={() => setAnchor(today)}>{t('Hoy')}</button><div className="agenda-period-arrows"><button className="workspace-icon agenda-period-arrow" aria-label={t('Periodo anterior')} onClick={() => move(-1)}><ChevronLeft size={20} /></button><button className="workspace-icon agenda-period-arrow" aria-label={t('Periodo siguiente')} onClick={() => move(1)}><ChevronRight size={20} /></button></div><h2 className="agenda-month-title" aria-live="polite">{heading}</h2></div>
-      <div className="agenda-date-controls">{canConnectGoogle && <button type="button" className="workspace-button" onClick={() => setGoogleOpen(true)}>{locale.startsWith('en') ? 'Sync calendar' : 'Sincronizar calendario'}<img className="google-calendar-sync-icon" src="/google-calendar.png" alt="" width={24} height={24} /></button>}<AppSelect aria-label={t('Vista de agenda')} value={view} onChange={(e) => setView(e.target.value as CompanyAgendaView)}><option value="month">{t('Mes')}</option><option value="week">{t('Semana')}</option><option value="day">{t('Día')}</option></AppSelect><input type="date" min="1900-01-01" max="9999-12-31" aria-label={t('Ir a fecha')} value={anchor} onChange={(e) => { if (e.target.validity.valid && e.target.value) setAnchor(e.target.value); }} /></div>
+      <div className="agenda-date-controls">
+        {canConnectGoogle && <button type="button" className="workspace-button" onClick={() => setGoogleOpen(true)}>{locale.startsWith('en') ? 'Sync calendar' : 'Sincronizar calendario'}<img className="google-calendar-sync-icon" src="/google-calendar.png" alt="" width={24} height={24} /></button>}
+        <div className="agenda-view-segmented" role="tablist" aria-label={t('Vista de agenda')}>
+          {(['month', 'week', 'day'] as const).map(mode => (
+            <button
+              key={mode}
+              type="button"
+              role="tab"
+              aria-selected={view === mode}
+              className={`agenda-view-segment ${view === mode ? 'is-active' : ''}`}
+              onClick={() => setView(mode)}
+            >
+              {mode === 'month' ? t('Mes') : mode === 'week' ? t('Semana') : t('Día')}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>}
 
     {!searching && <section className="company-birthdays" aria-labelledby="company-birthdays-title">

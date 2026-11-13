@@ -40,11 +40,30 @@
 .company-agenda-sidebar .company-calendar-filters label { align-items: flex-start; line-height: 1.5; padding-block: 4px; }
 .company-agenda-sidebar .company-calendar-filters input { flex-shrink: 0; margin-top: 1px; }
 .company-agenda-sidebar-toggle { display: none; }
-.agenda-mini-heading { display: flex; align-items: center; gap: 2px; margin-bottom: 12px; }
+.agenda-mini-heading { position: relative; display: flex; align-items: center; gap: 2px; margin-bottom: 12px; }
 .agenda-mini-heading h3 { flex: 1; margin: 0; font-size: 14px; font-weight: 500; }
 .agenda-mini-heading h3::first-letter { text-transform: uppercase; }
-.agenda-mini-heading > button { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; color: var(--color-slate-600); cursor: pointer; }
-.agenda-mini-heading > button:hover:not(:disabled) { background: var(--color-slate-200); }
+.agenda-mini-heading > button:not(.agenda-mini-title-btn) { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; color: var(--color-slate-600); cursor: pointer; }
+.agenda-mini-heading > button:not(.agenda-mini-title-btn):hover:not(:disabled) { background: var(--color-slate-200); }
+.agenda-mini-title-btn { display: flex !important; align-items: center; gap: 4px; flex: 1; min-width: 0; height: 28px; padding: 0 4px; border: 0; border-radius: 6px; background: transparent; color: var(--color-slate-800); font-size: 13.5px; font-weight: 600; cursor: pointer; text-align: left; transition: background-color 120ms ease; }
+.agenda-mini-title-btn:hover { background: var(--color-slate-200); }
+.agenda-mini-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agenda-mini-title-text::first-letter { text-transform: uppercase; }
+.agenda-mini-title-chevron { flex-shrink: 0; color: var(--color-slate-500); transition: transform 150ms ease; }
+.agenda-mini-title-chevron.is-open { transform: rotate(180deg); }
+.agenda-month-picker-popover { position: absolute; top: calc(100% + 2px); left: 0; right: 0; z-index: 50; padding: 8px 6px; background: #ffffff; border: 1px solid var(--color-slate-200); border-radius: 10px; box-shadow: 0 10px 25px -5px rgb(15 23 42 / 18%), 0 6px 12px -4px rgb(15 23 42 / 12%); display: flex; flex-direction: column; gap: 8px; }
+.agenda-month-picker-year-row { display: flex; align-items: center; justify-content: space-between; gap: 2px; background: var(--color-slate-100); border: 1px solid var(--color-slate-200); border-radius: 6px; padding: 2px 4px; }
+.agenda-month-picker-year-btn { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 4px; background: transparent; color: var(--color-slate-600); cursor: pointer; }
+.agenda-month-picker-year-btn:hover:not(:disabled) { background: var(--color-slate-200); color: var(--color-slate-900); }
+.agenda-month-picker-year-btn:disabled { opacity: .35; cursor: default; }
+.agenda-month-picker-year-input { flex: 1; min-width: 0; text-align: center; border: 0; background: transparent; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--color-slate-800); padding: 1px 0; -moz-appearance: textfield; }
+.agenda-month-picker-year-input::-webkit-outer-spin-button, .agenda-month-picker-year-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.agenda-month-picker-year-input:focus-visible { outline: 2px solid var(--color-brand-500); border-radius: 4px; }
+.agenda-month-picker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
+.agenda-month-picker-cell { display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 2px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--color-slate-700); font-size: 11.5px; font-weight: 500; cursor: pointer; transition: background-color 100ms ease, color 100ms ease; text-transform: capitalize; }
+.agenda-month-picker-cell:hover:not(.is-selected) { background: var(--color-slate-100); color: var(--color-slate-900); }
+.agenda-month-picker-cell.is-selected { background: var(--color-brand-500); color: #ffffff; font-weight: 600; }
+.agenda-month-picker-cell:focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 1px; }
 .agenda-mini button:disabled { opacity: .35; cursor: default; }
 .agenda-mini-weekdays, .agenda-mini-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; text-align: center; }
 .agenda-mini-weekdays { margin-bottom: 6px; color: var(--color-slate-500); font-size: 11px; }
@@ -101,6 +120,11 @@
 .calendar-color-actions > button { min-height: 36px; padding: 6px 10px; font-size: 13px; }
 @media (hover: none) { .calendar-color-toggle { opacity: 1; pointer-events: auto; } }
 .company-agenda .agenda-date-controls > .app-select-trigger { width: auto; min-width: 100px; }
+.agenda-view-segmented { display: inline-flex; align-items: center; gap: 3px; padding: 3px; border-radius: 9px; background: var(--color-slate-100); border: 1px solid var(--color-slate-200); }
+.agenda-view-segment { display: inline-flex; align-items: center; justify-content: center; height: 30px; padding: 0 14px; border: 0; border-radius: 7px; background: transparent; color: var(--color-slate-600); font-size: 13px; font-weight: 500; cursor: pointer; transition: background-color 140ms ease, color 140ms ease; white-space: nowrap; }
+.agenda-view-segment:hover:not(.is-active) { background: var(--color-slate-200); color: var(--color-slate-900); }
+.agenda-view-segment.is-active { background: var(--color-brand-500); color: #fff; font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / 12%); }
+.agenda-view-segment:focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 2px; }
 .google-calendar-sync-icon { display: block; width: 24px; height: 24px; flex-shrink: 0; object-fit: contain; }
 .company-calendar-scroll { flex: 1; min-height: 0; overflow: auto; padding: 0 16px 16px; }
 .company-calendar { width: 100%; min-width: 840px; table-layout: fixed; border-collapse: collapse; }
