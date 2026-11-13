@@ -195,7 +195,7 @@ export function GroupTaskActivitySection({
                 {/* Optional Comment */}
                 {item.comentario ? (
                   <View style={styles.commentBox}>
-                    <Text style={styles.commentText}>“{item.comentario}”</Text>
+                    <Text style={styles.commentText}>{item.comentario.replace(/^[“"']+|[”"']+$/g, '').trim()}</Text>
                   </View>
                 ) : null}
 

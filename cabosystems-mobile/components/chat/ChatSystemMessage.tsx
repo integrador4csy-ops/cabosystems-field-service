@@ -261,7 +261,7 @@ export function ChatSystemMessage({
         {/* Optional Comment */}
         {cleanComment ? (
           <View style={styles.commentBox}>
-            <Text style={styles.commentText}>“{cleanComment}”</Text>
+            <Text style={styles.commentText}>{cleanComment}</Text>
           </View>
         ) : null}
 

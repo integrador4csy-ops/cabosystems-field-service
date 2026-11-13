@@ -172,7 +172,7 @@ export const ChatSystemMessage: React.FC<ChatSystemMessageProps> = ({
         {/* Optional Comment */}
         {meta?.comentario ? (
           <blockquote className="mt-1.5 rounded-md border-l-2 border-brand-400 bg-white/90 px-2.5 py-1 text-[11px] italic text-slate-600">
-            “{meta.comentario}”
+            {meta.comentario.replace(/^[“"']+|[”"']+$/g, '').trim()}
           </blockquote>
         ) : null}
 
