@@ -31,6 +31,7 @@ import { AgendaNativePager } from './AgendaNativePager';
 import { AgendaPreviewCache } from '@/lib/agendaPreviewCache';
 
 import { useCalendarColors } from '@/lib/useCalendarColors';
+import { useHeaderHeight } from '@/components/HeaderCaboSystems';
 
 const EMPTY: CompanyEvent[] = [];
 
@@ -50,7 +51,10 @@ function FocusAwareAgendaNativePager(props: React.ComponentProps<typeof AgendaNa
   return <AgendaNativePager {...props} enabled={props.enabled && focused} />;
 }
 
+let cachedBirthdayProfiles: CompanyBirthdayProfile[] | null = null;
+
 export default function CompanyAgendaScreen() {
+  const headerHeight = useHeaderHeight();
   const { profile, user } = useAuth(); const owner = profile?.activo ? profile.id : '';
   const windowManager = useMemo(() => getAgendaWindow(owner), [owner]);
   const periodCache = windowManager.cache;
@@ -60,7 +64,7 @@ export default function CompanyAgendaScreen() {
   const isPreReady = Boolean(owner && windowManager.ready);
   const [hydratedOwner, setHydratedOwner] = useState<string | null>(() => (isPreReady ? owner : null));
   const initializedOwner = useRef<string | null>(isPreReady ? owner : null);
-  const hydrated = hydratedOwner === owner && windowManager.ready;
+  const hydrated = Boolean(owner);
   const personalColors = useCalendarColors(owner);
   useFocusEffect(useCallback(() => afterTabPaint(() => { void personalColors.reload(); }), [personalColors.reload]));
   const canManage = canManageCompanyAgenda(profile);
@@ -73,7 +77,7 @@ export default function CompanyAgendaScreen() {
   }));
   const setAnchor = useCallback((anchor: string) => setPeriod(current => ({ anchor, position: 0, pageEpoch: current.pageEpoch + 1 })), []);
   const [view, setView] = useState<CompanyView>(() => (isPreReady ? windowManager.view : 'month'));
-  const nativePaging = view === 'month';
+  const nativePaging = view === 'month' || view === 'week';
   const [today, setToday] = useState(() => dateKey(new Date())); const [query, setQuery] = useState('');
   const [data, setData] = useState<{ owner: string; from: string; to: string; items: CompanyEvent[] }>({ owner: '', from: '', to: '', items: [] });
   const initialDays = useMemo(() => companyDays(isPreReady ? windowManager.anchor : dateKey(new Date()), isPreReady ? windowManager.view : 'month'), [isPreReady, windowManager]);
@@ -84,8 +88,8 @@ export default function CompanyAgendaScreen() {
   const [syncModalVisible, setSyncModalVisible] = useState(false);
   const [calendars, setCalendars] = useState<{ owner: string; items: AgendaGoogleCalendar[] }>({ owner: '', items: [] });
   const [hiddenCalendars, setHiddenCalendars] = useState<string[]>([]);
-  const [birthdayProfiles, setBirthdayProfiles] = useState<CompanyBirthdayProfile[]>([]);
-  const [birthdaysReady, setBirthdaysReady] = useState(false);
+  const [birthdayProfiles, setBirthdayProfiles] = useState<CompanyBirthdayProfile[]>(() => cachedBirthdayProfiles ?? []);
+  const [birthdaysReady, setBirthdaysReady] = useState(() => Boolean(cachedBirthdayProfiles));
   const sequence = useRef(0);
   const days = useMemo(() => companyDays(anchor, view), [anchor, view]);
   const from = days[0];
@@ -147,13 +151,8 @@ export default function CompanyAgendaScreen() {
   useEffect(() => { setHiddenCalendars([]); setErrorMessage(''); }, [owner]);
   const [searchRevision, setSearchRevision] = useState(0);
   const searchClient = useMemo(() => new AgendaSearchClient(), [owner]);
-  useFocusEffect(useCallback(() => {
-    if (!owner) return;
-    return afterTabPaint(() => {
-      const stopPolling = startForegroundPolling(() => searchClient.prepare(), 25_000);
-      return () => { stopPolling(); searchClient.clear(); };
-    });
-  }, [owner, searchClient, searchRevision]));
+  // La búsqueda de la agenda ya no tiene entrada en pantalla: no se prepara el
+  // índice de Google Calendar en cada foco ni se sondea cada 25 s.
 
   useFocusEffect(useCallback(() => {
     return afterTabPaint(() => {
@@ -172,10 +171,11 @@ export default function CompanyAgendaScreen() {
   }, [load, owner]));
 
   useFocusEffect(useCallback(() => {
-    if (!owner) return;
+    if (!owner || birthdaysReady || birthdayProfiles.length > 0) return;
     let active = true;
     return afterTabPaint(() => {
       void getCompanyBirthdays().then(items => {
+        cachedBirthdayProfiles = items;
         if (active) setBirthdayProfiles(items);
       }).catch(() => {
         // Birthdays complement the agenda and never block calendar events.
@@ -184,7 +184,7 @@ export default function CompanyAgendaScreen() {
       });
       return () => { active = false; };
     });
-  }, [owner]));
+  }, [owner, birthdaysReady, birthdayProfiles.length]));
 
 
 
@@ -230,13 +230,13 @@ export default function CompanyAgendaScreen() {
   const countsFor = (pageRows: CompanyRow[]) => new Map(pageRows.filter((row): row is Extract<CompanyRow, { kind: 'heading' }> => row.kind === 'heading').map(row => [row.date, row.count]));
   const counts = useMemo(() => countsFor(rows), [rows]);
   const renderPeriodHeader = useCallback((pageAnchor: string, pageDays: string[], pageRows: CompanyRow[]) => <View style={s.calendarEdge}><CompanyAgendaGrid copy={c} locale={locale} view={view} anchor={pageAnchor} today={today} days={pageDays} counts={countsFor(pageRows)} onDate={setAnchor} onView={setView} /></View>, [c, locale, view, today, setAnchor]);
-  const controls = <View style={s.fixedControls}>
-    <CompanyAgendaControls showCalendar={false} onSyncPress={() => setSyncModalVisible(true)} calendarFilter={<CompanyCalendarFilters key={owner} colors={personalColors.colors} loadingColors={personalColors.loading} colorsFailed={personalColors.failed} onRetryColors={personalColors.reload} onSaveColor={personalColors.save} calendars={calendarFilters} hidden={hiddenCalendars} locale={locale} onToggle={toggleCalendar} />} copy={c} locale={locale} query={query} view={view} anchor={anchor} today={today} days={days} counts={counts} heading={periodHeading(anchor, days)} onSearch={setQuery} onView={setView} onDate={setAnchor} onMove={move} onToday={() => setAnchor(dateKey(new Date()))} />
+  const controls = <View style={[s.fixedControls, { paddingTop: headerHeight }]}>
+    <CompanyAgendaControls showCalendar={false} calendarFilter={<CompanyCalendarFilters key={owner} colors={personalColors.colors} loadingColors={personalColors.loading} colorsFailed={personalColors.failed} onRetryColors={personalColors.reload} onSaveColor={personalColors.save} calendars={calendarFilters} hidden={hiddenCalendars} locale={locale} onToggle={toggleCalendar} />} copy={c} locale={locale} view={view} anchor={anchor} today={today} days={days} counts={counts} onView={setView} onDate={setAnchor} />
     {!query.trim() ? <View style={s.birthdays} accessibilityRole="summary" accessibilityLabel={language === 'es' ? `Cumpleaños de ${birthdayMonth}` : `Birthdays in ${birthdayMonth}`}>
       <CakeSlice size={12} color={P.accent} />
       <Text style={s.birthdayTitle}>{language === 'es' ? `Cumpleaños · ${birthdayMonth}` : `Birthdays · ${birthdayMonth}`}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.birthdayList}>
-        {!birthdaysReady ? <Text style={s.birthdayEmpty}>{language === 'es' ? 'Cargando…' : 'Loading…'}</Text> : birthdays.length > 0 ? birthdays.map(birthday => <View key={birthday.id} style={s.birthdayItem}><Text style={s.birthdayDay}>{birthday.day}</Text><Text numberOfLines={1} style={s.birthdayName}>{birthday.name}</Text></View>) : <Text style={s.birthdayEmpty}>{language === 'es' ? 'Ninguno este mes' : 'None this month'}</Text>}
+        {!birthdaysReady && birthdayProfiles.length === 0 ? null : birthdays.length > 0 ? birthdays.map(birthday => <View key={birthday.id} style={s.birthdayItem}><Text style={s.birthdayDay}>{birthday.day}</Text><Text numberOfLines={1} style={s.birthdayName}>{birthday.name}</Text></View>) : <Text style={s.birthdayEmpty}>{language === 'es' ? 'Ninguno este mes' : 'None this month'}</Text>}
       </ScrollView>
     </View> : null}
     {!query.trim() && error ? <View accessibilityRole="alert" style={s.error}><Text style={[s.help, s.errorCopy]}>{errorMessage || c.failed}{cached ? `\n${c.cached}` : ''}</Text><Pressable accessibilityRole="button" accessibilityLabel={c.retry} onPress={() => void load(true)} style={s.icon}><RefreshCw size={18} color={P.ink} /></Pressable></View> : null}
@@ -272,11 +272,9 @@ export default function CompanyAgendaScreen() {
   }, [preview, previewCache, owner, view, anchor, nativePaging, query]);
   return <View style={s.page}>
     <StatusBar style="dark" />
-    <CompanyAgendaTopBar copy={c} canManage={canManage} onCreate={() => setDialog({ owner, event: null, day: anchor })} />
-    {hydrated ? <>
+    <CompanyAgendaTopBar copy={c} canManage={canManage} onCreate={() => setDialog({ owner, event: null, day: anchor })} onSync={() => setSyncModalVisible(true)} />
     {controls}
     {nativePaging && !query.trim() ? <FocusAwareAgendaNativePager key={`${owner}:${view}:${pageEpoch}`} anchor={anchor} pagePosition={position} view={view} enabled={hydrated && !dialog} renderPage={nativePage} onMove={swipeMove} style={s.listArea} /> : <FocusAwareAgendaSwipeArea scopeKey={`${owner}:${view}:${pageEpoch}`} pagePosition={position} previousPages={previousPages} nextPages={nextPages} periodKey={`${owner}:${view}:${from}:${to}`} canGoPrevious={moveAgendaPeriod(anchor, view, -1) !== anchor} canGoNext={moveAgendaPeriod(anchor, view, 1) !== anchor} style={s.listArea} enabled={hydrated && !query.trim() && !dialog} onMove={swipeMove}><CompanyAgendaSearchResults periodKey={`${view}:${from}:${to}`} colors={personalColors.colors} client={searchClient} key={owner} query={query.trim()} today={today} locale={locale} hiddenCalendars={hiddenCalendars} revision={searchRevision} header={header} bottomInset={insets.bottom} onOpen={openEvent} onClear={() => setQuery('')} onDate={day => { setQuery(''); setAnchor(day); setView('day'); }} fallback={{ rows, renderItem: renderRow, refreshing, onRefresh: () => void load(true), empty: loading && periodCache.read(from, to) === null ? <View style={s.empty}><ActivityIndicator color={P.accent} /><Text style={s.help}>{c.loading}</Text></View> : <View style={s.empty}><CalendarDays size={26} color={P.slate} /><Text style={s.emptyText}>{c.empty}</Text></View> }} /></FocusAwareAgendaSwipeArea>}
-    </> : <View style={s.boot}><ActivityIndicator color={P.accent} /></View>}
     {dialog && dialog.owner === owner ? <CompanyEventModal key={`${owner}-${dialog.event?.id || dialog.day}`} event={dialog.event} day={dialog.day} canManage={canManage} copy={c} locale={locale} onClose={() => setDialog(null)} onSave={save} onDelete={remove} /> : null}
     <GoogleCalendarSyncModal visible={syncModalVisible} onClose={() => setSyncModalVisible(false)} onSyncDone={() => { setSyncModalVisible(false); void load(true); }} copy={c} locale={locale} />
   </View>;
@@ -285,7 +283,7 @@ const s = StyleSheet.create({
   boot: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   page: { flex: 1, backgroundColor: P.white },
   fixedControls: { width: '100%', maxWidth: 720, alignSelf: 'center', paddingHorizontal: 20, backgroundColor: P.white },
-  birthdays: { minHeight: 26, marginTop: 4, marginBottom: 4, paddingHorizontal: 2, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  birthdays: { minHeight: 26, marginTop: 0, marginBottom: 2, paddingHorizontal: 2, flexDirection: 'row', alignItems: 'center', gap: 6 },
   birthdayTitle: { flexShrink: 0, color: P.muted, fontFamily: 'Outfit_600SemiBold', fontSize: 13, lineHeight: 16, textTransform: 'capitalize' },
   birthdayList: { alignItems: 'center' },
   birthdayItem: { flexDirection: 'row', alignItems: 'baseline', gap: 4, maxWidth: 220, paddingHorizontal: 8, borderLeftWidth: 1, borderLeftColor: P.line },
@@ -294,7 +292,7 @@ const s = StyleSheet.create({
   birthdayEmpty: { paddingLeft: 8, borderLeftWidth: 1, borderLeftColor: P.line, color: P.muted, fontFamily: 'Outfit_400Regular', fontSize: 12.5, lineHeight: 16 },
   calendarEdge: { marginHorizontal: -20 },
   listArea: { flex: 1, width: '100%', maxWidth: 720, alignSelf: 'center' },
-  dayHeading: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 24, paddingBottom: 2 },
+  dayHeading: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 12, paddingBottom: 2 },
   dayTitle: { flex: 1, color: P.ink, fontFamily: 'Outfit_600SemiBold', fontSize: 14, textTransform: 'capitalize' },
   count: { color: P.muted, fontFamily: 'Outfit_400Regular', fontSize: 12 },
   empty: { paddingHorizontal: 16, paddingVertical: 36, gap: 12, alignItems: 'center' },

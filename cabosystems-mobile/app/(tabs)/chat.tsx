@@ -23,7 +23,6 @@ import {
   Search,
   Plus,
   MessageSquare,
-  Users,
   Video,
   Sparkles,
   Camera,
@@ -32,8 +31,9 @@ import {
 } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { useAuth } from '@/lib/auth';
+import { HeaderCaboSystems, useHeaderHeight } from '@/components/HeaderCaboSystems';
 import { getMyChatGroups, getCachedMyChatGroups } from '@/lib/chatApi';
-import { restoreChatRooms, getSavedChatGroups, subscribeChatRooms } from '@/lib/chatRoomCache';
+import { restoreChatRooms, getSavedChatGroups, subscribeChatRooms, loadChatRoom } from '@/lib/chatRoomCache';
 import type { ChatGroup } from '@/types/database';
 
 const LOGO_DARK = require('@/assets/images/Logo-CaboSystems-Field-Service-Dark.png');
@@ -90,7 +90,7 @@ const LastMessagePreview = React.memo(function LastMessagePreview({ group }: { g
   if (lastMsg.tipo === 'imagen') {
     return (
       <View style={styles.mediaPreviewRow}>
-        <Camera size={13} color={Colors.primary} strokeWidth={2.2} />
+        <Camera size={14} color={Colors.primary} strokeWidth={2.2} />
         <Text style={styles.mediaPreviewText} numberOfLines={1}>
           {sender}{tr(": Foto de evidencia")}</Text>
       </View>
@@ -100,7 +100,7 @@ const LastMessagePreview = React.memo(function LastMessagePreview({ group }: { g
   if (lastMsg.tipo === 'video') {
     return (
       <View style={styles.mediaPreviewRow}>
-        <Video size={13} color={Colors.primary} strokeWidth={2.2} />
+        <Video size={14} color={Colors.primary} strokeWidth={2.2} />
         <Text style={styles.mediaPreviewText} numberOfLines={1}>
           {sender}{tr(": Video técnico")}</Text>
       </View>
@@ -110,7 +110,7 @@ const LastMessagePreview = React.memo(function LastMessagePreview({ group }: { g
   if (lastMsg.tipo === 'sticker') {
     return (
       <View style={styles.mediaPreviewRow}>
-        <Sparkles size={13} color={Colors.primary} strokeWidth={2.2} />
+        <Sparkles size={14} color={Colors.primary} strokeWidth={2.2} />
         <Text style={styles.mediaPreviewText} numberOfLines={1}>
           {sender}{tr(": Sticker")}</Text>
       </View>
@@ -128,17 +128,22 @@ const LastMessagePreview = React.memo(function LastMessagePreview({ group }: { g
 const ChatGroupItem = React.memo(function ChatGroupItem({
   item,
   onPress,
+  userId,
 }: {
   item: ChatGroup;
   onPress: (id: string) => void;
+  userId?: string;
 }) {
   const { t: tr } = useInterfaceTranslation();
   const lastMsgTime = item.ultimo_mensaje
     ? formatChatTime(item.ultimo_mensaje.created_at)
     : '';
 
-  const isAdminOfGroup = item.mi_rol === 'admin';
   const initials = getInitials(item.nombre);
+
+  const handlePressIn = useCallback(() => {
+    if (userId) void loadChatRoom(userId, item.id);
+  }, [userId, item.id]);
 
   const handlePress = useCallback(() => {
     onPress(item.id);
@@ -148,6 +153,7 @@ const ChatGroupItem = React.memo(function ChatGroupItem({
     <Pressable
       accessibilityRole="button" accessibilityLabel={tr('Abrir chat ') + item.nombre}
       style={({ pressed }) => [styles.groupCard, pressed && styles.groupCardPressed]}
+      onPressIn={handlePressIn}
       onPress={handlePress}
     >
       {/* Avatar */}
@@ -166,47 +172,33 @@ const ChatGroupItem = React.memo(function ChatGroupItem({
             <Text style={styles.avatarInitials}>{initials}</Text>
           </View>
         )}
-
-
       </View>
 
       {/* Detalles del Grupo */}
       <View style={styles.groupInfo}>
         <View style={styles.groupHeaderRow}>
-          <Text style={styles.groupName} numberOfLines={1}>
-            {item.nombre}
-          </Text>
+          <View style={styles.groupNameRow}>
+            <Text style={styles.groupName} numberOfLines={1}>
+              {item.nombre}
+            </Text>
+            {item.solo_multimedia ? (
+              <View style={styles.multimediaBadge}>
+                <Camera size={11} color={Colors.primary} strokeWidth={2.4} />
+                <Text style={styles.multimediaBadgeText}>{tr("Evidencias")}</Text>
+              </View>
+            ) : null}
+          </View>
           {!!lastMsgTime && <Text style={styles.timeText}>{lastMsgTime}</Text>}
         </View>
 
-        <View style={styles.lastMessageContainer}><LastMessagePreview group={item} /></View>
-        {/* Group attributes */}
-        <View style={styles.badgesRow}>
-          {item.solo_multimedia ? (
-            <View style={styles.multimediaBadge}>
-              <Camera size={10.5} color={Colors.primary} strokeWidth={2.2} />
-              <Text style={styles.multimediaBadgeText}>{tr("Evidencias")}</Text>
-            </View>
-          ) : null}
-
-          <View style={styles.membersCountBadge}>
-            <Users size={10.5} color={Colors.textSecondary} strokeWidth={2} />
-            <Text style={styles.membersCountText}>{item.miembros_count || 1}{tr(" miembros")}</Text>
-          </View>
-
-          {isAdminOfGroup && (
-            <View style={styles.roleTag}>
-              <Text style={styles.roleTagText}>{tr("Admin")}</Text>
-            </View>
-          )}
+        <View style={styles.lastMessageContainer}>
+          <LastMessagePreview group={item} />
         </View>
-
-
       </View>
 
       {/* Indicador flecha derecha */}
       <View style={styles.arrowContainer}>
-        <ChevronRight size={17} color={Colors.textDisabled} strokeWidth={2.2} />
+        <ChevronRight size={16} color={Colors.textDisabled} strokeWidth={2.2} />
       </View>
     </Pressable>
   );
@@ -215,12 +207,14 @@ const ChatGroupItem = React.memo(function ChatGroupItem({
 export default function ChatTabScreen() {
   const { t: tr } = useInterfaceTranslation();
   const router = useRouter();
+  const headerHeight = useHeaderHeight();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const { profile } = useAuth();
-  const cached = profile?.id ? getCachedMyChatGroups(profile.id) : null;
+  const initialSaved = profile?.id ? getSavedChatGroups(profile.id) : [];
+  const cached = (profile?.id ? getCachedMyChatGroups(profile.id) : null) ?? (initialSaved.length ? initialSaved : null);
   const [groups, setGroups] = useState<ChatGroup[]>(() => cached ?? []);
-  const [loading, setLoading] = useState(() => !cached);
+  const [loading, setLoading] = useState(() => !cached && !initialSaved.length);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<ChatFilter>('todos');
@@ -228,12 +222,21 @@ export default function ChatTabScreen() {
   const listOwner = useRef(profile?.id ?? '');
 
   useEffect(() => {
+    if (!profile?.id || !groups.length) return;
+    const owner = profile.id;
+    for (const group of groups.slice(0, 4)) {
+      void loadChatRoom(owner, group.id);
+    }
+  }, [profile?.id, groups]);
+
+  useEffect(() => {
     const owner = profile?.id;
     if (listOwner.current !== (owner ?? '')) {
       listOwner.current = owner ?? '';
-      const prepared = owner ? getCachedMyChatGroups(owner) : null;
+      const saved = owner ? getSavedChatGroups(owner) : [];
+      const prepared = (owner ? getCachedMyChatGroups(owner) : null) ?? (saved.length ? saved : null);
       setGroups(prepared ?? []);
-      setLoading(!prepared);
+      setLoading(!prepared && !saved.length);
       lastFetchRef.current = prepared ? Date.now() : 0;
     }
     if (!owner) return;
@@ -352,14 +355,17 @@ export default function ChatTabScreen() {
   }, [groups, searchQuery, filter]);
 
   const handleOpenGroup = useCallback((groupId: string) => {
+    if (profile?.id) {
+      void loadChatRoom(profile.id, groupId);
+    }
     router.push(`/chat/${groupId}` as any);
-  }, [router]);
+  }, [profile?.id, router]);
 
   const renderGroupItem = useCallback(
     ({ item }: { item: ChatGroup }) => (
-      <ChatGroupItem item={item} onPress={handleOpenGroup} />
+      <ChatGroupItem item={item} onPress={handleOpenGroup} userId={profile?.id} />
     ),
-    [handleOpenGroup]
+    [handleOpenGroup, profile?.id]
   );
 
   const renderListHeader = () => (
@@ -405,7 +411,7 @@ export default function ChatTabScreen() {
             ]}
             numberOfLines={1}
             adjustsFontSizeToFit
-          >{tr("Todos (")}{stats.todos})
+          >{tr("Todos")}{groups.length > 0 || !loading ? ` (${stats.todos})` : ''}
           </Text>
         </Pressable>
 
@@ -424,7 +430,7 @@ export default function ChatTabScreen() {
             ]}
             numberOfLines={1}
             adjustsFontSizeToFit
-          >{tr("Recientes (")}{stats.recientes})
+          >{tr("Recientes")}{groups.length > 0 || !loading ? ` (${stats.recientes})` : ''}
           </Text>
         </Pressable>
 
@@ -443,7 +449,7 @@ export default function ChatTabScreen() {
             ]}
             numberOfLines={1}
             adjustsFontSizeToFit
-          >{tr("Evidencias (")}{stats.evidencias})
+          >{tr("Evidencias")}{groups.length > 0 || !loading ? ` (${stats.evidencias})` : ''}
           </Text>
         </Pressable>
       </View>
@@ -453,10 +459,7 @@ export default function ChatTabScreen() {
   const renderEmptyState = () => {
     if (loading && groups.length === 0) {
       return (
-        <View style={styles.centerLoading}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>{tr("Cargando canales del equipo...")}</Text>
-        </View>
+        <View style={{ paddingVertical: 48 }} />
       );
     }
     return (
@@ -502,35 +505,24 @@ export default function ChatTabScreen() {
   return (
     <View style={styles.container}>
       {/* Top Navbar Minimalista con Logo Oficial CSY pegado a la izquierda */}
-      <View style={styles.headerWrapper}>
-        <SafeAreaView edges={['top']} style={styles.safeArea}>
-          <View style={[styles.navContainer, isTablet && styles.navContainerTablet]}>
-            <View style={styles.logoGroup}>
-              <Image
-                source={LOGO_DARK}
-                style={[styles.logo, isTablet && styles.logoTablet]}
-                contentFit="contain"
-                contentPosition="left center"
-                priority="high"
-              />
-            </View>
-
-            {isGlobalAdmin ? (
-              <Pressable
-                style={({ pressed }) => [styles.newGroupBtn, pressed && { opacity: 0.85 }]}
-                onPress={() => router.push('/chat/new-group' as any)}
-                accessibilityRole="button"
-                accessibilityLabel={tr("Crear nuevo chat")}
-                hitSlop={8}
-              >
-                <Plus size={15} color="#FFFFFF" strokeWidth={2.8} />
-                <Text style={styles.newGroupBtnText}>{tr("Nuevo")}</Text>
-              </Pressable>
-            ) : null}
-            <ProfileNavButton />
-          </View>
-        </SafeAreaView>
-      </View>
+      <HeaderCaboSystems
+        seamless
+        showProjectSelector={false}
+        showNotificationCenter={false}
+        rightAccessory={
+          isGlobalAdmin ? (
+            <Pressable
+              style={({ pressed }) => [styles.newGroupBtn, pressed && { opacity: 0.85 }]}
+              onPress={() => router.push('/chat/new-group' as any)}
+              accessibilityRole="button"
+              accessibilityLabel={tr("Crear nuevo chat")}
+              hitSlop={8}
+            >
+              <Plus size={20} color="#FFFFFF" strokeWidth={2.6} />
+            </Pressable>
+          ) : undefined
+        }
+      />
 
       {/* Lista de Grupos */}
       <FlatList
@@ -539,7 +531,7 @@ export default function ChatTabScreen() {
         renderItem={renderGroupItem}
         ListHeaderComponent={renderListHeader}
         ListEmptyComponent={renderEmptyState}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingTop: headerHeight }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -591,20 +583,12 @@ const styles = StyleSheet.create({
     height: 60,
   },
   newGroupBtn: {
-    flexDirection: 'row',
+    width: 44,
+    height: 44,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: Colors.primary,
-    paddingHorizontal: 13,
-    paddingVertical: 7.5,
-    borderRadius: BorderRadius.sm,
-    gap: 5,
-    marginRight: 10,
-    ...Shadow.xs,
-  },
-  newGroupBtnText: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 12.5,
-    color: '#FFFFFF',
+    borderRadius: 22,
   },
   listContent: {
     paddingHorizontal: Spacing.md, paddingBottom: 110, width: '100%', maxWidth: 960, alignSelf: 'center',
@@ -614,7 +598,7 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xs,
   },
   searchContainer: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', paddingHorizontal: 12, borderRadius: 10, height: 44, gap: 8, borderWidth: 1, borderColor: 'rgba(0,0,0,0.12)', marginBottom: Spacing.sm,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', paddingHorizontal: 12, borderRadius: 10, height: 42, gap: 8, borderWidth: 1, borderColor: 'rgba(0,0,0,0.12)', marginBottom: 6,
   },
   searchInput: {
     flex: 1,
@@ -629,15 +613,15 @@ const styles = StyleSheet.create({
   filterPillsContainer: {
     flexDirection: 'row',
     gap: 6,
-    paddingVertical: Spacing.xs,
-    marginBottom: Spacing.xs,
+    paddingVertical: 2,
+    marginBottom: 4,
     width: '100%',
   },
   filterPill: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 7.5,
+    paddingVertical: 6,
     paddingHorizontal: 2,
     borderRadius: BorderRadius.full,
     backgroundColor: Colors.card,
@@ -658,8 +642,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   groupCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    minHeight: 92, paddingVertical: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: 62,
+    paddingVertical: 9,
   },
   groupCardPressed: {
     opacity: 0.55,
@@ -668,13 +655,22 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   avatarImage: {
-    width: 44, height: 44, borderRadius: 22,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   avatarPlaceholder: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(52,62,72,0.06)', justifyContent: 'center', alignItems: 'center',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(52,62,72,0.06)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   avatarInitials: {
-    fontFamily: 'Outfit_600SemiBold', fontSize: 15, color: Colors.brandSlate,
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 15,
+    color: Colors.brandSlate,
   },
   groupInfo: {
     flex: 1,
@@ -683,55 +679,67 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 3,
+    marginBottom: 2,
+  },
+  groupNameRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginRight: 8,
   },
   groupName: {
-    flex: 1, fontFamily: 'Outfit_600SemiBold', fontSize: 16, lineHeight: 22, color: '#000000', marginRight: 8,
+    flexShrink: 1,
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 16,
+    lineHeight: 21,
+    color: '#000000',
   },
   timeText: {
-    fontFamily: 'Outfit_400Regular', fontSize: 11, color: Colors.brandSlate,
-  },
-  badgesRow: {
-    flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 12, rowGap: 4, marginTop: 6,
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 12,
+    color: Colors.brandSlate,
   },
   multimediaBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(247, 140, 38, 0.1)',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
   },
   multimediaBadgeText: {
-    fontFamily: 'Outfit_500Medium', fontSize: 11, color: Colors.brandSlate,
-  },
-  membersCountBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-  },
-  membersCountText: {
-    fontFamily: 'Outfit_400Regular', fontSize: 11, color: Colors.brandSlate,
-  },
-  roleTag: {
-    justifyContent: 'center',
-  },
-  roleTagText: {
-    fontFamily: 'Outfit_400Regular', fontSize: 11, color: Colors.brandSlate,
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 10,
+    color: Colors.primary,
   },
   lastMessageContainer: {
-    marginTop: 3,
+    marginTop: 1,
   },
   lastMsgText: {
-    fontFamily: 'Outfit_400Regular', fontSize: 13, lineHeight: 19, color: Colors.brandSlate,
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 14,
+    lineHeight: 19,
+    color: Colors.brandSlate,
   },
   lastMsgSender: {
     fontFamily: 'Outfit_600SemiBold',
     color: Colors.text,
   },
   emptyMsgText: {
-    fontFamily: 'Outfit_400Regular', fontSize: 13, lineHeight: 19, color: Colors.brandSlate,
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 14,
+    lineHeight: 19,
+    color: Colors.brandSlate,
   },
   mediaPreviewRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4.5,
+    gap: 5,
   },
   mediaPreviewText: {
-    flexShrink: 1, fontFamily: 'Outfit_400Regular', fontSize: 13, lineHeight: 19, color: Colors.brandSlate,
+    flexShrink: 1, fontFamily: 'Outfit_400Regular', fontSize: 14, lineHeight: 20, color: Colors.brandSlate,
   },
   arrowContainer: {
     justifyContent: 'center',

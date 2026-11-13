@@ -5,6 +5,7 @@ import { GripVertical, Loader2, Search } from 'lucide-react';
 import type { Tarea } from '../../types/projects';
 import { TaskCard } from './TaskCard';
 import { updateTask } from '../../lib/projectsApi';
+import { buildTaskProgressScope, canProgressTask } from '../../lib/taskProgressAccess';
 import './TaskBoard.css';
 
 const columns = [
@@ -22,11 +23,16 @@ interface TaskBoardProps {
   onMoveTask: (task: Tarea, status: Tarea['estatus']) => Promise<void>;
   showSearch?: boolean;
   projectLabels?: Record<string, string>;
+  fullTaskProjectIds?: ReadonlySet<string>;
 }
 
-export function TaskBoard({ tasks, expandedTaskIds, onToggleExpand, onTaskUpdated, onEditTask, onMoveTask, showSearch = true, projectLabels }: TaskBoardProps) {
+export function TaskBoard({ tasks, expandedTaskIds, onToggleExpand, onTaskUpdated, onEditTask, onMoveTask, showSearch = true, projectLabels, fullTaskProjectIds }: TaskBoardProps) {
   const { t } = useTranslation();
-  const { user, isAdmin } = useAdminAuth();
+  const { user, adminProfile } = useAdminAuth();
+  const progressScope = useMemo(
+    () => buildTaskProgressScope(user?.id, adminProfile, fullTaskProjectIds),
+    [user?.id, adminProfile, fullTaskProjectIds],
+  );
   const [query, setQuery] = useState('');
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [overStatus, setOverStatus] = useState<Tarea['estatus'] | null>(null);
@@ -86,11 +92,13 @@ export function TaskBoard({ tasks, expandedTaskIds, onToggleExpand, onTaskUpdate
             <header className="task-board-column-heading"><h4>{t(column.label)}</h4><span>{column.tasks.length}</span></header>
             <div className="task-board-column-content">
               {column.tasks.length === 0 && <p className="task-board-empty">{query.trim() ? t("Sin coincidencias") : t("No hay tareas en este estado")}</p>}
-              {column.tasks.map((task) => (
+              {column.tasks.map((task) => {
+                const canProgress = canProgressTask(task, progressScope);
+                return (
                 <div key={task.id} className={`task-board-item ${draggedId === task.id ? 'is-dragging' : ''}`}>
                   <div className="task-board-drag-row">
                     <span
-                      draggable={!saving && (isAdmin || task.asignado_a === user?.id)}
+                      draggable={!saving && canProgress}
                       onDragStart={(event) => { setDraggedId(task.id); event.dataTransfer.setData('text/plain', task.id); event.dataTransfer.effectAllowed = 'move'; }}
                       onDragEnd={() => { setDraggedId(null); setOverStatus(null); }}
                       title={t("Arrastrar tarea a otro estado")}
@@ -98,9 +106,10 @@ export function TaskBoard({ tasks, expandedTaskIds, onToggleExpand, onTaskUpdate
                       className="task-board-drag-handle"
                     ><GripVertical size={16} aria-hidden="true" /></span>
                   </div>
-                  <TaskCard task={task} variant="board" projectLabel={projectLabels?.[task.proyecto_id]} isExpanded={expandedTaskIds.has(task.id)} onToggleExpand={() => onToggleExpand(task.id)} onTaskUpdated={onTaskUpdated} onEditTask={onEditTask} />
+                  <TaskCard task={task} variant="board" projectLabel={projectLabels?.[task.proyecto_id]} canProgress={canProgress} isExpanded={expandedTaskIds.has(task.id)} onToggleExpand={() => onToggleExpand(task.id)} onTaskUpdated={onTaskUpdated} onEditTask={onEditTask} />
                 </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         ))}

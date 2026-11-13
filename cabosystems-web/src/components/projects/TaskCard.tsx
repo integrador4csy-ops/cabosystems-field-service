@@ -24,6 +24,7 @@ import {
   recordTaskProgress,
 } from '../../lib/projectsApi';
 import { taskProgressRequestId } from '../../lib/taskProgress';
+import { buildTaskProgressScope, canProgressTask } from '../../lib/taskProgressAccess';
 import { TaskProgressDialog } from './TaskProgressDialog';
 import { TaskProgressHistory } from './TaskProgressHistory';
 
@@ -31,6 +32,7 @@ interface TaskCardProps {
   task: Tarea;
   variant?: 'list' | 'board';
   projectLabel?: string;
+  canProgress?: boolean;
   showScheduledDate?: boolean;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
@@ -42,6 +44,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   task,
   variant = 'list',
   projectLabel,
+  canProgress: canProgressProp,
   showScheduledDate = true,
   isExpanded: controlledExpanded,
   onToggleExpand,
@@ -49,8 +52,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onEditTask,
 }) => {
   const { t, locale } = useTranslation();
-  const { user, isAdmin } = useAdminAuth();
-  const canProgress = isAdmin || task.asignado_a === user?.id;
+  const { user, adminProfile, isAdmin } = useAdminAuth();
+  const canProgress = canProgressProp ?? canProgressTask(task, buildTaskProgressScope(user?.id, adminProfile));
   const scheduledLabel = showScheduledDate && task.fecha_programada ? parseDateKey(task.fecha_programada).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : '';
   const contextLabel = [projectLabel, scheduledLabel].filter(Boolean).join(' · ');
   const [failedAvatar, setFailedAvatar] = useState('');

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { SearchIcon, CloseIcon } from '../../icons';
-import { CalendarDays, Car, ChevronLeft, ChevronRight, ClipboardPlus, Menu, MapPin, Plus, RefreshCw } from 'lucide-react';
+import { CalendarDays, Car, ChevronLeft, ChevronRight, Menu, MapPin, Plus, RefreshCw } from 'lucide-react';
 import { useTranslation } from '../../context/LanguageContext';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAdminAuth } from '../../context/AdminAuthContext';
@@ -109,7 +109,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       {hasSearch && (
         <div className="header-search relative min-w-0">
           <SearchIcon size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <input ref={searchInputRef} type="search" aria-label={searchLabel} value={sectionQuery} onChange={(event) => changeSectionQuery(event.target.value)} placeholder={searchPlaceholder} className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm text-slate-800 placeholder:text-slate-500 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/15 transition-colors" />
+          <input ref={searchInputRef} type="search" aria-label={searchLabel} value={sectionQuery} onChange={(event) => changeSectionQuery(event.target.value)} placeholder={searchPlaceholder} className="h-10 w-full rounded-lg border border-slate-200 bg-white shadow-2xs pl-10 pr-10 text-sm text-slate-800 placeholder:text-slate-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/15 transition-colors" />
           {sectionQuery && <button type="button" onClick={() => changeSectionQuery('')} aria-label={t("Borrar búsqueda")} className="absolute right-1 top-1 flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"><CloseIcon size={16} /></button>}
         </div>
       )}
@@ -124,6 +124,33 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             {historyWorkers.map((worker) => <option key={worker.profile.id} value={worker.profile.id}>{worker.profile.nombre || worker.profile.full_name || t('Técnico')}</option>)}
           </AppSelect>
         </label>
+        <div className="flex h-9 items-center rounded-lg border border-slate-200 bg-white shadow-2xs">
+          <button
+            type="button"
+            onClick={() => onHistoryDateChange?.(shiftDate(historyDate || today, -1))}
+            className="flex h-full w-8 items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors"
+            aria-label={t('Día anterior')}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onHistoryDateChange?.(today)}
+            className="flex h-full items-center gap-1.5 border-x border-slate-200 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <CalendarDays size={14} />
+            {historyDate === today ? t('Hoy') : historyDate === yesterday ? t('Ayer') : historyDate}
+          </button>
+          <button
+            type="button"
+            disabled={Boolean(historyDate && historyDate >= today)}
+            onClick={() => onHistoryDateChange?.(shiftDate(historyDate || today, 1))}
+            className="flex h-full w-8 items-center justify-center text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 transition-colors"
+            aria-label={t('Día siguiente')}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
         <div className="history-header-presets" aria-label={t('Fechas rápidas')}>
           <button type="button" aria-pressed={historyDate === today} onClick={() => onHistoryDateChange?.(today)}>{t('Hoy')}</button>
           <button type="button" aria-pressed={historyDate === yesterday} onClick={() => onHistoryDateChange?.(yesterday)}>{t('Ayer')}</button>
@@ -189,13 +216,29 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       <div className="header-status flex items-center justify-end gap-3 text-xs tabular-nums">
         {isTasks && (isAgenda ? canManageEvents : isAdmin) && <button type="button" onClick={isAgenda ? requestCreateEvent : requestCreateTask} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{isAgenda ? t('Nuevo evento') : t('Nueva Tarea')}</button>}
         {isChat && canManageChat && <button type="button" onClick={requestCreateChatGroup} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{t('Nuevo grupo')}</button>}
-        {isWarranty && <button type="button" onClick={requestCreateWarranty} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><ClipboardPlus size={16} aria-hidden="true" />{t('Nueva garantía')}</button>}
+        {isWarranty && <button type="button" onClick={requestCreateWarranty} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{t('Nueva garantía')}</button>}
         {isTeam && <button type="button" onClick={requestCreateTeamInvite} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{t('Nueva invitación')}</button>}
-        {isRadar && <>
-          <div className="flex items-center gap-1.5 text-emerald-700" title={t('header.onlineTitle')}><span className="h-2 w-2 rounded-full bg-emerald-500" /><span className="font-semibold">{onlineCount}</span><span className="hidden sm:inline">{t('header.online')}</span></div>
-          {movingCount > 0 && <div className="flex items-center gap-1.5 text-orange-700" title={t('header.inRouteTitle')}><Car size={14} /><span className="font-semibold">{movingCount}</span><span className="hidden xl:inline">{t('header.inRoute')}</span></div>}
-          <div className="flex items-center gap-1.5 text-slate-500" title={t('header.offlineTitle')}><span className="h-2 w-2 rounded-full bg-slate-400" /><span className="font-semibold">{offlineCount}</span><span className="hidden sm:inline">{t('header.offline')}</span></div>
-        </>}
+        {isRadar && (
+          <div className="flex h-9 items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 shadow-2xs">
+            <div className="flex items-center gap-1.5 text-emerald-700 font-medium" title={t('header.onlineTitle')}>
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="font-semibold">{onlineCount}</span>
+              <span className="hidden sm:inline">{t('header.online')}</span>
+            </div>
+            {movingCount > 0 && (
+              <div className="flex items-center gap-1.5 text-orange-700 font-medium" title={t('header.inRouteTitle')}>
+                <Car size={14} />
+                <span className="font-semibold">{movingCount}</span>
+                <span className="hidden xl:inline">{t('header.inRoute')}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 text-slate-500 font-medium" title={t('header.offlineTitle')}>
+              <span className="h-2 w-2 rounded-full bg-slate-400" />
+              <span className="font-semibold">{offlineCount}</span>
+              <span className="hidden sm:inline">{t('header.offline')}</span>
+            </div>
+          </div>
+        )}
         <NotificationCenter />
       </div>
     </header>

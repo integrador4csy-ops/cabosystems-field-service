@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bell, Check, CheckCheck, ClipboardCheck, ListChecks, MessageCircle, X } from 'lucide-react';
+import { Bell, Check, CheckCheck, ClipboardCheck, ListChecks, MessageCircle, ShieldCheck, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { useSidebar } from '../../context/SidebarContext';
@@ -7,7 +7,7 @@ import { useTranslation } from '../../context/LanguageContext';
 
 type AppNotification = {
   id: string;
-  kind: 'task_assigned' | 'field_check' | 'chat_message' | 'system';
+  kind: 'task_assigned' | 'field_check' | 'chat_message' | 'warranty_update' | 'system';
   title: string;
   body: string;
   target: string | null;
@@ -77,6 +77,15 @@ export function NotificationCenter() {
     await notificationClient.from('app_notifications').update({ read_at: readAt }).eq('user_id', user.id).is('read_at', null);
   };
 
+  const toggleNotifications = () => {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    setOpen(true);
+    void markAllRead();
+  };
+
   const openItem = (item: AppNotification) => {
     setOpen(false);
     if (!item.read_at) {
@@ -89,12 +98,14 @@ export function NotificationCenter() {
       setActiveItem('chat');
     } else if (item.target === 'tasks') {
       setActiveItem('proyectos');
+    } else if (item.target === 'warranties') {
+      setActiveItem('garantias');
     }
   };
 
   const english = language === 'en';
   return <div ref={rootRef} className="relative shrink-0">
-    <button type="button" aria-label={t('Notificaciones')} aria-expanded={open} onClick={() => setOpen((value) => !value)} className="relative flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/25">
+    <button type="button" aria-label={t('Notificaciones')} aria-expanded={open} onClick={toggleNotifications} className="relative flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/25">
       <Bell size={19} aria-hidden="true" />
       {unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex min-h-4 min-w-4 items-center justify-center rounded-full border-2 border-white bg-brand-500 px-0.5 text-[9px] font-bold leading-none text-white">{unread > 9 ? '9+' : unread}</span>}
     </button>
@@ -110,7 +121,7 @@ export function NotificationCenter() {
         {loading && items.length === 0 && <div className="py-12 text-center text-sm text-slate-500">{t('Cargando...')}</div>}
         {!loading && items.length === 0 && <div className="px-6 py-12 text-center"><Bell size={28} className="mx-auto text-slate-400" /><p className="mt-3 font-semibold text-slate-800">{english ? 'You are up to date' : 'Estás al día'}</p><p className="mx-auto mt-1 max-w-64 text-sm leading-5 text-slate-500">{english ? 'New assignments, checks and messages will appear here.' : 'Aquí aparecerán nuevas asignaciones, checks y mensajes.'}</p></div>}
         {items.map((item) => {
-          const Icon = item.kind === 'chat_message' ? MessageCircle : item.kind === 'field_check' ? ClipboardCheck : ListChecks;
+          const Icon = item.kind === 'chat_message' ? MessageCircle : item.kind === 'field_check' ? ClipboardCheck : item.kind === 'warranty_update' ? ShieldCheck : ListChecks;
           return <button type="button" key={item.id} onClick={() => openItem(item)} className={`flex w-full items-start gap-3 rounded-xl p-3 text-left transition-colors hover:bg-slate-50 ${item.read_at ? '' : 'bg-orange-50/80'}`}>
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-100 text-brand-600"><Icon size={18} /></span>
             <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">{item.title}</span>{item.read_at ? <Check size={14} className="text-slate-400" /> : <span className="h-2 w-2 rounded-full bg-brand-500" />}</span><span className="mt-0.5 line-clamp-2 block text-xs leading-5 text-slate-600">{item.body}</span><span className="mt-1 block text-[11px] font-medium text-slate-400">{relativeTime(item.created_at, english)}</span></span>

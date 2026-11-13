@@ -14,13 +14,16 @@ import {
   Share,
   RefreshControl,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
 import {
   UserPlus,
+  Plus,
   Mail,
   Shield,
   Trash2,
@@ -41,6 +44,7 @@ import {
 } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, Shadow, Animation } from '@/constants/Theme';
 import { useAuth } from '@/lib/auth';
+import { HeaderCaboSystems, useHeaderHeight } from '@/components/HeaderCaboSystems';
 import { supabase } from '@/lib/supabase';
 import { pickImageSafe } from '@/lib/mediaPicker';
 import { uploadAvatarImage } from '@/lib/avatarUpload';
@@ -75,7 +79,50 @@ type TabType = 'colaboradores' | 'invitaciones';
 type TeamRow = { kind: 'collaborator'; item: Profile } | { kind: 'invitation'; item: Invitacion };
 let cachedUsersData: { owner: string; users: Profile[]; invitaciones: Invitacion[]; timestamp: number } | null = null;
 
+const usersCachePath = (owner: string) => {
+  const root = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+  return root ? `${root}users-cache-${encodeURIComponent(owner)}.json` : null;
+};
+
+export async function readUsersDiskCache(owner: string) {
+  if (!owner) return null;
+  try {
+    const path = usersCachePath(owner);
+    const raw = Platform.OS === 'web'
+      ? localStorage.getItem(`users-cache:${owner}`)
+      : path ? await FileSystem.readAsStringAsync(path) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.owner === owner && Array.isArray(parsed.users)) {
+      return parsed as { owner: string; users: Profile[]; invitaciones: Invitacion[]; timestamp: number };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function writeUsersDiskCache(data: { owner: string; users: Profile[]; invitaciones: Invitacion[]; timestamp: number }) {
+  if (!data?.owner) return;
+  try {
+    const raw = JSON.stringify(data);
+    if (Platform.OS === 'web') {
+      localStorage.setItem(`users-cache:${data.owner}`, raw);
+    } else {
+      const path = usersCachePath(data.owner);
+      if (path) await FileSystem.writeAsStringAsync(path, raw);
+    }
+  } catch {}
+}
+
 export async function preloadUsersData(owner: string) {
+  if (!owner) return;
+  if (!cachedUsersData || cachedUsersData.owner !== owner) {
+    const saved = await readUsersDiskCache(owner);
+    if (saved && (!cachedUsersData || cachedUsersData.owner !== owner)) {
+      cachedUsersData = saved;
+    }
+  }
   if (cachedUsersData?.owner === owner && Date.now() - cachedUsersData.timestamp < 30000) return;
   try {
     const [usersRes, invitesRes] = await Promise.all([
@@ -86,12 +133,14 @@ export async function preloadUsersData(owner: string) {
         .eq('estado', 'pendiente')
         .order('created_at', { ascending: false }),
     ]);
-    cachedUsersData = {
+    const nextData = {
       owner,
       users: (usersRes.data as Profile[]) || [],
       invitaciones: (invitesRes.data as Invitacion[]) || [],
       timestamp: Date.now(),
     };
+    cachedUsersData = nextData;
+    void writeUsersDiskCache(nextData);
   } catch (e) {
     console.warn('Error preloading users data:', e);
   }
@@ -102,6 +151,7 @@ export default function UsersScreen() {
   const { profile } = useAuth();
   const prepared = cachedUsersData?.owner === profile?.id ? cachedUsersData : null;
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const [users, setUsers] = useState<Profile[]>(() => prepared?.users ?? []);
@@ -157,10 +207,15 @@ export default function UsersScreen() {
     profile?.rol === 'supervisor_instalacion' ||
     profile?.rol === 'aux_operaciones';
 
+  const hasDataRef = useRef(Boolean(cachedUsersData));
+  useEffect(() => {
+    hasDataRef.current = users.length > 0 || invitaciones.length > 0 || Boolean(cachedUsersData);
+  }, [users.length, invitaciones.length]);
+
   // 1. Cargar usuarios e invitaciones
   const fetchData = useCallback(async (isSilent = false) => {
     if (!profile?.id || !isAdmin) return;
-    if (!isSilent && users.length === 0 && invitaciones.length === 0) {
+    if (!isSilent && !hasDataRef.current) {
       setLoadingData(true);
     }
     try {
@@ -175,7 +230,9 @@ export default function UsersScreen() {
 
       const nextUsers = (usersRes.data as Profile[]) || [];
       const nextInvites = (invitesRes.data as Invitacion[]) || [];
-      cachedUsersData = { owner: profile.id, users: nextUsers, invitaciones: nextInvites, timestamp: Date.now() };
+      const nextData = { owner: profile.id, users: nextUsers, invitaciones: nextInvites, timestamp: Date.now() };
+      cachedUsersData = nextData;
+      void writeUsersDiskCache(nextData);
       setUsers(nextUsers);
       setInvitaciones(nextInvites);
       lastFetchRef.current = Date.now();
@@ -184,7 +241,21 @@ export default function UsersScreen() {
     } finally {
       setLoadingData(false);
     }
-  }, [users.length, invitaciones.length, profile?.id, isAdmin]);
+  }, [profile?.id, isAdmin]);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    if (!cachedUsersData || cachedUsersData.owner !== profile.id) {
+      void readUsersDiskCache(profile.id).then(saved => {
+        if (saved && (!cachedUsersData || cachedUsersData.owner !== profile.id)) {
+          cachedUsersData = saved;
+          setUsers(saved.users);
+          setInvitaciones(saved.invitaciones);
+          setLoadingData(false);
+        }
+      });
+    }
+  }, [profile?.id]);
 
   useEffect(() => {
     const isStale = cachedUsersData?.owner !== profile?.id || Date.now() - lastFetchRef.current > 30000;
@@ -397,22 +468,8 @@ export default function UsersScreen() {
   if (!isAdmin) {
     return (
       <View style={styles.container}>
-        <View style={styles.headerWrapper}>
-          <SafeAreaView edges={['top']} style={styles.safeArea}>
-            <View style={[styles.navContainer, isTablet && styles.navContainerTablet]}>
-              <View style={styles.logoGroup}>
-                <Image
-                  source={LOGO_DARK}
-                  style={[styles.logo, isTablet && styles.logoTablet]}
-                  contentFit="contain"
-                  contentPosition="left center"
-                  priority="high"
-                />
-              </View>
-            </View>
-          </SafeAreaView>
-        </View>
-        <View style={styles.noAccess}>
+        <HeaderCaboSystems seamless showProjectSelector={false} showNotificationCenter={false} />
+        <View style={[styles.noAccess, { paddingTop: headerHeight }]}>
           <Ionicons name="lock-closed-outline" size={48} color={Colors.textMuted} />
           <Text style={styles.noAccessText}>{tr("Acceso restringido a administradores")}</Text>
         </View>
@@ -543,40 +600,31 @@ export default function UsersScreen() {
   );
 
   const listContentStyle = useMemo(
-    () => [styles.scrollContent, { paddingTop: Spacing.md, paddingBottom: insets.bottom + 110 }],
-    [insets.bottom]
+    () => [styles.scrollContent, { paddingTop: headerHeight + Spacing.md, paddingBottom: insets.bottom + 110 }],
+    [headerHeight, insets.bottom]
   );
 
   return (
     <View style={styles.container}>
       {/* Top Navbar Minimalista con Logo Oficial CSY pegado a la izquierda */}
-      <View style={styles.headerWrapper}>
-        <SafeAreaView edges={['top']} style={styles.safeArea}>
-          <View style={[styles.navContainer, isTablet && styles.navContainerTablet]}>
-            <View style={styles.logoGroup}>
-              <Image
-                source={LOGO_DARK}
-                style={[styles.logo, isTablet && styles.logoTablet]}
-                contentFit="contain"
-                contentPosition="left center"
-                priority="high"
-              />
-            </View>
-
-            {isAdmin && (
-              <Pressable
-                style={({ pressed }) => [styles.inviteNavBtn, pressed && { opacity: 0.85 }]}
-                onPress={() => setInviteModalVisible(true)}
-                hitSlop={8}
-              >
-                <UserPlus size={15} color="#FFFFFF" strokeWidth={2.6} />
-                <Text style={styles.inviteNavBtnText}>{tr("Invitar")}</Text>
-              </Pressable>
-            )}
-            <ProfileNavButton />
-          </View>
-        </SafeAreaView>
-      </View>
+      <HeaderCaboSystems
+        seamless
+        showProjectSelector={false}
+        showNotificationCenter={false}
+        rightAccessory={
+          isAdmin ? (
+            <Pressable
+              style={({ pressed }) => [styles.inviteNavBtn, pressed && { opacity: 0.85 }]}
+              onPress={() => setInviteModalVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel={tr("Invitar")}
+              hitSlop={8}
+            >
+              <Plus size={20} color="#FFFFFF" strokeWidth={2.6} />
+            </Pressable>
+          ) : undefined
+        }
+      />
 
       <FlashList<TeamRow>
         style={styles.scrollView}
@@ -588,16 +636,6 @@ export default function UsersScreen() {
         refreshControl={<RefreshControl refreshing={loadingData} onRefresh={fetchData} colors={[Colors.primary]} tintColor={Colors.primary} />}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={<View>
-        {/* Encabezado Principal */}
-        <View style={styles.headerArea}>
-          <Text style={styles.pageTitle}>{tr("Gestión de Personal")}</Text>
-          <Text style={styles.pageSubtitle}>
-            {selectedTab === 'colaboradores'
-              ? tr('{value0} colaboradores activos en la plataforma', {value0: activeCollaborators.length})
-              : tr('{value0} invitaciones pendientes de registro', {value0: invitaciones.length})}
-          </Text>
-        </View>
-
         {/* Separación por Cápsulas (TailAdmin Light Mode - Ambas visibles sin deslizar) */}
         <View style={styles.filterPillsContainer}>
           {/* Cápsula 1: Colaboradores */}
@@ -620,7 +658,7 @@ export default function UsersScreen() {
                 selectedTab === 'colaboradores' && styles.filterPillTextActive,
               ]}
               numberOfLines={1}
-            >{tr("Colaboradores (")}{activeCollaborators.length})
+            >{tr("Equipo")}
             </Text>
           </Pressable>
 
@@ -652,9 +690,7 @@ export default function UsersScreen() {
 </View>}
         ListEmptyComponent={
           loadingData && teamRows.length === 0 ? (
-            <View style={{ paddingVertical: 48, alignItems: 'center', justifyContent: 'center' }}>
-              <ActivityIndicator size="large" color={Colors.primary} />
-            </View>
+            <View style={{ paddingVertical: 48 }} />
           ) : selectedTab === 'colaboradores' ? (
               <View style={styles.emptyContainer}>
                 <View style={styles.emptyIconCircle}>
@@ -1053,7 +1089,11 @@ const styles = StyleSheet.create({
     paddingRight: Spacing.xl,
   },
   logoGroup: {
-    flex: 1, minWidth: 0, justifyContent: 'center', alignItems: 'flex-start',
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    transform: [{ translateY: -3 }],
   },
   logo: {
     width: '100%', maxWidth: 220, height: 54,
@@ -1063,20 +1103,12 @@ const styles = StyleSheet.create({
     height: 60,
   },
   inviteNavBtn: {
-    flexDirection: 'row',
+    width: 44,
+    height: 44,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: Colors.primary,
-    paddingHorizontal: 13,
-    paddingVertical: 7.5,
-    borderRadius: BorderRadius.sm,
-    gap: 5,
-    marginRight: 10,
-    ...Shadow.xs,
-  },
-  inviteNavBtnText: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 12.5,
-    color: '#FFFFFF',
+    borderRadius: 22,
   },
   scrollView: {
     flex: 1,
@@ -1097,16 +1129,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_500Medium',
     fontSize: 14,
     color: Colors.textMuted,
-  },
-  headerArea: {
-    marginBottom: Spacing.md,
-    paddingTop: Spacing.xs,
-  },
-  pageTitle: {
-    fontFamily: 'Outfit_600SemiBold', fontSize: 18, lineHeight: 24, color: '#000000',
-  },
-  pageSubtitle: {
-    fontFamily: 'Outfit_400Regular', fontSize: 13, lineHeight: 19, color: Colors.brandSlate, marginTop: 4,
   },
   filterPillsContainer: {
     flexDirection: 'row',

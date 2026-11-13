@@ -22,7 +22,7 @@ const { CompanyAgendaControls, CompanyAgendaGrid } = load('components/agenda/Com
   'lucide-react-native': { ChevronLeft: 'ChevronLeft', ChevronRight: 'ChevronRight', Plus: 'Plus', Search: 'Search', X: 'X' },
   '@/constants/Theme': { AgendaPalette: {}, Colors: {} },
   '@/components/HeaderCaboSystems': { HeaderCaboSystems: 'HeaderCaboSystems' },
-  '@/lib/agenda': dates, './AgendaDatePicker': { AgendaDatePicker: 'AgendaDatePicker' },
+  '@/lib/agenda': dates, './AgendaDatePicker': { AgendaDatePicker: 'AgendaDatePicker' }, '@/components/EqualSegmentedTabs': { EqualSegmentedTabs: 'EqualSegmentedTabs' },
 });
 const props = { copy: COMPANY_AGENDA_COPY.es, locale: 'es-MX', view: 'week', anchor: '2026-10-21', today: '2026-10-28', days: Array.from({ length: 7 }, (_, index) => dates.shiftDate('2026-10-19', index)), counts: new Map(), query: '', heading: '19–25 de octubre', onSearch() {}, onView() {}, onDate() {}, onMove() {}, onToday() {} };
 const dateButtons = renderer => renderer.root.findAll(node => node.type === 'Pressable' && node.props.accessibilityLabel?.startsWith(props.copy.selectDay));
@@ -32,7 +32,7 @@ test('shared controls omit the date grid while standalone controls retain their 
   try {
     await React.act(async () => { renderer = Renderer.create(React.createElement(CompanyAgendaControls, { ...props, showCalendar: false })); });
     assert.equal(dateButtons(renderer).length, 0);
-    assert.equal(renderer.root.findAll(node => node.type === 'Pressable' && node.props.accessibilityRole === 'tab').length, 3);
+    assert.equal(renderer.root.findAll(node => node.type === 'EqualSegmentedTabs').length, 1);
     await React.act(async () => renderer.update(React.createElement(CompanyAgendaControls, props)));
     assert.equal(dateButtons(renderer).length, 7);
   } finally { if (renderer) await React.act(async () => renderer.unmount()); }

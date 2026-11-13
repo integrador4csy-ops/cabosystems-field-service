@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Bell, Check, CheckCheck, ClipboardCheck, ListChecks, MessageCircle, X } from 'lucide-react-native';
+import { Bell, Check, CheckCheck, ClipboardCheck, ListChecks, MessageCircle, ShieldCheck, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from '@/lib/i18n';
@@ -9,7 +9,7 @@ import { BorderRadius, Colors, Shadow, Spacing } from '@/constants/Theme';
 
 type AppNotification = {
   id: string;
-  kind: 'task_assigned' | 'field_check' | 'chat_message' | 'system';
+  kind: 'task_assigned' | 'field_check' | 'chat_message' | 'warranty_update' | 'system';
   title: string;
   body: string;
   target: string | null;
@@ -99,7 +99,7 @@ export function NotificationCenter() {
             {loading && items.length === 0 ? <ActivityIndicator style={styles.loader} color={Colors.primary} /> : null}
             {!loading && items.length === 0 ? <View style={styles.empty}><Bell size={28} color={Colors.textSecondary} /><Text style={styles.emptyTitle}>{language === 'en' ? 'You are up to date' : 'Estás al día'}</Text><Text style={styles.emptyText}>{language === 'en' ? 'New assignments, checks and messages will appear here.' : 'Aquí aparecerán nuevas asignaciones, checks y mensajes.'}</Text></View> : null}
             {items.map((item) => {
-              const Icon = item.kind === 'chat_message' ? MessageCircle : item.kind === 'field_check' ? ClipboardCheck : ListChecks;
+              const Icon = item.kind === 'chat_message' ? MessageCircle : item.kind === 'field_check' ? ClipboardCheck : item.kind === 'warranty_update' ? ShieldCheck : ListChecks;
               return <Pressable key={item.id} onPress={() => openItem(item)} style={({ pressed }) => [styles.item, !item.read_at && styles.itemUnread, pressed && styles.pressed]}>
                 <View style={styles.itemIcon}><Icon size={19} color={Colors.primary} /></View>
                 <View style={styles.itemBody}><View style={styles.itemTitleRow}><Text numberOfLines={1} style={styles.itemTitle}>{item.title}</Text>{!item.read_at ? <View style={styles.unreadDot} /> : <Check size={14} color={Colors.textSecondary} />}</View><Text numberOfLines={2} style={styles.itemText}>{item.body}</Text><Text style={styles.time}>{relativeTime(item.created_at, language === 'en')}</Text></View>

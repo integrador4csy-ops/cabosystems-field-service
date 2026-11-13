@@ -80,3 +80,10 @@ test('layout starts no preloads before Main and cancels late route preparation o
   const pending = queued[0](); stop(); finish(); await pending;
   assert.equal(stopped, true); assert.equal(prepared.length, 0);
 });
+
+test('all tabs load from startup and keep preloaded state across route changes', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../app/(tabs)/_layout.tsx'), 'utf8');
+  assert.match(source, /if \(!mainReady\) return afterTabPaint\(markMainReady\)/);
+  assert.match(source, /lazy: false/);
+  assert.doesNotMatch(source, /currentTab !== 'index'\) return afterTabPaint\(markMainReady\)/);
+});

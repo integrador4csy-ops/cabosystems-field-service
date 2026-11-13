@@ -5,16 +5,16 @@ import { Colors } from '@/constants/Theme';
 import { useTranslation } from '@/lib/i18n';
 import type { FleetMapWorker } from '@/lib/fleetMap';
 
-interface Props { workers: FleetMapWorker[]; loading: boolean; error: boolean; refreshing: boolean; onRefresh: () => void }
+interface Props { workers: FleetMapWorker[]; loading: boolean; error: boolean; onRefresh: () => void; overlayTop?: number }
 
-export function LiveFleetMap({ workers, loading, error, refreshing, onRefresh }: Props) {
+export function LiveFleetMap({ workers, loading, error, onRefresh }: Props) {
   const { t } = useTranslation();
   return <View style={styles.container}>
     {loading ? <ActivityIndicator color={Colors.primary} /> : <MapPinned size={32} color={Colors.primary} />}
     <Text style={styles.title}>{error ? t('maps.unavailable') : t('maps.webTitle')}</Text>
     <Text style={styles.text}>{error ? t('maps.retryHelp') : t('maps.webHelp')}</Text>
     <Text style={styles.count}>{workers.length} {t('maps.people')}</Text>
-    <Pressable disabled={refreshing} onPress={onRefresh} style={styles.button}><RefreshCw size={16} color="#FFFFFF" /><Text style={styles.buttonText}>{t('maps.refresh')}</Text></Pressable>
+    <Pressable onPress={onRefresh} style={styles.button}><RefreshCw size={16} color="#FFFFFF" /><Text style={styles.buttonText}>{t('maps.refresh')}</Text></Pressable>
   </View>;
 }
 

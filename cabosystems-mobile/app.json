@@ -7,6 +7,9 @@
     "icon": "./assets/images/icon.png",
     "scheme": "cabosystemsmobile",
     "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cabosystems.fieldservice",
@@ -19,6 +22,9 @@
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "splash": {
         "backgroundColor": "#ffffff"
       },
       "package": "com.cabosystems.fieldservice",

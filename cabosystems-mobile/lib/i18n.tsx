@@ -19,6 +19,9 @@ export const TRANSLATIONS = {
     'nav.tracking': 'Seguimiento',
     'tracking.liveMap': 'Mapa en vivo',
     'tracking.checks': 'Checks',
+    'tracking.routeHistory': 'Historial',
+    'tracking.views': 'Vistas de seguimiento',
+    'tracking.search': 'Buscar técnico...',
     'nav.locations': 'Villas',
     'nav.profile': 'Perfil',
 
@@ -160,6 +163,9 @@ export const TRANSLATIONS = {
     'nav.tracking': 'Tracking',
     'tracking.liveMap': 'Live map',
     'tracking.checks': 'Checks',
+    'tracking.routeHistory': 'Route history',
+    'tracking.views': 'Tracking views',
+    'tracking.search': 'Search technician...',
     'nav.locations': 'Villas',
     'nav.profile': 'Profile',
 

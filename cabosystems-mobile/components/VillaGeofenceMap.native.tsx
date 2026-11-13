@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
-import MapView, { Circle, Marker, type MapPressEvent } from 'react-native-maps';
+import MapView, { Circle, Marker, PROVIDER_GOOGLE, type MapPressEvent } from 'react-native-maps';
 
 export interface GeofenceMapCoordinates {
   latitude: number;
@@ -21,6 +21,7 @@ export function VillaGeofenceMap({ coordinates, radiusMeters, onChange }: Props)
   return (
     <View style={styles.frame}>
       <MapView
+        provider={PROVIDER_GOOGLE}
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         initialRegion={{ ...coordinates, latitudeDelta: 0.006, longitudeDelta: 0.006 }}

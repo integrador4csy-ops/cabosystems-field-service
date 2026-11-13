@@ -1,9 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, Pressable, Modal, TextInput, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Pressable, Modal, TextInput, StyleSheet, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { usePathname } from 'expo-router';
-import { Image } from 'expo-image';
 import { FlashList } from '@shopify/flash-list';
 import { ChevronDown, X, Search, Check } from 'lucide-react-native';
 import { AgendaPalette as P } from '@/constants/Theme';
@@ -23,7 +22,7 @@ export function AgendaHeader({ projects, projectId, onSelect, copy: c }: { proje
     {focused ? <StatusBar style="dark" /> : null}
     <View style={[styles.header, { paddingTop: insets.top }]}>
       <View style={styles.bar}>
-        <Image source={logo} style={styles.logo} contentFit="contain" contentPosition="left center" />
+        <Image source={logo} defaultSource={logo} style={styles.logo} resizeMode="contain" fadeDuration={0} />
         <Pressable accessibilityRole="button" accessibilityLabel={`${c.selectProject}: ${selected?.villa || c.allProjects}`} onPress={() => setOpen(true)} style={styles.projectButton}>
           <Text numberOfLines={1} style={styles.projectButtonText}>{selected?.villa || selected?.unidad || c.allProjects}</Text><ChevronDown size={16} color={P.white} />
         </Pressable>

@@ -7,6 +7,7 @@ import { useTranslation } from '../../context/LanguageContext';
 import { useSidebar } from '../../context/SidebarContext';
 import { dateKey } from '../../lib/taskDates';
 import { countTaskStatuses, filterWorkspaceTasks, sortWorkspaceTasks, taskVillaScope } from '../../lib/taskFilters';
+import { buildTaskProgressScope, canProgressTask } from '../../lib/taskProgressAccess';
 import type { Proyecto, Tarea } from '../../types/projects';
 import type { Profile } from '../../types/fleet';
 import { CreateProjectModal } from './CreateProjectModal';
@@ -41,6 +42,7 @@ interface TaskWorkspaceProps {
   projects: Proyecto[];
   tasks: Tarea[];
   staff: Profile[];
+  fullTaskProjectIds?: readonly string[];
   loading: boolean;
   error: string | null;
   searchQuery: string;
@@ -50,10 +52,15 @@ interface TaskWorkspaceProps {
   onDeleteProject: (project: Proyecto) => Promise<void>;
 }
 
-export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, searchQuery, createVersion, onReload, onMoveTask, onDeleteProject }: TaskWorkspaceProps) {
+export function TaskWorkspace({ mode, projects, tasks, staff, fullTaskProjectIds = [], loading, error, searchQuery, createVersion, onReload, onMoveTask, onDeleteProject }: TaskWorkspaceProps) {
   const { t, locale } = useTranslation();
   const { targetTaskId, setTargetTaskId } = useSidebar();
-  const { isAdmin, user } = useAdminAuth();
+  const { isAdmin, user, adminProfile } = useAdminAuth();
+  const fullTaskProjectSet = useMemo(() => new Set(fullTaskProjectIds), [fullTaskProjectIds]);
+  const progressScope = useMemo(
+    () => buildTaskProgressScope(user?.id, adminProfile, fullTaskProjectSet),
+    [user?.id, adminProfile, fullTaskProjectSet],
+  );
   const [reportOpen, setReportOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [sortOrder, setSortOrder] = useSessionPreference<'asc' | 'desc'>('csy_task_sort', 'asc', (value): value is 'asc' | 'desc' => value === 'asc' || value === 'desc');
@@ -283,9 +290,9 @@ export function TaskWorkspace({ mode, projects, tasks, staff, loading, error, se
       </div>
     </div>}
     {loading ? <div className="workspace-empty" role="status"><Loader2 size={24} className="animate-spin" /><p>{t('Cargando tareas...')}</p></div>
-      : mode === 'agenda' ? <TaskAgenda tasks={visible} projectLabels={projectLabels} expandedTaskIds={expanded} onToggleExpand={toggleExpand} onTaskUpdated={() => void onReload()} onEditTask={editTask} onCreateTask={createTaskOnDay} selectedDate={agendaDate} view={agendaView} onDateChange={setAgendaDate} onViewChange={setAgendaView} />
-      : view === 'board' ? <TaskBoard tasks={visible} showSearch={false} expandedTaskIds={expanded} onToggleExpand={toggleExpand} onTaskUpdated={() => void onReload()} onEditTask={editTask} onMoveTask={onMoveTask} />
-      : <div className="workspace-task-list">{visible.length ? visible.map((task) => <TaskCard key={task.id} task={task} isExpanded={expanded.has(task.id)} onToggleExpand={() => toggleExpand(task.id)} onTaskUpdated={() => void onReload()} onEditTask={editTask} />) : <p className="workspace-empty">{t('No hay tareas que coincidan con los filtros.')}</p>}</div>}
+      : mode === 'agenda' ? <TaskAgenda tasks={visible} projectLabels={projectLabels} fullTaskProjectIds={fullTaskProjectSet} expandedTaskIds={expanded} onToggleExpand={toggleExpand} onTaskUpdated={() => void onReload()} onEditTask={editTask} onCreateTask={createTaskOnDay} selectedDate={agendaDate} view={agendaView} onDateChange={setAgendaDate} onViewChange={setAgendaView} />
+      : view === 'board' ? <TaskBoard tasks={visible} showSearch={false} fullTaskProjectIds={fullTaskProjectSet} expandedTaskIds={expanded} onToggleExpand={toggleExpand} onTaskUpdated={() => void onReload()} onEditTask={editTask} onMoveTask={onMoveTask} />
+      : <div className="workspace-task-list">{visible.length ? visible.map((task) => <TaskCard key={task.id} task={task} canProgress={canProgressTask(task, progressScope)} isExpanded={expanded.has(task.id)} onToggleExpand={() => toggleExpand(task.id)} onTaskUpdated={() => void onReload()} onEditTask={editTask} />) : <p className="workspace-empty">{t('No hay tareas que coincidan con los filtros.')}</p>}</div>}
     </div>
     {reportOpen && <TaskReportDialog key={user?.id} projects={projects} staff={staff} initialProject={selectedVilla?.id} onClose={() => setReportOpen(false)} />}
     {templateOpen && selectedVilla && <TaskTemplateDialog key={selectedVilla.id} project={selectedVilla} onClose={() => setTemplateOpen(false)} onApplied={templateApplied} />}

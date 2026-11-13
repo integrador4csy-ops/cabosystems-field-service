@@ -57,7 +57,7 @@ test('agenda renders with Expo Router focus alone and disables swipes when the r
   const copy = evaluate(fs.readFileSync(path.join(__dirname, '../lib/companyAgendaCopy.ts'), 'utf8'), {});
   const cache = evaluate(fs.readFileSync(path.join(__dirname, '../lib/agendaPeriodCache.ts'), 'utf8'), {});
   const gestures = evaluate(fs.readFileSync(path.join(__dirname, '../lib/agendaGestures.ts'), 'utf8'), { './agenda': dates });
-  const windowManager = { cache: new cache.AgendaPeriodCache(async () => []), anchor: dates.dateKey(new Date()), view: 'week', ready: true, calendars: [], subscribe: () => () => {}, initialize: async () => {}, select() {}, getCalendars: async () => [], invalidate() {} };
+  const windowManager = { cache: new cache.AgendaPeriodCache(async () => []), anchor: dates.dateKey(new Date()), view: 'day', ready: true, calendars: [], subscribe: () => () => {}, initialize: async () => {}, select() {}, getCalendars: async () => [], invalidate() {} };
   let routeFocused = true;
   const focusListeners = new Set();
   let screenRenders = 0;
@@ -66,8 +66,8 @@ test('agenda renders with Expo Router focus alone and disables swipes when the r
   const component = name => ({ [name]: name });
   const { default: Screen } = evaluate(source, {
     react: React,
-    'react-native': { View: 'View', Text: 'Text', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', AppState: { currentState: 'active' }, StyleSheet: { create: value => value } },
-    'lucide-react-native': { CalendarDays: 'CalendarDays', RefreshCw: 'RefreshCw' },
+    'react-native': { View: 'View', Text: 'Text', ScrollView: 'ScrollView', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', AppState: { currentState: 'active' }, StyleSheet: { create: value => value } },
+    'lucide-react-native': { CalendarDays: 'CalendarDays', RefreshCw: 'RefreshCw', CakeSlice: 'CakeSlice' },
     'expo-router': { useFocusEffect(callback) {
       React.useEffect(() => {
         let cleanup;
@@ -86,13 +86,14 @@ test('agenda renders with Expo Router focus alone and disables swipes when the r
     '@/lib/agendaPreviewCache': evaluate(fs.readFileSync(path.join(__dirname, '../lib/agendaPreviewCache.ts'), 'utf8'), {}),
     '@/lib/companyAgenda': { canManageCompanyAgenda: () => false, companyDays: date => [date], companyRows: () => [] },
     '@/lib/agendaWindowService': { getAgendaWindow: () => windowManager },
-    '@/lib/companyAgendaApi': { getCompanyEvents: async () => [], getGoogleCalendars: async () => [] }, '@/lib/companyAgendaCache': {},
-    '@/lib/companyAgendaCopy': copy, '@/lib/companyAgendaPresentation': {},
+    '@/lib/companyAgendaApi': { getCompanyEvents: async () => [], getGoogleCalendars: async () => [], getCompanyBirthdays: async () => [] }, '@/lib/companyAgendaCache': {},
+    '@/lib/companyAgendaCopy': copy, '@/lib/companyAgendaPresentation': { birthdaysForMonth: () => [], eventSchedule: () => '' },
     '@/lib/supabase': { supabase: { channel: () => channel, removeChannel: async () => {} } },
     '@/lib/agendaSearchClient': { AgendaSearchClient: class { clear() {} } },
     '@/lib/foregroundPolling': { startForegroundPolling: () => () => {} },
     '@/lib/tabPreparation': { afterTabPaint: task => task() },
     '@/lib/useCalendarColors': { useCalendarColors: () => colors },
+    '@/components/HeaderCaboSystems': { useHeaderHeight: () => 72 },
     './CompanyAgendaControls': { ...component('CompanyAgendaControls'), ...component('CompanyAgendaTopBar'), ...component('CompanyAgendaGrid') },
     './CompanyAgendaEvent': component('CompanyAgendaEvent'),
     './CompanyAgendaSearchResults': component('CompanyAgendaSearchResults'),
@@ -121,7 +122,7 @@ test('agenda renders with Expo Router focus alone and disables swipes when the r
     await React.act(async () => { pager.props.onMove(1); pager.props.onMove(1); pager.props.onMove(-1); });
     assert.equal(renderer.root.findByType('AgendaSwipeArea').props.pagePosition, 1);
     assert.equal(renderer.root.findByType('AgendaSwipeArea').props.scopeKey, scope);
-    const expectedAnchor = [1, 1, -1].reduce((date, direction) => gestures.moveAgendaPeriod(date, 'week', direction), initialAnchor);
+    const expectedAnchor = [1, 1, -1].reduce((date, direction) => gestures.moveAgendaPeriod(date, 'day', direction), initialAnchor);
     assert.equal(renderer.root.findByType('CompanyAgendaControls').props.anchor, expectedAnchor);
     routeFocused = false;
     const previousPages = renderer.root.findByType('AgendaSwipeArea').props.previousPages;

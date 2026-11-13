@@ -23,3 +23,16 @@ test('the native editor presents a movable pin and visible radius circle', () =>
   assert.match(modal, /radiusMeters - 25/);
   assert.match(modal, /radiusMeters \+ 25/);
 });
+
+test('a completed check clears captured form state and keeps the compact action dock above navigation', () => {
+  const screen = read('app/checkin/[id].tsx');
+  assert.match(screen, /const resetCompletedCheck/);
+  assert.match(screen, /setPhotoUri\(null\)/);
+  assert.match(screen, /setNotes\(''\)/);
+  assert.match(screen, /resetCompletedCheck\(\);\s*setFeedbackModal/);
+  assert.match(screen, /styles\.embeddedActionDock/);
+  assert.match(screen, /bottomInset \+ BOTTOM_BAR_HEIGHT \+ 8/);
+  assert.match(screen, /minHeight: 260/);
+  assert.match(screen, /minHeight: 82/);
+  assert.match(screen, /currentProject\.desarrollo\} · \{currentProject\.villa/);
+});

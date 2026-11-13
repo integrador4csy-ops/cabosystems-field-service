@@ -22,13 +22,33 @@ export interface StoredBiometricCredentials {
   refreshToken?: string;
 }
 
+let cachedBiometricStatus: BiometricStatus | null = null;
+let cachedBiometricEnabled: boolean | null = null;
+
+export function getCachedBiometricStatus(): BiometricStatus | null {
+  return cachedBiometricStatus;
+}
+
+export function getCachedBiometricEnabled(): boolean | null {
+  return cachedBiometricEnabled;
+}
+
+export async function preloadBiometrics(): Promise<void> {
+  try {
+    await Promise.all([getBiometricStatus(), isBiometricAuthEnabled()]);
+  } catch {}
+}
+
 /**
  * Verifica si el dispositivo cuenta con hardware biométrico (huella, rostro) y si está configurado.
  */
-export async function getBiometricStatus(): Promise<BiometricStatus> {
+export async function getBiometricStatus(forceRefresh = false): Promise<BiometricStatus> {
+  if (!forceRefresh && cachedBiometricStatus) return cachedBiometricStatus;
   try {
     if (Platform.OS === 'web') {
-      return { available: false, enrolled: false, biometryType: 'generic', label: 'Biometría' };
+      const res = { available: false, enrolled: false, biometryType: 'generic' as const, label: 'Biometría' };
+      cachedBiometricStatus = res;
+      return res;
     }
 
     const hasHardware = await LocalAuthentication.hasHardwareAsync();
@@ -60,27 +80,37 @@ export async function getBiometricStatus(): Promise<BiometricStatus> {
       }
     }
 
-    return {
+    cachedBiometricStatus = {
       available: hasHardware,
       enrolled: isEnrolled,
       biometryType,
       label,
     };
+    return cachedBiometricStatus;
   } catch (error) {
     console.warn('Error checking biometric status:', error);
-    return { available: false, enrolled: false, biometryType: 'generic', label: 'Huella Dactilar' };
+    const fallback = { available: false, enrolled: false, biometryType: 'generic' as const, label: 'Huella Dactilar' };
+    cachedBiometricStatus = fallback;
+    return fallback;
   }
 }
 
 /**
  * Verifica si el usuario tiene activado el acceso biométrico en este dispositivo.
  */
-export async function isBiometricAuthEnabled(): Promise<boolean> {
+export async function isBiometricAuthEnabled(forceRefresh = false): Promise<boolean> {
+  if (!forceRefresh && cachedBiometricEnabled !== null) return cachedBiometricEnabled;
   try {
-    if (Platform.OS === 'web') return false;
+    if (Platform.OS === 'web') {
+      cachedBiometricEnabled = false;
+      return false;
+    }
     const enabled = await SecureStore.getItemAsync(BIOMETRICS_ENABLED_KEY);
-    return enabled === 'true';
+    const result = enabled === 'true';
+    cachedBiometricEnabled = result;
+    return result;
   } catch {
+    cachedBiometricEnabled = false;
     return false;
   }
 }
@@ -90,6 +120,7 @@ export async function isBiometricAuthEnabled(): Promise<boolean> {
  */
 export async function setBiometricEnabled(enabled: boolean): Promise<void> {
   try {
+    cachedBiometricEnabled = enabled;
     if (Platform.OS === 'web') return;
     if (enabled) {
       await SecureStore.setItemAsync(BIOMETRICS_ENABLED_KEY, 'true');
@@ -123,6 +154,7 @@ export async function setBiometricCredentials(
   refreshToken?: string | null
 ): Promise<void> {
   try {
+    cachedBiometricEnabled = enabled;
     if (Platform.OS === 'web') return;
 
     if (enabled && email) {

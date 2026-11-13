@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker, type LatLng } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE, type LatLng } from 'react-native-maps';
 import { Image } from 'expo-image';
-import { Battery, LocateFixed, MapPinned, Navigation, RefreshCw, X, Zap } from 'lucide-react-native';
+import { Battery, MapPinned, Navigation, X, Zap } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BOTTOM_BAR_HEIGHT, BOTTOM_BAR_MIN_INSET } from '@/constants/NavigationLayout';
 import { Colors } from '@/constants/Theme';
@@ -14,8 +14,8 @@ interface Props {
   workers: FleetMapWorker[];
   loading: boolean;
   error: boolean;
-  refreshing: boolean;
   onRefresh: () => void;
+  overlayTop?: number;
 }
 
 const DEFAULT_REGION = { latitude: 23.0626, longitude: -109.7036, latitudeDelta: 0.18, longitudeDelta: 0.18 };
@@ -71,13 +71,16 @@ function getRoleLabel(rol?: string | null, en?: boolean): string {
   return rol.replace(/_/g, ' ').toUpperCase();
 }
 
-export function LiveFleetMap({ workers, loading, error, refreshing, onRefresh }: Props) {
+export function LiveFleetMap({ workers, loading, error, onRefresh, overlayTop = 12 }: Props) {
   const { t } = useTranslation();
   const { language } = useLanguage();
   const en = language === 'en';
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
   const centered = useRef(false);
+  const markerTrackingSettled = useRef(false);
+  const [mapReady, setMapReady] = useState(false);
+  const [trackMarkerViews, setTrackMarkerViews] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = useMemo(() => workers.find(worker => worker.profile.id === selectedId) || null, [selectedId, workers]);
   const online = workers.filter(worker => !worker.isOffline).length;
@@ -87,28 +90,44 @@ export function LiveFleetMap({ workers, loading, error, refreshing, onRefresh }:
 
   const centerAll = () => {
     if (!coordinates.length) return;
-    if (coordinates.length === 1) {
-      mapRef.current?.animateCamera({ center: coordinates[0], zoom: 17 }, { duration: 450 });
-    } else {
-      mapRef.current?.fitToCoordinates(coordinates, { animated: true, edgePadding: { top: 100, right: 50, bottom: 220, left: 50 } });
+    try {
+      if (coordinates.length === 1) {
+        mapRef.current?.animateCamera({ center: coordinates[0], zoom: 16 }, { duration: 450 });
+      } else {
+        // El margen superior usa la altura real del overlay: con 120 fijo los
+        // marcadores quedaban bajo la cabecera y se veían como logos recortados.
+        mapRef.current?.fitToCoordinates(coordinates, { animated: true, edgePadding: { top: overlayTop + 28, right: 50, bottom: 220, left: 50 } });
+      }
+    } catch {
+      // Map instance not fully attached yet
     }
   };
 
   useEffect(() => {
-    if (centered.current || !coordinates.length) return;
+    if (!mapReady || centered.current || !coordinates.length) return;
     centered.current = true;
-    const frame = requestAnimationFrame(centerAll);
-    return () => cancelAnimationFrame(frame);
-  }, [coordinates]);
+    const timer = setTimeout(centerAll, 200);
+    return () => clearTimeout(timer);
+  }, [mapReady, coordinates]);
 
   useEffect(() => {
     if (selectedId && !workers.some(worker => worker.profile.id === selectedId)) setSelectedId(null);
   }, [selectedId, workers]);
 
+  useEffect(() => {
+    if (!workers.length || markerTrackingSettled.current) return;
+    const timer = setTimeout(() => {
+      markerTrackingSettled.current = true;
+      setTrackMarkerViews(false);
+    }, 1_500);
+    return () => clearTimeout(timer);
+  }, [workers.length]);
+
   return <View style={styles.container}>
     <MapView
+      provider={PROVIDER_GOOGLE}
       ref={mapRef}
-      style={StyleSheet.absoluteFill}
+      style={styles.map}
       initialRegion={DEFAULT_REGION}
       mapType="standard"
       userInterfaceStyle="light"
@@ -116,6 +135,7 @@ export function LiveFleetMap({ workers, loading, error, refreshing, onRefresh }:
       showsBuildings
       showsTraffic={false}
       toolbarEnabled={false}
+      onMapReady={() => setMapReady(true)}
       onPress={() => setSelectedId(null)}
     >
       {workers.map(worker => {
@@ -126,6 +146,7 @@ export function LiveFleetMap({ workers, loading, error, refreshing, onRefresh }:
 
         return <Marker
           key={worker.profile.id}
+          tracksViewChanges={trackMarkerViews}
           coordinate={{ latitude: worker.location.latitud, longitude: worker.location.longitud }}
           anchor={{ x: 0.5, y: hasBattery ? 0.65 : 0.5 }}
           zIndex={active ? 2 : 1}
@@ -163,7 +184,7 @@ export function LiveFleetMap({ workers, loading, error, refreshing, onRefresh }:
       })}
     </MapView>
 
-    <View style={styles.statusBar} pointerEvents="box-none">
+    <View style={[styles.statusBar, { top: overlayTop + 8 }]} pointerEvents="box-none">
       <View style={styles.statusPill}>
         <View style={[styles.dot, styles.statusOnline]} />
         <Text style={styles.statusText}>{online} {t('maps.live')}</Text>
@@ -171,12 +192,6 @@ export function LiveFleetMap({ workers, loading, error, refreshing, onRefresh }:
         <Navigation size={13} color="#343E48" />
         <Text style={styles.statusText}>{moving} {t('maps.moving')}</Text>
       </View>
-      <Pressable accessibilityLabel={t('maps.refresh')} disabled={refreshing} onPress={onRefresh} style={styles.mapButton}>
-        <RefreshCw size={18} color="#343E48" />
-      </Pressable>
-      <Pressable accessibilityLabel={t('maps.center')} onPress={centerAll} style={styles.mapButton}>
-        <LocateFixed size={18} color="#343E48" />
-      </Pressable>
     </View>
 
     {loading && !workers.length ? <View style={styles.messageCard}>
@@ -303,15 +318,15 @@ export function LiveFleetMap({ workers, loading, error, refreshing, onRefresh }:
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#E9EEF2' },
-  statusBar: { position: 'absolute', top: 12, left: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statusPill: { minHeight: 42, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.96)' },
-  statusText: { fontFamily: 'Outfit_600SemiBold', fontSize: 11.5, color: '#343E48' },
-  separator: { width: 1, height: 16, marginHorizontal: 2, backgroundColor: 'rgba(52,62,72,0.16)' },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  container: { ...StyleSheet.absoluteFill, flex: 1, width: '100%', height: '100%', backgroundColor: '#E9EEF2' },
+  map: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' },
+  statusBar: { position: 'absolute', left: 12, flexDirection: 'row', alignItems: 'center' },
+  statusPill: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.94)' },
+  statusText: { fontFamily: 'Outfit_600SemiBold', fontSize: 10.5, color: '#343E48' },
+  separator: { width: 1, height: 13, marginHorizontal: 1, backgroundColor: 'rgba(52,62,72,0.16)' },
+  dot: { width: 7, height: 7, borderRadius: 4 },
   statusOnline: { backgroundColor: '#12B76A' },
   statusOffline: { backgroundColor: '#98A2B3' },
-  mapButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.96)' },
   markerContainer: { alignItems: 'center' },
   markerHalo: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 24, borderWidth: 3, borderColor: 'rgba(255,255,255,0.94)', backgroundColor: 'rgba(247,140,38,0.22)' },
   markerHaloActive: { width: 54, height: 54, borderRadius: 27, borderColor: Colors.primary },

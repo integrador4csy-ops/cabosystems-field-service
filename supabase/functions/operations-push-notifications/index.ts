@@ -26,7 +26,7 @@ serve(async (req) => {
     const body = await req.json();
     const kind = body?.kind;
     const entityId = body?.entityId;
-    if (!entityId || !['task_assigned', 'field_check'].includes(kind)) return json({ error: 'Invalid event' }, 400);
+    if (!entityId || !['task_assigned', 'field_check', 'warranty_update'].includes(kind)) return json({ error: 'Invalid event' }, 400);
 
     let recipientIds: string[] = [];
     let title = '';
@@ -46,7 +46,7 @@ serve(async (req) => {
       message = 'Tienes una nueva tarea. Abre la app para consultar los detalles.';
       data = { target: 'tasks' };
       eventKey = String(body.eventKey || `task:${task.id}:${task.asignado_a}`);
-    } else {
+    } else if (kind === 'field_check') {
       const { data: record, error } = await admin
         .from('registros_campo')
         .select('id, tecnico_id')
@@ -59,6 +59,28 @@ serve(async (req) => {
       message = 'Se registró un nuevo check. Abre la app para consultar la evidencia.';
       data = { target: 'checks' };
       eventKey = `field-check:${record.id}`;
+    } else {
+      const [{ data: caller }, { data: visibleWarranty }, { data: warranty, error }] = await Promise.all([
+        admin.from('profiles').select('rol, activo').eq('id', authData.user.id).single(),
+        callerClient.from('warranty_cases').select('id').eq('id', entityId).maybeSingle(),
+        admin.from('warranty_cases').select('id, case_number, equipment, responsible_id, status, area, updated_at').eq('id', entityId).single(),
+      ]);
+      if (error || !warranty) return json({ error: 'Warranty case not found' }, 404);
+      if (!caller?.activo || !visibleWarranty) return json({ error: 'Warranty access required' }, 403);
+
+      const statusLabels: Record<string, string> = {
+        registered: 'Registrada',
+        review: 'Gestionando solicitud',
+        waiting: 'Solicitud enviada / en revisión',
+        resolved: 'Garantía aprobada · Cerrada',
+        rejected: 'Sin garantía · Cerrada',
+      };
+      const managedBy = warranty.area === 'operations' ? 'Compras' : 'Operaciones';
+      recipientIds = [warranty.responsible_id];
+      title = `Garantía GAR-${String(warranty.case_number).padStart(4, '0')} actualizada`;
+      message = `${warranty.equipment}: ${statusLabels[warranty.status] || warranty.status}. Gestionada por ${managedBy}.`;
+      data = { target: 'warranties' };
+      eventKey = `warranty:${warranty.id}:${warranty.updated_at}`;
     }
 
     if (!recipientIds.length) return json({ success: true, sentCount: 0 });

@@ -53,7 +53,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       setScheduledDate(taskToEdit.fecha_programada || '');
       setTitulo(taskToEdit.titulo);
       setDescripcion(taskToEdit.descripcion || '');
-      setAsignadoA(taskToEdit.asignado_a || '');
+      setAsignadoA(staffList.some((person) => person.id === taskToEdit.asignado_a) ? taskToEdit.asignado_a || '' : '');
       setEstatus(taskToEdit.estatus);
       setPrioridad(taskToEdit.prioridad || 'media');
       setInitialSubtasks([]);
@@ -67,7 +67,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       setInitialSubtasks(['']);
     }
     setError(null);
-  }, [isOpen, taskToEdit, project.id, defaultDate]);
+  }, [isOpen, taskToEdit, project.id, defaultDate, staffList]);
 
   const dialogRef = useDialog(isOpen, () => { if (!loading) onClose(); });
 

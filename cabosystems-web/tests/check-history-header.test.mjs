@@ -26,6 +26,12 @@ test('check history view provides an accordion list expanded by default', () => 
   assert.match(checksView, /isExpanded \? t\('Ocultar'\) : t\('Ver registros'\)/);
 });
 
+test('check evidence opens inside the current checks view', () => {
+  assert.match(checksView, /ImageLightboxModal/);
+  assert.match(checksView, /setEvidence\(\{ url: entry\.photo_url/);
+  assert.doesNotMatch(checksView, /target="_blank"/);
+});
+
 test('app connects checks controls between header and checks view', () => {
   assert.match(app, /checkTechnicianId=\{checkTechnicianId\}/);
   assert.match(app, /checkDate=\{checkDate\}/);

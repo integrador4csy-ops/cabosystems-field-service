@@ -281,3 +281,111 @@ Por solicitud del usuario se quitó Año de la fila de vistas de Agenda. Quedan 
 Agenda: selector de fecha ahora es campo con borde, DD/MM/AAAA e icono de calendario, conserva selector modal. Debajo de las vistas, encabezado contextual: fecha larga para Día, rango lunes-domingo para Semana y mes/año para Mes. Se añadieron controles anterior/Hoy/siguiente en ese encabezado; Hoy recalcula fecha actual y preserva vista y filtros. Año continúa oculto. Sin cambios de backend.
 
 Agenda: controles anterior/periodo actual/siguiente alineados junto al texto de fecha. Atajo indica Hoy para Día, Esta semana para Semana y Este mes para Mes.
+
+### Parpadeo al cambiar de pestaña (12 de noviembre de 2026)
+
+El usuario reportó que al cambiar de pestaña por primera vez había un parpadeo, una caída de rendimiento y que el logo de CaboSystems desaparecía. Solo en la primera visita; después el cambio era fluido. Se investigó con ADB sobre el Android físico (JNL74P6LCQ4XFE6H): grabación de pantalla a 22 fps con `adb shell screenrecord`, análisis de frames con ffmpeg (brillo mínimo por frame en la región del logo) y `dumpsys gfxinfo` para frames y percentiles.
+
+Causas confirmadas y corregidas:
+
+1. **El logo de la cabecera se quedaba en blanco durante el primer render de cada pestaña.** `expo-image` no entrega su drawable en el primer frame tras volverse visible la escena, y la cabecera quedaba con el hueco del logo. Se sustituyó por el `Image` de React Native con `defaultSource` (resuelve el recurso del APK de forma síncrona en Android) en `components/HeaderCaboSystems.tsx`, `components/agenda/AgendaHeader.tsx` y `app/(auth)/index.tsx`. El PNG es 1000x336 (ratio 2.976) frente a una caja de 3.0, así que `resizeMode="contain"` es visualmente equivalente. Verificado: en Team y Chat el logo ya aparece en el frame posterior al toque.
+
+2. **La cápsula naranja del tab bar iba un paso por detrás del contenido.** `ConnectedTabBarProvider` se alimentaba de `useSegments()`, que se actualiza un ciclo tarde. Ahora el proveedor vive dentro de `renderOrderedTabBar` y recibe la ruta enfocada del estado real del navegador (`props.state` ya reordenado con `orderTabBarState`). Verificado: contenido y cápsula coinciden en todos los cambios.
+
+3. **El mapa se renderizaba fuera del navegador de pestañas y obligaba a poner todas las escenas translúcidas.** React Navigation mantiene montadas las escenas inactivas (`detachInactiveScreens={false}`) y, con el `zIndex` eliminado por `react-native-screens` (`Screen.tsx`), su contenido se pintaba sobre el mapa. `TrackingSurface` ahora se monta dentro de su propia escena (`app/(tabs)/maps.tsx`) y las escenas son opacas; se eliminaron `transparentScene`, la capa `persistentTracking` y la barra de toques `TrackingTabHitBar`. La superficie nativa del mapa sigue viva porque la escena no se desmonta.
+
+4. **Los marcadores del mapa quedaban bajo la cabecera.** `fitToCoordinates` usaba `edgePadding.top` fijo de 120 dp frente a una cabecera de unos 160 dp: los marcadores se veían recortados y parecían logos fantasma. Ahora el margen usa `overlayTop + 28`.
+
+5. **El arranque competía con el trabajo pesado.** El mapa (superficie nativa de Google Maps) se montaba al detectar `mainReady`, y `startChatBackgroundSync` (5 canales realtime e histórico completo de cada sala) arrancaba en el mismo frame. El mapa ahora se monta en `requestIdleCallback` y la sincronización de chat espera al hilo libre. El frame más lento del arranque pasó de **500 ms a 81 ms** (`dumpsys gfxinfo`, p99).
+
+Validación: TypeScript sin errores, 191/191 pruebas en verde y revisión en el Android físico. El APK independiente se regeneró con `gradlew assembleRelease` (firma con la keystore de debug, igual que la versión instalada) y se verificó en el teléfono. No se tocó el backend ni se modificaron datos.
+
+### Agenda móvil sin título ni buscador (12 de noviembre de 2026)
+
+Por indicación del usuario se retiraron de la pestaña Schedule el encabezado "Agenda de la empresa" y el cuadro de búsqueda de eventos. Cambios:
+
+- `components/agenda/CompanyAgendaControls.tsx`: se eliminan el texto de sección y el `TextInput` de búsqueda, y con ello las props `query`/`onSearch` y las ramas `query.trim()` que alternaban entre modo búsqueda y modo calendario. Los estilos `sectionTitle`, `search`, `searchInput` y `clear` quedaron sin uso y se retiraron.
+- `components/agenda/CompanyAgendaScreen.tsx`: deja de pasar `query`/`onSearch` a los controles.
+- `lib/companyAgendaCopy.ts` y `lib/uiTranslations.ts`: se retiran las cadenas huérfanas `title`, `search`, `clearSearch` y la traducción "Agenda de la empresa".
+
+Con el buscador fuera, la búsqueda de la agenda ya no es alcanzable, así que se eliminó el `useFocusEffect` que preparaba el índice de Google Calendar (`prepare-search`) y lo sondeaba cada 25 s mientras la pestaña estaba enfocada: era una llamada a la edge function por ciclo sin ningún consumidor. La maquinaria de búsqueda (`AgendaSearchClient`, `CompanyAgendaSearchResults`, `agendaSearchApi`) se conserva intacta para poder restituirla si vuelve a haber entrada en pantalla; el contador `searchRevision` se sigue usando para invalidar la caché al guardar o borrar un evento.
+
+El calendario mensual, el selector de periodo, el selector de vista, el filtro de calendarios, los cumpleaños y la rejilla quedan igual. TypeScript sin errores y 191/191 pruebas en verde.
+
+### Selector de vistas de la agenda en línea (12 de noviembre de 2026)
+
+Por indicación del usuario, el desplegable de vista de la pestaña Schedule (Mes / Semana / Día) se sustituyó por las tres opciones visibles en línea, y el filtro de calendarios se subió a la fila del periodo, a la derecha.
+
+- `components/agenda/CompanyAgendaControls.tsx`: se usa `EqualSegmentedTabs` (el mismo control segmentado de la pestaña Tracking, con la opción activa en naranja) en lugar de `AgendaViewListbox`. El filtro de calendarios pasa de la fila inferior a la fila del selector de periodo, alineado a la derecha.
+- `components/agenda/CompanyCalendarFilters.tsx`: el disparador deja de forzar `width: '100%'` y pasa a tomar el ancho de su contenido, para poder alinearse a la derecha; el resumen "n/n" recorta en una línea.
+- Se elimina `components/agenda/AgendaViewListbox.tsx`, que queda sin uso.
+- `tests/agenda-continuous-layout.test.cjs`: la comprobación del control de vistas pasa de `AgendaViewListbox` a `EqualSegmentedTabs`.
+
+Distribución resultante en la pestaña Agenda: cabecera con el logo; fila del periodo con el mes a la izquierda y el filtro de calendarios a la derecha; fila de vistas con Mes / Semana / Día; cumpleaños; rejilla. TypeScript sin errores y 191/191 pruebas en verde.
+
+### Aviso de PRELOAD sin manejar en la pestaña fab (12 de noviembre de 2026)
+
+En desarrollo, expo-router registraba `The action 'PRELOAD' with payload {"name":"fab"} was not handled by any navigator`. Origen: con `lazy: false` en las `screenOptions` de las pestañas, expo-router precarga de forma ansiosa cada pantalla declarada disparando la acción `PRELOAD` de React Navigation (`createBaseTabProps.js` → `usePreloadPlaceholderRoutes.js`). El `TabRouter` solo la atiende si el nombre está en sus `routeNames`, y la pantalla `fab` no llega a ser una pestaña real: para administradores es `href: null` (oculta) y para técnicos es un `tabBarButton` a medida. La acción quedaba sin destino y React Navigation la reportaba por `onUnhandledAction`.
+
+Solución: `lazy: true` explícito en la pantalla `fab`. Deja de precargarse y el aviso desaparece. Además es lo correcto: `app/(tabs)/fab.tsx` monta la pantalla de check-in, que abre cámara y GPS, así que no debe montarse al arrancar la app. TypeScript sin errores y 191/191 pruebas en verde.
+
+### Reproductor de notas de voz del chat (13 de noviembre de 2026)
+
+El usuario reportó que las notas de voz no se reproducían. Se investigó sobre el Android físico: `dumpsys audio` para el foco de audio, `uiautomator` para localizar el botón y la caché SQLite de la app para extraer la URL real del archivo.
+
+Diagnóstico:
+
+- El archivo es correcto: la nota se guarda en el bucket público `chat-media` y responde `HTTP 200`, `Content-Type: audio/mp4`, 85 KB, con `Accept-Ranges: bytes`.
+- El log de foco muestra que la reproducción sí ocurría las dos primeras veces (`requestAudioFocus` → ~7 s → `abandonAudioFocus`, el tiempo exacto de la nota) y que a partir de la tercera pulsación **no había ninguna petición de foco**: `play()` nunca llegaba a ejecutarse.
+- La causa estaba en el encadenado del reproductor: al terminar, el player queda en estado "finalizado" y el reinicio dependía del promise de `seekTo(0)`, que en Android puede no resolverse nunca. Encadenado así, `play()` no se llamaba nunca. Además el `play()` de la rama normal no tenía `.catch`, así que cualquier fallo quedaba en silencio y el usuario no veía ningún error. Y el grabador deja el modo de audio en "sin grabación", por lo que la nota podía quedar muda.
+
+Cambios en `components/chat/ChatAudioPlayer.tsx`:
+
+- El reinicio se hace con `settle(player.seekTo(0), 600)`: una carrera contra un temporizador garantiza que `play()` se intente aunque el `seekTo` no resuelva.
+- `play()` y `seekTo()` se esperan dentro de `try/catch`; el error se registra y la burbuja muestra "No se pudo reproducir" (con su traducción en `lib/uiTranslations.ts`).
+- Se repone el modo de audio con `setAudioModeAsync({ playsInSilentMode: true })` antes de reproducir, para que la nota se oiga también con el teléfono en silencio.
+- Registro de players activos: solo suena una nota a la vez y cada player se detiene y suelta el foco al desmontarse. Antes, un player vivo bloqueaba el foco de audio de los siguientes y la reproducción se quedaba muda.
+
+Validado en vivo con Expo Go 58.0.5 y Metro (sin compilar APK): primer toque reproduce y el UI muestra pausa y 0:01; al terminar, un segundo toque vuelve a reproducir, con `requestAudioFocus` en ambos casos. TypeScript sin errores y 191/191 pruebas en verde.
+
+### Limpieza de la cabecera de la pestaña Equipo (13 de noviembre de 2026)
+
+Por indicación del usuario se retiraron de la pestaña Team el título "Staff management" y el subtítulo con el número de colaboradores activos, y la cápsula de la lista pasó de "Staff (5)" a "Team".
+
+- `app/(tabs)/users.tsx`: se elimina el bloque `headerArea` con el título y el subtítulo, y la cápsula de colaboradores usa `tr("Equipo")`. Se retiran los estilos `headerArea`, `pageTitle` y `pageSubtitle`, que quedan sin uso.
+- `lib/uiTranslations.ts`: se retiran las cadenas huérfanas "Colaboradores (", "Gestión de Personal", "{value0} colaboradores activos en la plataforma" y "{value0} invitaciones pendientes de registro". "Equipo" ya estaba traducida como "Team".
+
+Verificado en vivo con Expo Go y Metro: la pantalla arranca directamente con las cápsulas "Team" e "Invitations (6)". TypeScript sin errores y 191/191 pruebas en verde.
+
+### Subida del contenido de la pestaña Agenda (13 de noviembre de 2026)
+
+Por indicación del usuario se subió el bloque de contenido de la pestaña Schedule y todos sus elementos, que quedaban con demasiado espacio respecto a la cabecera.
+
+- `components/agenda/CompanyAgendaControls.tsx`: el relleno superior de los controles pasa de 18 a 6, la fila del periodo deja de tener margen superior y el relleno inferior de la rejilla baja de 14 a 8.
+- `components/agenda/CompanyAgendaScreen.tsx`: la fila de cumpleaños reduce sus márgenes a 0 y 2, y el encabezado de día baja su relleno superior de 24 a 12.
+
+Con esto la fila del mes queda alineada con las cápsulas de las demás pestañas y el bloque de eventos sube unos 46 dp. Verificado en vivo con Expo Go y Metro en las vistas Mes y Semana. TypeScript sin errores y 191/191 pruebas en verde.
+
+### Previews de la lista de chats más grandes (13 de noviembre de 2026)
+
+Por indicación del usuario se agrandaron un punto los textos de la lista de conversaciones de la pestaña Chat.
+
+- `app/(tabs)/chat.tsx`: el nombre del chat pasa de 15 a 16, la fecha de 11 a 12, la previa del último mensaje de 13 a 14 y el estado sin mensajes también de 13 a 14. Los iconos de foto, video y sticker pasan de 13 a 14, el de evidencias de 10 a 11, y la tarjeta crece de 58 a 62 de alto mínimo con 9 de relleno vertical para que nada se corte.
+
+TypeScript sin errores y 191/191 pruebas en verde.
+
+### Burbuja de la barra inferior: círculo sobre el icono y deslizado con muelle (13 de noviembre de 2026)
+
+El usuario señaló que la burbuja naranja de la barra inferior no era lo bastante grande para cubrir la palabra completa de pestañas largas como "Tracking" o "Schedule". Midiendo en el dispositivo se confirmó el problema: la burbuja era un círculo de 62 dp y la palabra "Schedule" mide unos 53 dp, así que las letras de los extremos se salían del naranja y quedaban blancas sobre blanco, ilegibles.
+
+Por indicación del usuario se optó por el diseño de círculo solo sobre el icono con la palabra siempre en tinta.
+
+`components/ConnectedTabBar.tsx`:
+
+- La burbuja pasa a ser un círculo de 34 dp centrado en el icono. Para no depender de constantes, el icono y la barra miden su posición real con `measureInWindow` y la burbuja se sitúa con esos valores; si la medición aún no ha ocurrido se usa una posición de reserva.
+- El desplazamiento cambia de `withTiming` (220 ms, con tirón al final) a `withSpring` (amortiguación 24, rigidez 190, masa 0.9): la burbuja se desliza de forma continua y se detiene sin sacudida.
+- La palabra de la pestaña deja de interpolarse a blanco y se mantiene siempre en tinta, con lo que ya no puede quedar ilegible fuera de la burbuja.
+
+`tests/tab-selection.test.cjs`: se actualiza al nuevo diseño (la palabra ya no cambia de color, el movimiento usa muelle y la burbuja es un círculo pequeño) y se añade `Text` al simulacro de `react-native`.
+
+Verificado en el dispositivo con Expo Go y Metro: burbuja circular centrada en el icono activo, icono en blanco y las cinco palabras en negro y legibles. TypeScript sin errores y 191/191 pruebas en verde.

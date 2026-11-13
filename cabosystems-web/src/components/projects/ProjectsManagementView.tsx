@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { deleteProject, getAssignableStaff, getProjects, getTasksByProject } from '../../lib/projectsApi';
+import { deleteProject, getAssignableStaff, getProjects, getTasksByProject, getUserTaskAccessGrants } from '../../lib/projectsApi';
+import { resolveFullTaskProjectIds } from '../../lib/taskProgressAccess';
 import { useSidebar } from '../../context/SidebarContext';
 import type { Proyecto, Tarea } from '../../types/projects';
 import type { Profile } from '../../types/fleet';
@@ -8,8 +9,9 @@ import { TaskWorkspace } from './TaskWorkspace';
 import { useSectionResources, type SectionResources } from '../../context/SectionResources';
 
 async function taskSnapshot() {
-  const [projects, tasks, staff] = await Promise.all([getProjects(), getTasksByProject(), getAssignableStaff()]);
-  return { projects, tasks, staff };
+  const [projects, tasks, staff, grants] = await Promise.all([getProjects(), getTasksByProject(), getAssignableStaff(), getUserTaskAccessGrants()]);
+  const fullTaskProjectIds = resolveFullTaskProjectIds(projects, grants);
+  return { projects, tasks, staff, fullTaskProjectIds };
 }
 export const prefetchTasks = (resources: SectionResources) => resources.queries.load('tasks', taskSnapshot);
 
@@ -20,6 +22,7 @@ export function ProjectsManagementView({ mode = 'tasks' }: { mode?: 'tasks' | 'a
   const [projects, setProjects] = useState<Proyecto[]>(cached?.projects || []);
   const [tasks, setTasks] = useState<Tarea[]>(cached?.tasks || []);
   const [staff, setStaff] = useState<Profile[]>(cached?.staff || []);
+  const [fullTaskProjectIds, setFullTaskProjectIds] = useState<string[]>(cached?.fullTaskProjectIds || []);
   const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
   const requestVersion = useRef(0);
@@ -30,11 +33,12 @@ export function ProjectsManagementView({ mode = 'tasks' }: { mode?: 'tasks' | 'a
     const version = ++requestVersion.current;
     if (showLoading && !hasLoaded.current) setLoading(true);
     try {
-      const { projects: nextProjects, tasks: nextTasks, staff: nextStaff } = await resources.queries.load('tasks', taskSnapshot, !showLoading);
+      const { projects: nextProjects, tasks: nextTasks, staff: nextStaff, fullTaskProjectIds: nextFullIds } = await resources.queries.load('tasks', taskSnapshot, !showLoading);
       if (version !== requestVersion.current) return;
       setProjects(nextProjects);
       setTasks(nextTasks);
       setStaff(nextStaff);
+      setFullTaskProjectIds(nextFullIds);
       hasLoaded.current = true;
       setError(null);
     } catch (err) {
@@ -53,6 +57,7 @@ export function ProjectsManagementView({ mode = 'tasks' }: { mode?: 'tasks' | 'a
       .on('postgres_changes', { event: '*', schema: 'public', table: 'proyectos' }, () => void loadData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tareas' }, () => void loadData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subtareas' }, () => void loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'proyecto_participantes' }, () => void loadData())
       .subscribe();
     return () => { requestVersion.current += 1; window.removeEventListener('focus', focus); void supabase.removeChannel(channel); };
   }, [loadData]);
@@ -67,5 +72,5 @@ export function ProjectsManagementView({ mode = 'tasks' }: { mode?: 'tasks' | 'a
     await loadData();
   };
 
-  return <TaskWorkspace mode={mode} projects={projects} tasks={tasks} staff={staff} loading={loading} error={error} searchQuery={taskSearchQuery} createVersion={taskCreateVersion} onReload={loadData} onMoveTask={moveTask} onDeleteProject={removeProject} />;
+  return <TaskWorkspace mode={mode} projects={projects} tasks={tasks} staff={staff} fullTaskProjectIds={fullTaskProjectIds} loading={loading} error={error} searchQuery={taskSearchQuery} createVersion={taskCreateVersion} onReload={loadData} onMoveTask={moveTask} onDeleteProject={removeProject} />;
 }

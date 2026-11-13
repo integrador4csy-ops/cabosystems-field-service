@@ -2,7 +2,9 @@ import { useMemo } from 'react';
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useSessionPreference } from '../../hooks/useSessionPreference';
 import { useTranslation } from '../../context/LanguageContext';
+import { useAdminAuth } from '../../context/AdminAuthContext';
 import { dateKey, parseDateKey, shiftDate, shiftMonth, weekDates } from '../../lib/taskDates';
+import { buildTaskProgressScope, canProgressTask } from '../../lib/taskProgressAccess';
 import type { Tarea } from '../../types/projects';
 import { TaskCard } from './TaskCard';
 import { TaskCalendar } from './TaskCalendar';
@@ -14,6 +16,7 @@ type ScheduledAgendaView = Exclude<AgendaView, 'unscheduled'>;
 interface TaskAgendaProps {
   tasks: Tarea[];
   projectLabels: Record<string, string>;
+  fullTaskProjectIds?: ReadonlySet<string>;
   expandedTaskIds: Set<string>;
   onToggleExpand: (id: string) => void;
   onTaskUpdated: () => void;
@@ -25,8 +28,13 @@ interface TaskAgendaProps {
   onViewChange: (view: AgendaView) => void;
 }
 
-export function TaskAgenda({ tasks, projectLabels, expandedTaskIds, onToggleExpand, onTaskUpdated, onEditTask, onCreateTask, selectedDate: anchor, view, onDateChange, onViewChange }: TaskAgendaProps) {
+export function TaskAgenda({ tasks, projectLabels, fullTaskProjectIds, expandedTaskIds, onToggleExpand, onTaskUpdated, onEditTask, onCreateTask, selectedDate: anchor, view, onDateChange, onViewChange }: TaskAgendaProps) {
   const { t, locale } = useTranslation();
+  const { user, adminProfile } = useAdminAuth();
+  const progressScope = useMemo(
+    () => buildTaskProgressScope(user?.id, adminProfile, fullTaskProjectIds),
+    [user?.id, adminProfile, fullTaskProjectIds],
+  );
   const [lastScheduledView, setLastScheduledView] = useSessionPreference<ScheduledAgendaView>('csy_agenda_scheduled_view', 'month', (value): value is ScheduledAgendaView => typeof value === 'string' && ['month', 'week', 'day'].includes(value));
   const toggleUnscheduled = () => {
     if (view === 'unscheduled') onViewChange(lastScheduledView);
@@ -37,7 +45,7 @@ export function TaskAgenda({ tasks, projectLabels, expandedTaskIds, onToggleExpa
   const movePeriod = (direction: number) => changeDate(view === 'month' ? shiftMonth(anchor, direction) : shiftDate(anchor, direction * (view === 'week' ? 7 : 1)));
   const dates = useMemo(() => view === 'week' ? weekDates(anchor).slice(0, 5) : [anchor], [anchor, view]);
   const unscheduled = tasks.filter((task) => !task.fecha_programada);
-  const renderCard = (task: Tarea) => <TaskCard key={task.id} task={task} variant="board" projectLabel={projectLabels[task.proyecto_id]} showScheduledDate={false} isExpanded={expandedTaskIds.has(task.id)} onToggleExpand={() => onToggleExpand(task.id)} onTaskUpdated={onTaskUpdated} onEditTask={onEditTask} />;
+  const renderCard = (task: Tarea) => <TaskCard key={task.id} task={task} variant="board" projectLabel={projectLabels[task.proyecto_id]} canProgress={canProgressTask(task, progressScope)} showScheduledDate={false} isExpanded={expandedTaskIds.has(task.id)} onToggleExpand={() => onToggleExpand(task.id)} onTaskUpdated={onTaskUpdated} onEditTask={onEditTask} />;
 
   return <div className="task-agenda">
     <div className="agenda-toolbar">

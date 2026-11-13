@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   anchoredSheet: { position: 'absolute', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: P.line, elevation: 6, shadowColor: P.ink, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 8 },
   fieldButton: { alignSelf: 'stretch', gap: 6, paddingHorizontal: 8, paddingVertical: 8, marginBottom: 0 },
   fieldText: { flexShrink: 1, fontSize: 13 },
-  compactButton: { flex: 1, alignSelf: 'stretch', borderWidth: 0, paddingHorizontal: 0, marginBottom: 0, gap: 0 }, compactText: { fontFamily: 'Outfit_600SemiBold', fontSize: 20, flexShrink: 1 },
+  compactButton: { flex: 1, alignSelf: 'stretch', borderWidth: 0, paddingHorizontal: 0, marginBottom: 0, gap: 0 }, compactText: { fontFamily: 'Outfit_600SemiBold', fontSize: 22, lineHeight: 28, flexShrink: 1 },
   dateButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 24, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 12, borderWidth: 1, borderColor: P.line, borderRadius: 8 }, dateText: { fontFamily: 'Outfit_400Regular', fontSize: 15, color: P.ink },
   backdrop: { flex: 1, backgroundColor: P.overlay, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 }, sheet: { width: '100%', maxWidth: 480, maxHeight: '90%', padding: 16, borderRadius: 12, backgroundColor: P.white },
   row: { flexDirection: 'row', alignItems: 'center' }, heading: { flex: 1, fontFamily: 'Outfit_600SemiBold', fontSize: 18, color: P.ink }, icon: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }, monthButton: { flex: 1, minHeight: 44, justifyContent: 'center', alignItems: 'center' }, monthText: { fontFamily: 'Outfit_500Medium', fontSize: 16, color: P.ink, textAlign: 'center' },

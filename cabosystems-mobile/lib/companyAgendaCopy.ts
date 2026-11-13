@@ -1,9 +1,9 @@
 const es = {
   calendar: 'Calendario', localCalendar: 'Solo CaboSystems', startTime: 'Hora de inicio (HH:mm)', endDate: 'Último día', endTime: 'Hora de fin (HH:mm)', calendarFailed: 'No se pudieron consultar los calendarios Google. Puedes guardar solo en CaboSystems.', googleTime: 'Horario de Los Cabos.', googleOccurrence: 'Los cambios y la eliminación afectan solo esta ocurrencia. La serie completa se administra en Google Calendar.', continues: 'Continúa',
-  agenda: 'Agenda', views: 'Vista de agenda', clearSearch: 'Borrar búsqueda',
-  title: 'Agenda de la empresa', newEvent: 'Nuevo evento', edit: 'Editar evento', details: 'Detalle del evento',
+  agenda: 'Agenda', views: 'Vista de agenda',
+  newEvent: 'Nuevo evento', edit: 'Editar evento', details: 'Detalle del evento',
   event: 'Evento', reminder: 'Recordatorio', all: 'Todos', events: 'Eventos', reminders: 'Recordatorios',
-  search: 'Buscar evento o ubicación', month: 'Mes', week: 'Semana', day: 'Día', today: 'Hoy',
+  month: 'Mes', week: 'Semana', day: 'Día', today: 'Hoy',
   previous: 'Periodo anterior', next: 'Periodo siguiente', loading: 'Cargando agenda...',
   failed: 'No se pudo actualizar la agenda. Comprueba tu conexión e intenta de nuevo.', retry: 'Reintentar',
   empty: 'No hay eventos en este periodo.', emptyFilter: 'No hay resultados para esta búsqueda o filtro.',
@@ -24,10 +24,10 @@ const es = {
 export type CompanyAgendaCopy = typeof es;
 const en: CompanyAgendaCopy = {
   calendar: 'Calendar', localCalendar: 'CaboSystems only', startTime: 'Start time (HH:mm)', endDate: 'Last day', endTime: 'End time (HH:mm)', calendarFailed: 'Could not load Google calendars. You can still save locally.', googleTime: 'Los Cabos time.', googleOccurrence: 'Changes and deletion apply only to this occurrence. Manage the full series in Google Calendar.', continues: 'Continues',
-  agenda: 'Calendar', views: 'Calendar view', clearSearch: 'Clear search',
-  title: 'Company calendar', newEvent: 'New event', edit: 'Edit event', details: 'Event details',
+  agenda: 'Calendar', views: 'Calendar view',
+  newEvent: 'New event', edit: 'Edit event', details: 'Event details',
   event: 'Event', reminder: 'Reminder', all: 'All', events: 'Events', reminders: 'Reminders',
-  search: 'Search event or location', month: 'Month', week: 'Week', day: 'Day', today: 'Today',
+  month: 'Month', week: 'Week', day: 'Day', today: 'Today',
   previous: 'Previous period', next: 'Next period', loading: 'Loading calendar...',
   failed: 'Could not refresh the calendar. Check your connection and try again.', retry: 'Try again',
   empty: 'No events in this period.', emptyFilter: 'No results for this search or filter.',

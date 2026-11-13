@@ -21,7 +21,10 @@ import { registerForPushNotificationsAsync, setupNotificationResponseListener } 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { startFieldSync } from '@/lib/fieldSync';
 import { FieldSyncStatus } from '@/components/FieldSyncStatus';
-import { startAgendaWindow } from '@/lib/agendaWindowService';
+import { startAgendaWindow, preloadAgendaData } from '@/lib/agendaWindowService';
+import { restoreChatRooms } from '@/lib/chatRoomCache';
+import { preloadUsersData } from './(tabs)/users';
+import { preloadMainTasks } from './(tabs)/index';
 
 export {
   ErrorBoundary,
@@ -34,8 +37,16 @@ export const unstable_settings = {
 function RootLayoutNav() {
   const { session, profile, loading } = useAuth();
   const agendaOwner = profile?.activo && profile.id === session?.user.id ? profile.id : '';
-  useEffect(() => agendaOwner ? startAgendaWindow(agendaOwner, false) : undefined, [agendaOwner]);
+  useEffect(() => agendaOwner ? startAgendaWindow(agendaOwner, true) : undefined, [agendaOwner]);
   useEffect(() => session?.user.id ? startFieldSync(session.user.id) : undefined, [session?.user.id]);
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    const uid = session.user.id;
+    void restoreChatRooms(uid);
+    void preloadUsersData(uid);
+    void preloadMainTasks(uid);
+    void preloadAgendaData(uid);
+  }, [session?.user?.id]);
   const segments = useSegments();
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
@@ -159,7 +170,7 @@ function RootLayoutNav() {
     <>
       <Stack screenOptions={{ headerShown: false, freezeOnBlur: true }}>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" activityEnabled={false} options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="pending" options={{ headerShown: false }} />
         <Stack.Screen name="task/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="checkin/[id]" options={{ headerShown: false, presentation: 'modal' }} />

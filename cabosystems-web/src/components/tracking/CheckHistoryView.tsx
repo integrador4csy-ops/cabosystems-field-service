@@ -4,6 +4,7 @@ import { useTranslation } from '../../context/LanguageContext';
 import { getAdminCheckHistory, type AdminCheckHistoryItem } from '../../lib/checkHistory';
 import { dateKey, shiftDate } from '../../lib/taskDates';
 import { AppSelect } from '../ui/AppSelect';
+import { ImageLightboxModal } from '../chat/ImageLightboxModal';
 
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'CS';
@@ -38,6 +39,7 @@ export function CheckHistoryView({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [collapsedMap, setCollapsedMap] = useState<Record<string, boolean>>({});
+  const [evidence, setEvidence] = useState<{ url: string; caption: string } | null>(null);
 
   const day = propDay ?? internalDay;
   const setDay = onDayChange ?? setInternalDay;
@@ -189,7 +191,7 @@ export function CheckHistoryView({
                         {place && <p className="mt-1 flex items-center gap-1 truncate text-sm text-slate-600"><MapPin size={14} className="shrink-0 text-slate-400" />{place}</p>}
                         {entry.comments && <p className="mt-1 text-sm text-slate-500">{entry.comments}</p>}
                       </div>
-                      {entry.photo_url && <a href={entry.photo_url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-2 justify-self-start rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-700 sm:justify-self-end"><Camera size={15} />{t('Ver evidencia')}</a>}
+                      {entry.photo_url && <button type="button" onClick={() => setEvidence({ url: entry.photo_url, caption: `${person.technician_name} · ${isIn ? 'Check-in' : 'Check-out'} · ${time}` })} className="inline-flex h-9 items-center gap-2 justify-self-start rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-700 sm:justify-self-end"><Camera size={15} />{t('Ver evidencia')}</button>}
                     </div>;
                   })}
                 </div>
@@ -198,6 +200,7 @@ export function CheckHistoryView({
           })}
         </div>}
       </div>
+      {evidence && <ImageLightboxModal imageUrl={evidence.url} caption={evidence.caption} onClose={() => setEvidence(null)} />}
     </section>
   );
 }

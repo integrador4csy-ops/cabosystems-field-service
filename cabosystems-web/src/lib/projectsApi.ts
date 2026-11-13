@@ -1,7 +1,9 @@
 import { supabase } from './supabase';
 import type { Proyecto, Tarea, Subtarea } from '../types/projects';
 import type { Profile } from '../types/fleet';
+import { isEligibleTaskAssignee } from './taskAssignees';
 import { prepareTaskEvidence } from './taskProgress';
+import type { UserTaskAccessGrants } from './taskProgressAccess';
 
 export interface TaskProgressActivity {
   id: number;
@@ -52,7 +54,10 @@ export async function getProjects(): Promise<Proyecto[]> {
   return (data || []).map((p: any) => ({
     id: p.id,
     desarrollo: p.desarrollo || 'Sin Desarrollo',
+    desarrollo_id: p.desarrollo_id ?? null,
     villa: p.villa || p.unidad || 'Sin Villa',
+    integrador_id: p.integrador_id ?? null,
+    tecnico_id: p.tecnico_id ?? null,
     numero_proyecto: p.numero_proyecto ?? null,
     cliente: p.cliente ?? null,
     descripcion: p.descripcion,
@@ -481,5 +486,35 @@ export async function getAssignableStaff(): Promise<Profile[]> {
     return [];
   }
 
-  return data || [];
+  return (data || []).filter(isEligibleTaskAssignee);
+}
+
+/**
+ * Obtener los permisos de acceso completo a tareas del usuario autenticado
+ */
+export async function getUserTaskAccessGrants(): Promise<UserTaskAccessGrants> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const userId = session?.user?.id ?? null;
+  if (!userId) return { userId: null, allTaskProjectIds: [], developmentIds: [] };
+
+  const [participantsRes, developmentRes] = await Promise.all([
+    supabase
+      .from('proyecto_participantes')
+      .select('proyecto_id')
+      .eq('usuario_id', userId)
+      .eq('tipo_acceso', 'todas_las_tareas'),
+    supabase
+      .from('desarrollo_accesos')
+      .select('desarrollo_id')
+      .eq('usuario_id', userId),
+  ]);
+
+  if (participantsRes.error) console.warn('Error fetching participant task access:', participantsRes.error);
+  if (developmentRes.error) console.warn('Error fetching development task access:', developmentRes.error);
+
+  return {
+    userId,
+    allTaskProjectIds: (participantsRes.data || []).map((row: { proyecto_id: string }) => row.proyecto_id),
+    developmentIds: (developmentRes.data || []).map((row: { desarrollo_id: string }) => row.desarrollo_id),
+  };
 }

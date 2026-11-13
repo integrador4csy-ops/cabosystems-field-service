@@ -1,33 +1,39 @@
 import React, { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { ChevronLeft, ChevronRight, Plus, Search, X, CalendarSync } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Plus, CalendarSync } from 'lucide-react-native';
 import { AgendaPalette as P, Colors } from '@/constants/Theme';
 import { HeaderCaboSystems } from '@/components/HeaderCaboSystems';
+import { EqualSegmentedTabs, type EqualSegmentedTab } from '@/components/EqualSegmentedTabs';
 import { parseDateKey } from '@/lib/agenda';
 import type { CompanyView } from '@/lib/companyAgenda';
 import type { CompanyAgendaCopy } from '@/lib/companyAgendaCopy';
 import { AgendaDatePicker } from './AgendaDatePicker';
 
-export const CompanyAgendaTopBar = React.memo(function CompanyAgendaTopBar({ copy: c, canManage, onCreate }: { copy: CompanyAgendaCopy; canManage: boolean; onCreate: () => void }) {
-  return <HeaderCaboSystems seamless showProjectSelector={false} rightAccessory={canManage ? <Pressable accessibilityRole="button" accessibilityLabel={c.newEvent} onPress={onCreate} style={({ pressed }) => [s.add, pressed && s.pressed]}><Plus size={23} strokeWidth={2} color={P.white} /></Pressable> : undefined} />;
+const VIEWS: readonly CompanyView[] = ['month', 'week', 'day'];
+
+export const CompanyAgendaTopBar = React.memo(function CompanyAgendaTopBar({ copy: c, canManage, onCreate, onSync }: { copy: CompanyAgendaCopy; canManage: boolean; onCreate: () => void; onSync: () => void }) {
+  return <HeaderCaboSystems seamless showProjectSelector={false} rightAccessory={canManage ? <Pressable accessibilityRole="button" accessibilityLabel={c.newEvent} onPress={onCreate} style={({ pressed }) => [s.add, pressed && s.pressed]}><Plus size={20} strokeWidth={2.6} color={P.white} /></Pressable> : undefined} accountAccessory={<Pressable accessibilityRole="button" accessibilityLabel={c.syncCalendar} onPress={onSync} style={({ pressed }) => [s.headerSync, pressed && s.pressed]}><CalendarSync size={21} strokeWidth={2.2} color={P.accent} /></Pressable>} />;
 });
 
-export const CompanyAgendaControls = React.memo(function CompanyAgendaControls({ copy: c, locale, query, view, anchor, today, days, counts, heading, onSearch, onView, onDate, onMove, onToday, calendarFilter, showCalendar = true, onSyncPress }: {
-  calendarFilter?: React.ReactNode; showCalendar?: boolean; onSyncPress?: () => void;
-  copy: CompanyAgendaCopy; locale: string; query: string; view: CompanyView; anchor: string; today: string;
-  days: string[]; counts: Map<string, number>; heading: string;
-  onSearch: (value: string) => void; onView: (value: CompanyView) => void;
-  onDate: (value: string) => void; onMove: (value: number) => void; onToday: () => void;
+export const CompanyAgendaControls = React.memo(function CompanyAgendaControls({ copy: c, locale, view, anchor, today, days, counts, onView, onDate, calendarFilter, showCalendar = true }: {
+  calendarFilter?: React.ReactNode; showCalendar?: boolean;
+  copy: CompanyAgendaCopy; locale: string; view: CompanyView; anchor: string; today: string;
+  days: string[]; counts: Map<string, number>;
+  onView: (value: CompanyView) => void;
+  onDate: (value: string) => void;
 }) {
+  const monthLabel = useMemo(() => new Intl.DateTimeFormat(locale, { month: 'long' }).format(parseDateKey(anchor)), [anchor, locale]);
+  const viewTabs = useMemo<readonly EqualSegmentedTab<CompanyView>[]>(
+    () => VIEWS.map(id => ({ id, label: c[id] })),
+    [c],
+  );
   return <View style={s.controls}>
-    <Text accessibilityRole="header" style={s.sectionTitle}>{c.title}</Text>
-    <View style={s.search}><Search size={18} color={P.slate} /><TextInput accessibilityLabel={c.search} placeholder={c.search} placeholderTextColor={P.muted} autoCorrect={false} value={query} onChangeText={onSearch} style={s.searchInput} />{query ? <Pressable accessibilityRole="button" accessibilityLabel={c.clearSearch} onPress={() => onSearch('')} style={s.clear}><X size={17} color={P.slate} /></Pressable> : null}</View>
-    {query.trim() ? <View style={{ alignItems: 'flex-end', marginBottom: 12 }}>{calendarFilter}</View> : null}
-    {!query.trim() ? <>
-    <View style={s.segmented} accessibilityRole="tablist" accessibilityLabel={c.views}>{(['month', 'week', 'day'] as const).map(value => <Pressable key={value} accessibilityRole="tab" accessibilityLabel={c[value]} accessibilityState={{ selected: view === value }} onPress={() => onView(value)} style={[s.segment, view === value && s.segmentActive]}><Text style={[s.segmentText, view === value && s.segmentTextActive]}>{c[value]}</Text></Pressable>)}</View>
-    <View style={s.periodRow}><AgendaDatePicker date={anchor} today={today} locale={locale} compact label={heading} onSelect={onDate} /><View style={s.filterRow}>{onSyncPress ? <Pressable accessibilityRole="button" accessibilityLabel={c.syncCalendar} onPress={onSyncPress} style={({ pressed }) => [s.syncBtn, pressed && s.pressed]}><CalendarSync size={16} color={Colors.primary} /><Text style={s.syncBtnText}>{c.syncGoogle}</Text></Pressable> : null}{calendarFilter}</View></View><View style={s.navigationRow}><Pressable accessibilityRole="button" onPress={onToday} style={s.today}><Text style={s.todayText}>{c.today}</Text></Pressable><View style={s.arrows}><Pressable accessibilityRole="button" accessibilityLabel={c.previous} onPress={() => onMove(-1)} style={s.icon}><ChevronLeft size={20} color={P.ink} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={c.next} onPress={() => onMove(1)} style={s.icon}><ChevronRight size={20} color={P.ink} /></Pressable></View></View>
+    <View style={s.periodNavigation}>
+      <View style={s.periodLabel}><AgendaDatePicker date={anchor} today={today} locale={locale} compact label={monthLabel} onSelect={onDate} /></View>
+      <View style={s.filterCell}>{calendarFilter}</View>
+    </View>
+    <EqualSegmentedTabs accessibilityLabel={c.views} value={view} tabs={viewTabs} onChange={onView} />
     {showCalendar ? <CompanyAgendaGrid copy={c} locale={locale} view={view} anchor={anchor} today={today} days={days} counts={counts} onDate={onDate} onView={onView} /> : null}
-    </> : null}
   </View>;
 });
 
@@ -52,8 +58,5 @@ export const CompanyAgendaGrid = React.memo(function CompanyAgendaGrid({ copy: c
 });
 
 const s = StyleSheet.create({
-  filterRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  syncBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 44, paddingHorizontal: 10, borderWidth: 1, borderColor: P.line, borderRadius: 9, backgroundColor: P.white },
-  syncBtnText: { color: Colors.primary, fontFamily: 'Outfit_600SemiBold', fontSize: 12 },
-  add: { width: 44, height: 44, borderRadius: 8, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', marginRight: 10 }, sectionTitle: { fontFamily: 'Outfit_600SemiBold', fontSize: 21, color: P.ink, marginBottom: 16 }, pressed: { opacity: 0.6 }, controls: { paddingTop: 18 }, search: { minHeight: 46, backgroundColor: P.wash, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 9, paddingLeft: 13, paddingRight: 4, marginBottom: 16 }, searchInput: { flex: 1, minHeight: 46, fontFamily: 'Outfit_400Regular', color: P.ink, fontSize: 14 }, clear: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }, segmented: { flexDirection: 'row', backgroundColor: P.wash, borderRadius: 10, padding: 4, marginBottom: 16 }, segment: { flex: 1, minHeight: 44, borderRadius: 7, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'transparent' }, segmentActive: { backgroundColor: P.white, borderColor: P.line }, segmentText: { fontFamily: 'Outfit_400Regular', color: P.slate, fontSize: 13 }, segmentTextActive: { fontFamily: 'Outfit_600SemiBold', color: P.ink }, periodRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }, navigationRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }, arrows: { flexDirection: 'row', alignItems: 'center' }, icon: { width: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' }, today: { minHeight: 44, paddingHorizontal: 14, justifyContent: 'center', borderWidth: 1, borderColor: P.line, borderRadius: 8 }, todayText: { fontFamily: 'Outfit_500Medium', color: P.ink, fontSize: 14 }, calendar: { paddingBottom: 14 }, weekdays: { flexDirection: 'row', marginBottom: 7 }, weekday: { width: '14.285714%', textAlign: 'center', color: P.muted, fontFamily: 'Outfit_500Medium', fontSize: 11, textTransform: 'uppercase', paddingVertical: 4 }, grid: { flexDirection: 'row', flexWrap: 'wrap' }, day: { width: '14.285714%', minHeight: 48, alignItems: 'center', justifyContent: 'center' }, dayCircle: { width: 33, height: 33, borderRadius: 17, borderWidth: 1, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' }, todayCircle: { borderColor: Colors.primary }, selectedCircle: { backgroundColor: Colors.primary, borderColor: Colors.primary }, dayNumber: { fontFamily: 'Outfit_500Medium', color: P.ink, fontSize: 14 }, outside: { color: P.muted }, selectedNumber: { color: P.white, fontFamily: 'Outfit_600SemiBold' }, dots: { minHeight: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }, dot: { width: 3, height: 3, borderRadius: 2, backgroundColor: P.slate }, outsideDot: { opacity: 0.4 }, typeTabs: { flexDirection: 'row', gap: 24, borderBottomWidth: 1, borderColor: P.line }, typeTab: { minHeight: 46, justifyContent: 'center', borderBottomWidth: 2, borderColor: 'transparent' }, typeTabActive: { borderColor: Colors.primary }, typeText: { fontFamily: 'Outfit_400Regular', color: P.muted, fontSize: 13 }, typeTextActive: { fontFamily: 'Outfit_600SemiBold', color: P.ink },
+  add: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' }, headerSync: { width: 44, height: 44, borderRadius: 22, backgroundColor: P.wash, alignItems: 'center', justifyContent: 'center' }, pressed: { opacity: 0.6 }, controls: { paddingTop: 6 }, periodNavigation: { height: 52, marginTop: 0, flexDirection: 'row', alignItems: 'center', gap: 10 }, periodLabel: { flex: 1, minWidth: 0, height: 52, alignItems: 'flex-start', justifyContent: 'center' }, filterCell: { flexShrink: 0, height: 44, justifyContent: 'center' }, icon: { width: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' }, calendar: { paddingBottom: 8 }, weekdays: { flexDirection: 'row', marginBottom: 7 }, weekday: { width: '14.285714%', textAlign: 'center', color: P.muted, fontFamily: 'Outfit_500Medium', fontSize: 11, textTransform: 'uppercase', paddingVertical: 4 }, grid: { flexDirection: 'row', flexWrap: 'wrap' }, day: { width: '14.285714%', minHeight: 48, alignItems: 'center', justifyContent: 'center' }, dayCircle: { width: 33, height: 33, borderRadius: 17, borderWidth: 1, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' }, todayCircle: { borderColor: Colors.primary }, selectedCircle: { backgroundColor: Colors.primary, borderColor: Colors.primary }, dayNumber: { fontFamily: 'Outfit_500Medium', color: P.ink, fontSize: 14 }, outside: { color: P.muted }, selectedNumber: { color: P.white, fontFamily: 'Outfit_600SemiBold' }, dots: { minHeight: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }, dot: { width: 3, height: 3, borderRadius: 2, backgroundColor: P.slate }, outsideDot: { opacity: 0.4 }, typeTabs: { flexDirection: 'row', gap: 24, borderBottomWidth: 1, borderColor: P.line }, typeTab: { minHeight: 46, justifyContent: 'center', borderBottomWidth: 2, borderColor: 'transparent' }, typeTabActive: { borderColor: Colors.primary }, typeText: { fontFamily: 'Outfit_400Regular', color: P.muted, fontSize: 13 }, typeTextActive: { fontFamily: 'Outfit_600SemiBold', color: P.ink },
 });

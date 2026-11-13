@@ -74,11 +74,6 @@ const renderTabBarLabel = ({ color, children, focused }: any) => (
   </Text>
 );
 
-// Keep one opaque surface with no focus listeners or scene animation work.
-const renderScreenLayout = ({ children }: { children: React.ReactNode }) => (
-  <View collapsable={false} style={styles.scene}>{children}</View>
-);
-
 const TasksIcon = ({ color, focused }: { color: any; focused: boolean }) => (
   <TabBarIcon tab="index" Icon={ClipboardList} color={color} focused={focused} />
 );
@@ -183,6 +178,15 @@ function PreparedTabLayout() {
     'index'
   );
 
+  const renderScreenLayout = useCallback(({ children }: { children: React.ReactNode }) => (
+    <View
+      collapsable={false}
+      style={styles.tabScene}
+    >
+      {children}
+    </View>
+  ), []);
+
 
   // SDK 58 queues tab-history reconciliation against stale ancestor keys when
   // opening a stack detail. Keep tab Back behavior explicit and focus-scoped.
@@ -196,8 +200,8 @@ function PreparedTabLayout() {
   }, [currentTab, router]));
 
   useEffect(() => {
-    if (!mainReady && currentTab !== 'index') return afterTabPaint(markMainReady);
-  }, [mainReady, currentTab, markMainReady]);
+    if (!mainReady) return afterTabPaint(markMainReady);
+  }, [mainReady, markMainReady]);
 
   useEffect(() => {
     if (!mainReady || !profile?.activo || !profile.id) return;
@@ -211,12 +215,39 @@ function PreparedTabLayout() {
   }, [mainReady, profile?.id, profile?.activo, isAdmin, router]);
   useEffect(() => {
     if (!mainReady || !profile?.activo || !profile.id) return;
-    return startChatBackgroundSync(profile.id);
+    const owner = profile.id;
+    // La sincronización en segundo plano abre 5 canales realtime y sincroniza el
+    // histórico completo de cada sala. Se retrasa hasta que el hilo JS queda
+    // libre para no competir con los primeros frames de la app.
+    let stopSync: void | (() => void);
+    let cancelled = false;
+    const start = () => {
+      if (cancelled) return;
+      stopSync = startChatBackgroundSync(owner);
+    };
+    const handle = typeof requestIdleCallback === 'function'
+      ? requestIdleCallback(start, { timeout: 3000 })
+      : setTimeout(start, 600);
+    return () => {
+      cancelled = true;
+      if (typeof requestIdleCallback === 'function') cancelIdleCallback(handle as any);
+      else clearTimeout(handle as any);
+      if (typeof stopSync === 'function') stopSync();
+    };
   }, [mainReady, profile?.id, profile?.activo]);
   // The registry follows Expo's seeded order; the bar keeps the product's visual order.
-  const renderOrderedTabBar = useCallback((props: BottomTabBarProps) => (
-    <BottomTabBar {...props} state={orderTabBarState(props.state, tabOrder)} />
-  ), [tabOrder]);
+  // La cápsula se alimenta del estado real del navegador (props.state), no de useSegments():
+  // useSegments() se actualiza un ciclo tarde y dejaba la cápsula un pestaña por detrás
+  // del contenido mostrado.
+  const renderOrderedTabBar = useCallback((props: BottomTabBarProps) => {
+    const ordered = orderTabBarState(props.state, tabOrder);
+    const focusedRoute = ordered.routes[ordered.index]?.name ?? '';
+    return (
+      <ConnectedTabBarProvider tabs={tabOrder} activeTab={focusedRoute}>
+        <BottomTabBar {...props} state={ordered} />
+      </ConnectedTabBarProvider>
+    );
+  }, [tabOrder]);
   const bottomInset = Math.max(insets.bottom, BOTTOM_BAR_MIN_INSET);
 
   const tabBarStyle = useMemo(
@@ -244,15 +275,18 @@ function PreparedTabLayout() {
   );
 
   return (
-    <ConnectedTabBarProvider tabs={tabOrder} activeTab={currentTab}>
-      <View style={styles.scene}>
+    <View style={styles.scene}>
+      <View style={styles.navigatorLayer}>
         <Tabs
         backBehavior="none"
         tabBar={renderOrderedTabBar}
-        detachInactiveScreens
+        // Keep the native map surface attached while another tab is active.
+        // Detaching it blocks Android's UI thread during Tracking -> Schedule
+        // and react-native-maps keeps part of the old surface alive anyway.
+        detachInactiveScreens={false}
         screenLayout={renderScreenLayout}
         screenOptions={{
-          lazy: true,
+          lazy: false,
           animation: 'none',
           sceneStyle: styles.scene,
           tabBarActiveTintColor: '#FFFFFF',
@@ -269,7 +303,6 @@ function PreparedTabLayout() {
       >
         <Tabs.Screen
           name="index"
-          activityEnabled={false}
           options={{
             title: t('nav.tasks'),
             tabBarIcon: TasksIcon,
@@ -280,16 +313,19 @@ function PreparedTabLayout() {
           name="fab"
           options={
             isAdmin
-              ? { href: null }
+              ? { href: null, lazy: true }
               : {
                   title: t('nav.checkins'),
+                  // El check-in abre cámara y GPS: no se precarga como el resto
+                  // de pestañas. Además, su PRELOAD no lo reconoce ningún
+                  // navegador y expo-router avisa por consola en desarrollo.
+                  lazy: true,
                   tabBarButton: props => <FloatingActionButton {...props} />,
                 }
           }
         />
         <Tabs.Screen
           name="chat"
-          activityEnabled={false}
           options={{
             title: t('nav.chat'),
             tabBarIcon: ChatIcon,
@@ -298,7 +334,6 @@ function PreparedTabLayout() {
         />
         <Tabs.Screen
           name="maps"
-          activityEnabled={!isAdmin}
           options={{
             title: t('nav.tracking'),
             tabBarIcon: MapsIcon,
@@ -308,7 +343,6 @@ function PreparedTabLayout() {
         />
         <Tabs.Screen
           name="users"
-          activityEnabled={!isAdmin}
           options={{
             title: t('nav.team'),
             tabBarIcon: UsersIcon,
@@ -324,14 +358,13 @@ function PreparedTabLayout() {
           name="profile"
           options={{
             title: t('nav.profile'),
-            lazy: true,
+            lazy: false,
             tabBarItemStyle: { display: 'none' },
             tabBarButton: () => null,
           }}
         />
         <Tabs.Screen
           name="schedule"
-          activityEnabled={false}
           options={{
             title: t('nav.schedule'),
             tabBarIcon: ScheduleIcon,
@@ -339,8 +372,8 @@ function PreparedTabLayout() {
           }}
         />
       </Tabs>
+        </View>
     </View>
-    </ConnectedTabBarProvider>
   );
 }
 
@@ -352,6 +385,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scene: { flex: 1, backgroundColor: '#FFFFFF', overflow: 'hidden' },
+  tabScene: { flex: 1, backgroundColor: '#FFFFFF', overflow: 'hidden' },
+  navigatorLayer: { flex: 1 },
   slidingSelection: {
     position: 'absolute',
     left: 8,

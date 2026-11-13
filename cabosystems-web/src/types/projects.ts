@@ -1,7 +1,10 @@
 export interface Proyecto {
   id: string;
   desarrollo: string;
+  desarrollo_id?: string | null;
   villa: string;
+  integrador_id?: string | null;
+  tecnico_id?: string | null;
   numero_proyecto?: string | null;
   cliente?: string | null;
   descripcion: string | null;

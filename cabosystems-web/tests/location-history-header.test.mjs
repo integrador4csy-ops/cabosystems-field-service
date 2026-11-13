@@ -28,3 +28,9 @@ test('route history content does not repeat its heading or filters', () => {
   assert.doesNotMatch(history, /<h1>\{t\('Historial de rutas'\)\}<\/h1>/);
   assert.doesNotMatch(history, /location-history-filters/);
 });
+
+test('route history map configures light mode and roadmap', () => {
+  const mapCode = readFileSync(path.join(root, 'src/components/history/LocationHistoryMap.tsx'), 'utf8');
+  assert.match(mapCode, /mapTypeId:\s*google\.maps\.MapTypeId\.ROADMAP/);
+  assert.match(mapCode, /colorScheme:\s*google\.maps\.ColorScheme\.LIGHT/);
+});

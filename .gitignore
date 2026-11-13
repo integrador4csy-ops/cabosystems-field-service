@@ -36,3 +36,7 @@ Thumbs.db
 web-build/
 *.tsbuildinfo
 BitChord/
+output/
+outputs/
+dogfood-output/
+tmp/

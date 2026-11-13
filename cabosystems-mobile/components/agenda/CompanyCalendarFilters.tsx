@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type ViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Check, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { CalendarDays, Check, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { AgendaPalette as P } from '@/constants/Theme';
 import { CalendarColorPicker } from './CalendarColorPicker';
 
@@ -24,9 +24,9 @@ export const CompanyCalendarFilters = React.memo(function CompanyCalendarFilters
   const menuWidth = Math.min(300, width - 32);
   const menuHeight = Math.min(editingCalendar ? 480 : 360, editingCalendar ? 480 : Math.max(64, calendars.length * 60 + 56), height - insets.top - insets.bottom - 32);
   const open = () => { setEditing(null); button.current?.measureInWindow((x, y, width, height) => setAnchor({ x, y, width, height })); };
-  return <View>
+  return <View style={s.root}>
     <Pressable ref={button} accessibilityRole="button" accessibilityLabel={`${label}: ${selected}/${calendars.length}`} accessibilityState={{ expanded: Boolean(anchor) }} onPress={open} style={({ pressed }) => [s.toggle, pressed && s.pressed]}>
-      <Text style={s.label}>{label}</Text><Text style={s.summary}>{selected}/{calendars.length}</Text>
+      <CalendarDays size={17} color={P.slate} /><Text numberOfLines={1} style={s.summary}>{selected}/{calendars.length}</Text>
       {anchor ? <ChevronUp size={14} color={P.accent} /> : <ChevronDown size={14} color={P.accent} />}
     </Pressable>
     <Modal visible={Boolean(anchor)} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setAnchor(null)}>
@@ -55,8 +55,8 @@ export const CompanyCalendarFilters = React.memo(function CompanyCalendarFilters
 });
 
 const s = StyleSheet.create({
-  toggle: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 9, borderWidth: 1, borderColor: P.line, borderRadius: 9, backgroundColor: P.white },
-  label: { color: P.slate, fontFamily: 'Outfit_500Medium', fontSize: 12 },
+  root: { flexShrink: 0 },
+  toggle: { height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 10, borderRadius: 9, backgroundColor: P.wash },
   summary: { color: P.slate, fontFamily: 'Outfit_400Regular', fontSize: 11, fontVariant: ['tabular-nums'] },
   options: { position: 'absolute', borderWidth: 1, borderColor: P.line, borderRadius: 12, backgroundColor: P.white, shadowColor: P.ink, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 5 },
   optionList: { padding: 8 },

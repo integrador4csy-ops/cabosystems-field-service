@@ -576,6 +576,15 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
     setFlash((prev) => (prev === 'off' ? 'on' : 'off'));
   };
 
+  const resetCompletedCheck = () => {
+    setPhotoUri(null);
+    setNotes('');
+    setFlash('off');
+    setCameraFullscreen(false);
+    setPendingSubmissionLocation(null);
+    setGeofenceStep('closed');
+  };
+
   const completeSubmission = async (
     submissionLocation: { latitude: number; longitude: number },
     geofence?: GeofenceDraft,
@@ -595,6 +604,7 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
           comments: notes.trim() || null,
           geofence: !isCheckOut ? geofence : undefined,
         });
+        resetCompletedCheck();
         setFeedbackModal({
           visible: true,
           type: 'success',
@@ -626,6 +636,7 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
       }
 
       const projectVilla = currentProject.villa || currentProject.unidad;
+      resetCompletedCheck();
       setFeedbackModal({
         visible: true,
         type: 'success',
@@ -722,6 +733,18 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
   };
 
   const submitText = isCheckOut ? tr("Registrar Check-out") : tr("Registrar Check-in");
+  const bottomInset = Math.max(insets.bottom, BOTTOM_BAR_MIN_INSET);
+  const submitControl = <Pressable
+    style={({ pressed }) => [
+      styles.submitButton,
+      (!photoUri || !locationCoords || isSubmitting || !currentProject) && styles.submitDisabled,
+      pressed && { opacity: 0.9 },
+    ]}
+    onPress={handleSubmit}
+    disabled={!photoUri || !locationCoords || isSubmitting || !currentProject}
+  >
+    {isSubmitting ? <><ActivityIndicator size="small" color={Colors.textWhite} /><Text style={styles.submitButtonText}>{tr("Guardando registro...")}</Text></> : <><Send size={18} color={Colors.textWhite} /><Text style={styles.submitButtonText}>{submitText}</Text></>}
+  </Pressable>;
 
   return (
     <View style={styles.container}>
@@ -747,7 +770,7 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: embedded
-            ? Math.max(insets.bottom, BOTTOM_BAR_MIN_INSET) + BOTTOM_BAR_HEIGHT + Spacing.xl
+            ? bottomInset + BOTTOM_BAR_HEIGHT + 92
             : Math.max(insets.bottom, Spacing.md) }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -797,68 +820,66 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
                     </View>
                   ) : currentProject ? (
                     <>
-                      <Text style={styles.taskCardTitle}>
-                        {currentProject.desarrollo}
+                      <Text style={styles.taskCardTitle} numberOfLines={1}>
+                        {currentProject.desarrollo} · {currentProject.villa || currentProject.unidad}
                       </Text>
-                      <Text style={styles.taskCardUnit}>
-                        {currentProject.villa || currentProject.unidad}
-                      </Text>
-                      <Text style={styles.taskCardSub}>
-                        {isCheckOut
-                          ? tr("Registro de salida (Check-Out) de la villa")
-                          : tr("Registro de llegada (Check-In) a la villa")}
-                      </Text>
+                      <View style={styles.taskCardModeRow}>
+                        <View style={styles.taskCardModeDot} />
+                        <Text style={styles.taskCardSub} numberOfLines={1}>
+                          {isCheckOut ? tr("Check-out de la villa") : tr("Check-in a la villa")}
+                        </Text>
+                      </View>
                     </>
                   ) : (
                     <Text style={styles.taskCardEmptyText}>{tr("Sin villa seleccionada")}</Text>
                   )}
                 </View>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.gpsIconButton,
-                    locationCoords && styles.gpsIconButtonSuccess,
-                    locationError && styles.gpsIconButtonError,
-                    pressed && { opacity: 0.7 },
-                  ]}
-                  onPress={async () => {
-                    const coords = await fetchLocation();
-                    if (coords) {
-                      Alert.alert(
-                        tr("Ubicación GPS"),
-                        tr("Latitud: {value0}\nLongitud: {value1}\nEstado: Satélite conectado correctamente.", { value0: coords.latitude.toFixed(5), value1: coords.longitude.toFixed(5) })
-                      );
-                    } else {
-                      Alert.alert(tr('Error de GPS'), tr("No se pudo actualizar la ubicación. Comprueba el permiso y la señal de GPS."));
-                    }
-                  }}
-                  disabled={locationLoading}
-                  accessibilityRole="button"
-                  accessibilityLabel={tr("Ubicación GPS")}
-                >
-                  {locationLoading ? (
-                    <ActivityIndicator size="small" color={Colors.primary} />
-                  ) : (
-                    <MapPin
-                      size={17}
-                      color={locationCoords || locationError ? Colors.primary : '#343e48'}
-                      strokeWidth={2.4}
-                    />
-                  )}
-                  {locationCoords && <View style={styles.gpsDotSuccess} />}
-                </Pressable>
-              </View>
-              <View style={styles.taskCardActionsRow}>
-                {projects.length > 1 && (
+                <View style={styles.taskCardControls}>
                   <Pressable
-                    style={({ pressed }) => [styles.taskChangeBtn, pressed && { opacity: 0.7 }]}
+                    style={({ pressed }) => [
+                      styles.gpsIconButton,
+                      locationCoords && styles.gpsIconButtonSuccess,
+                      locationError && styles.gpsIconButtonError,
+                      pressed && { opacity: 0.7 },
+                    ]}
+                    onPress={async () => {
+                      const coords = await fetchLocation();
+                      if (coords) {
+                        Alert.alert(
+                          tr("Ubicación GPS"),
+                          tr("Latitud: {value0}\nLongitud: {value1}\nEstado: Satélite conectado correctamente.", { value0: coords.latitude.toFixed(5), value1: coords.longitude.toFixed(5) })
+                        );
+                      } else {
+                        Alert.alert(tr('Error de GPS'), tr("No se pudo actualizar la ubicación. Comprueba el permiso y la señal de GPS."));
+                      }
+                    }}
+                    disabled={locationLoading}
                     accessibilityRole="button"
-                    accessibilityLabel={tr("Cambiar villa")}
-                    onPress={() => { Keyboard.dismiss(); setShowVillaModal(true); }}
+                    accessibilityLabel={tr("Ubicación GPS")}
                   >
-                    <Text style={styles.taskChangeBtnText}>{tr("CAMBIAR VILLA")}</Text>
-                    <ChevronDown size={14} color="#343e48" />
+                    {locationLoading ? (
+                      <ActivityIndicator size="small" color={Colors.primary} />
+                    ) : (
+                      <MapPin
+                        size={17}
+                        color={locationCoords || locationError ? Colors.primary : '#343e48'}
+                        strokeWidth={2.4}
+                      />
+                    )}
+                    {locationCoords && <View style={styles.gpsDotSuccess} />}
                   </Pressable>
-                )}
+                  {projects.length > 1 && (
+                    <Pressable
+                      style={({ pressed }) => [styles.taskChangeBtn, pressed && { opacity: 0.7 }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={tr("Cambiar villa")}
+                      onPress={() => { Keyboard.dismiss(); setShowVillaModal(true); }}
+                    >
+                      <Text style={styles.taskChangeBtnText}>{tr("CAMBIAR")}</Text>
+                      <ChevronDown size={13} color="#343e48" />
+                    </Pressable>
+                  )}
+                </View>
               </View>
             </View>
 
@@ -886,36 +907,14 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
                 value={notes}
                 onChangeText={setNotes}
                 multiline
-                numberOfLines={3}
+                numberOfLines={4}
               />
             </View>
           </View>
-          <View style={styles.footer}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.submitButton,
-                (!photoUri || !locationCoords || isSubmitting || !currentProject) &&
-                  styles.submitDisabled,
-                pressed && { opacity: 0.9 },
-              ]}
-              onPress={handleSubmit}
-              disabled={!photoUri || !locationCoords || isSubmitting || !currentProject}
-            >
-              {isSubmitting ? (
-                <>
-                  <ActivityIndicator size="small" color={Colors.textWhite} />
-                  <Text style={styles.submitButtonText}>{tr("Guardando registro...")}</Text>
-                </>
-              ) : (
-                <>
-                  <Send size={18} color={Colors.textWhite} />
-                  <Text style={styles.submitButtonText}>{submitText}</Text>
-                </>
-              )}
-            </Pressable>
-          </View>
+          {!embedded && <View style={styles.footer}>{submitControl}</View>}
         </ScrollView>
       </KeyboardAvoidingView>
+      {embedded && <View style={[styles.embeddedActionDock, { bottom: bottomInset + BOTTOM_BAR_HEIGHT + 8 }]}>{submitControl}</View>}
 
       <Modal visible={cameraFullscreen && cameraActive} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setCameraFullscreen(false)}>
         <View style={styles.fullscreenPage}>
@@ -1107,9 +1106,10 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   cameraWrapper: {
-    minHeight: 320,
+    minHeight: 260,
     backgroundColor: '#000000',
-    margin: Spacing.md,
+    marginHorizontal: 12,
+    marginVertical: 8,
     borderRadius: BorderRadius.xl,
     overflow: 'hidden',
     borderWidth: 1,
@@ -1117,7 +1117,7 @@ const styles = StyleSheet.create({
   },
   cameraContainer: {
     flex: 1,
-    height: 340,
+    height: 260,
   },
   cameraOverlay: {
     ...StyleSheet.absoluteFill,
@@ -1141,13 +1141,13 @@ const styles = StyleSheet.create({
     borderRightWidth: 3,
   },
   bottomLeft: {
-    bottom: 90,
+    bottom: 84,
     left: 20,
     borderBottomWidth: 3,
     borderLeftWidth: 3,
   },
   bottomRight: {
-    bottom: 90,
+    bottom: 84,
     right: 20,
     borderBottomWidth: 3,
     borderRightWidth: 3,
@@ -1161,7 +1161,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
+    paddingVertical: 10,
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
   },
   controlButton: {
@@ -1179,8 +1179,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   captureButton: {
-    width: 68,
-    height: 68,
+    width: 58,
+    height: 58,
     borderRadius: BorderRadius.full,
     borderWidth: 4,
     borderColor: Colors.textWhite,
@@ -1188,13 +1188,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   captureButtonInner: {
-    width: 54,
-    height: 54,
+    width: 46,
+    height: 46,
     borderRadius: BorderRadius.full,
     backgroundColor: Colors.textWhite,
   },
   previewContainer: {
-    height: 340,
+    height: 260,
     position: 'relative',
   },
   previewBadge: {
@@ -1244,7 +1244,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   permissionContainer: {
-    height: 340,
+    height: 260,
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.xl,
@@ -1355,8 +1355,8 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   infoSection: {
-    paddingHorizontal: Spacing.md,
-    gap: Spacing.md,
+    paddingHorizontal: 12,
+    gap: 8,
   },
   gpsCard: {
     flexDirection: 'row',
@@ -1426,18 +1426,18 @@ const styles = StyleSheet.create({
   },
   notesLabel: {
     fontFamily: 'Outfit_600SemiBold',
-    fontSize: 11,
+    fontSize: 12,
     color: Colors.textSecondary,
     letterSpacing: 0.5,
   },
   notesInput: {
     backgroundColor: Colors.card,
     borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
+    padding: 14,
     fontFamily: 'Outfit_400Regular',
-    fontSize: 13,
+    fontSize: 14,
     color: Colors.text,
-    minHeight: 80,
+    minHeight: 82,
     textAlignVertical: 'top',
     borderWidth: 1,
     borderColor: Colors.border,
@@ -1452,13 +1452,21 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
   },
+  embeddedActionDock: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    zIndex: 20,
+    backgroundColor: 'transparent',
+  },
   submitButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.primary,
     borderRadius: BorderRadius.lg,
-    paddingVertical: Spacing.md,
+    minHeight: 52,
+    paddingVertical: 12,
     gap: Spacing.sm,
     ...Shadow.xs,
   },
@@ -1473,10 +1481,9 @@ const styles = StyleSheet.create({
   taskCard: {
     backgroundColor: Colors.card,
     borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
+    padding: 14,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginBottom: Spacing.sm,
     ...Shadow.xs,
   },
   taskCardHeader: {
@@ -1485,8 +1492,8 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   taskCardIconBox: {
-    width: 36,
-    height: 36,
+    width: 42,
+    height: 42,
     borderRadius: BorderRadius.md,
     backgroundColor: Colors.primaryLight,
     alignItems: 'center',
@@ -1498,30 +1505,25 @@ const styles = StyleSheet.create({
   },
   taskCardHeaderLabel: {
     fontFamily: 'Outfit_700Bold',
-    fontSize: 10,
+    fontSize: 11,
     color: Colors.textSecondary,
     letterSpacing: 0.8,
   },
   taskCardTitle: {
     fontFamily: 'Outfit_600SemiBold',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 21,
     color: Colors.text,
     marginTop: 2,
   },
-  taskCardUnit: {
-    fontFamily: 'Outfit_500Medium',
-    fontSize: 13,
-    lineHeight: 19,
-    color: Colors.text,
-    marginTop: 2,
-  },
+  taskCardModeRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
+  taskCardModeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.primary },
   taskCardSub: {
     fontFamily: 'Outfit_400Regular',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     color: Colors.textSecondary,
-    marginTop: 1,
+    marginTop: 0,
   },
   taskCardLoadingRow: {
     flexDirection: 'row',
@@ -1540,16 +1542,10 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     marginTop: 2,
   },
-  taskCardActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: Spacing.sm,
-    marginTop: Spacing.sm,
-  },
+  taskCardControls: { alignItems: 'flex-end', gap: 6 },
   gpsIconButton: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     borderRadius: BorderRadius.md,
     backgroundColor: '#FFFFFF',
     flexShrink: 0,
@@ -1579,10 +1575,10 @@ const styles = StyleSheet.create({
   taskChangeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 48,
+    minHeight: 34,
     gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
     borderRadius: BorderRadius.md,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
@@ -1590,7 +1586,7 @@ const styles = StyleSheet.create({
   },
   taskChangeBtnText: {
     fontFamily: 'Outfit_700Bold',
-    fontSize: 11,
+    fontSize: 10,
     color: '#343e48',
   },
   taskWarningBox: {

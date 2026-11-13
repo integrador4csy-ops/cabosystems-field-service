@@ -124,6 +124,11 @@ export async function updateWarrantyCase(id: string, input: UpdateWarrantyCaseIn
     warranty_until: input.warranty_until || null,
   }).eq('id', id).select(caseSelection).single();
   if (error) throw error;
+  void supabase.functions.invoke('operations-push-notifications', {
+    body: { kind: 'warranty_update', entityId: id },
+  }).then(({ error: notificationError }) => {
+    if (notificationError) console.warn('Warranty notification failed:', notificationError);
+  }).catch((notificationError) => console.warn('Warranty notification failed:', notificationError));
   return normalizeCase(data);
 }
 

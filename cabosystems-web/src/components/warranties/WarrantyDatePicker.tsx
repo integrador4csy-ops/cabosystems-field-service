@@ -9,6 +9,8 @@ interface WarrantyDatePickerProps {
   locale?: string;
   placeholder?: string;
   disabled?: boolean;
+  compact?: boolean;
+  todayKey?: string;
   className?: string;
 }
 
@@ -38,17 +40,24 @@ export function WarrantyDatePicker({
   locale = 'es',
   placeholder,
   disabled = false,
+  compact = false,
+  todayKey,
   className = '',
 }: WarrantyDatePickerProps) {
   const isEn = locale.startsWith('en');
   const uid = useId();
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const dateButtonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const [open, setOpen] = useState(false);
 
   // Parse initial selected date or default to today
   const today = useMemo(() => {
+    if (todayKey && /^\d{4}-\d{2}-\d{2}$/.test(todayKey)) {
+      const [year, month, day] = todayKey.split('-').map(Number);
+      return { year, month: month - 1, day, key: todayKey };
+    }
     const d = new Date();
     return {
       year: d.getFullYear(),
@@ -56,7 +65,7 @@ export function WarrantyDatePicker({
       day: d.getDate(),
       key: toDateKey(d.getFullYear(), d.getMonth(), d.getDate()),
     };
-  }, []);
+  }, [todayKey]);
 
   const parsedValue = useMemo(() => {
     if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
@@ -119,7 +128,7 @@ export function WarrantyDatePicker({
       if (event.key === 'Escape') {
         event.preventDefault();
         setOpen(false);
-        triggerRef.current?.focus();
+        dateButtonRef.current?.focus();
       }
     };
 
@@ -223,47 +232,67 @@ export function WarrantyDatePicker({
     }).format(dateObj);
   }, [parsedValue, locale]);
 
+  const isTodaySelected = parsedValue?.key === today.key;
+
   return (
     <div className={`relative ${className}`}>
-      <button
+      <div
         ref={triggerRef}
-        type="button"
-        disabled={disabled}
-        onClick={() => setOpen(!open)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={open ? uid : undefined}
-        className={`flex h-11 w-full items-center justify-between rounded-lg border bg-white px-3 text-left text-sm transition-colors outline-none ${
+        className={`flex ${compact ? 'h-8 gap-0.5 pl-2 pr-0.5 text-[11.5px]' : 'h-11 gap-1 pl-3 pr-1.5 text-sm'} w-full items-center rounded-lg border bg-white transition-colors ${
           open
             ? 'border-brand-500 ring-2 ring-brand-500/15'
-            : 'border-slate-200 hover:border-slate-300'
-        } ${disabled ? 'cursor-not-allowed opacity-50 bg-slate-50' : 'cursor-pointer'}`}
+            : 'border-slate-200 hover:border-slate-300 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15'
+        } ${disabled ? 'cursor-not-allowed opacity-50 bg-slate-50' : ''}`}
       >
-        <span className={displayFormatted ? 'font-medium text-slate-800' : 'text-slate-400'}>
-          {displayFormatted || placeholder || (isEn ? 'dd/mm/yyyy' : 'dd/mm/aaaa')}
-        </span>
+        <button
+          ref={dateButtonRef}
+          type="button"
+          disabled={disabled}
+          onClick={() => setOpen(!open)}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-controls={open ? uid : undefined}
+          className={`flex h-full min-w-0 flex-1 items-center text-left outline-none ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+        >
+          <span className={`min-w-0 flex-1 truncate whitespace-nowrap ${displayFormatted ? 'font-medium text-slate-800' : 'text-slate-400'}`}>
+            {displayFormatted || placeholder || (isEn ? 'dd/mm/yyyy' : 'dd/mm/aaaa')}
+          </span>
+        </button>
 
-        <div className="flex items-center gap-1 text-slate-400">
+        <div className="flex shrink-0 items-center gap-0.5 text-slate-400">
+          <button
+            type="button"
+            disabled={disabled}
+            aria-pressed={isTodaySelected}
+            onClick={chooseToday}
+            className={`${compact ? 'h-6 px-1 text-[10.5px]' : 'h-7 px-2.5 text-xs'} shrink-0 rounded-md bg-white text-slate-900 transition-colors hover:bg-slate-100 ${
+              isTodaySelected ? 'font-bold' : 'font-semibold'
+            } ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+          >
+            {isEn ? 'Today' : 'Hoy'}
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => setOpen(!open)}
+            aria-label={isEn ? 'Open calendar' : 'Abrir calendario'}
+            className={`flex ${compact ? 'h-6 w-5' : 'h-8 w-8'} items-center justify-center rounded-md transition-colors hover:bg-slate-100 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+          >
+            <CalendarDays size={compact ? 12 : 16} className={open ? 'text-brand-500' : 'text-slate-400'} />
+          </button>
           {displayFormatted && !disabled && (
-            <span
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               onClick={clearDate}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.stopPropagation();
-                  onChange('');
-                }
-              }}
+              aria-label={isEn ? 'Clear date' : 'Borrar fecha'}
               title={isEn ? 'Clear date' : 'Borrar fecha'}
-              className="flex h-5 w-5 items-center justify-center rounded-full hover:bg-slate-100 hover:text-slate-600"
+              className={`flex ${compact ? 'h-5 w-4' : 'h-6 w-6'} items-center justify-center rounded-md hover:bg-slate-100 hover:text-slate-600`}
             >
-              <X size={13} />
-            </span>
+              <X size={compact ? 10 : 13} />
+            </button>
           )}
-          <CalendarDays size={16} className={open ? 'text-brand-500' : 'text-slate-400'} />
         </div>
-      </button>
+      </div>
 
       {open &&
         !disabled &&

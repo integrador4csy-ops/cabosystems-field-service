@@ -12,9 +12,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Image } from 'expo-image';
 import { AlertCircle, Mail, Lock, Eye, EyeOff, Fingerprint, ScanFace } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { useAuth, formatAuthError } from '@/lib/auth';
@@ -153,9 +153,10 @@ export default function LoginScreen() {
         <View style={[styles.logoContainer, isCompact && styles.logoContainerCompact]}>
           <Image
             source={LOGO_DARK}
+            defaultSource={LOGO_DARK}
             style={{ width: logoWidth, height: logoWidth * (320 / 1000) }}
-            contentFit="contain"
-            priority="high"
+            resizeMode="contain"
+            fadeDuration={0}
           />
         </View>
 

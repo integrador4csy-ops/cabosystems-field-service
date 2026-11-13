@@ -36,6 +36,12 @@ export function getCachedChatRoom(userId: string, groupId: string, maxAge = Infi
   return userId && entry?.loaded && Date.now() - entry.savedAt < maxAge ? entry.snapshot : null;
 }
 
+export function getCachedChatGroup(userId: string, groupId: string): ChatGroup | null {
+  selectOwner(userId);
+  const entry = rooms.get(groupId);
+  return entry ? entry.snapshot.group : null;
+}
+
 export function restoreChatRooms(userId: string): Promise<void> {
   selectOwner(userId);
   if (!userId) return Promise.resolve();

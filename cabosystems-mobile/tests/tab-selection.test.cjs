@@ -19,13 +19,14 @@ function fixture() {
       return React.useMemo(() => new Proxy({}, { get: (_, key) => ref.current()[key] }), []);
     },
     withTiming: (target, config) => { animations.push({ target, config }); return target; },
+    withSpring: (target, config) => { animations.push({ target, config }); return target; },
     interpolateColor: (value, _, colors) => value === 1 ? colors[1] : colors[0],
   };
   const exports = {};
   const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../components/ConnectedTabBar.tsx'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText;
   vm.runInNewContext(source, { exports, Math, require: name => {
     if (name === 'react' || name === 'react/jsx-runtime') return require(name);
-    if (name === 'react-native') return { View: 'View', Pressable: 'Pressable', useWindowDimensions: () => ({ width: 400 }), StyleSheet: { create: value => value, absoluteFill: {} } };
+    if (name === 'react-native') return { View: 'View', Text: 'Text', Pressable: 'Pressable', useWindowDimensions: () => ({ width: 400 }), StyleSheet: { create: value => value, absoluteFill: {} } };
     if (name === 'react-native-reanimated') return reanimated;
     if (name === '@/constants/Theme') return { Colors: { primary: '#f78c26' } };
     throw Error(name);
@@ -39,11 +40,12 @@ test('one position drives the capsule, icon and label without JS renders between
   const render = activeTab => React.createElement(api.ConnectedTabBarProvider, { activeTab, tabs },
     React.createElement(api.ConnectedTabBackground),
     ...tabs.map(tab => React.createElement(React.Fragment, { key: tab }, React.createElement(api.ConnectedTabIcon, { tab, Icon }), React.createElement(api.ConnectedTabLabel, { tab }, tab))));
-  const style = id => renderer.root.findByProps({ testID: id }).props.style.at(-1);
+  const style = id => { const value = renderer.root.findByProps({ testID: id }).props.style; return Array.isArray(value) ? value.at(-1) : value; };
   try {
     await React.act(async () => { renderer = Renderer.create(render('index')); });
     assert.equal(style('tab-icon-light-index').opacity, 1);
-    assert.equal(style('tab-label-index').color, '#FFFFFF');
+    // La palabra se mantiene siempre en tinta para no quedar ilegible fuera de la burbuja.
+    assert.equal(style('tab-label-index').color, '#343e48');
     api.values[0].value = 0.5;
     assert.equal(style('tab-icon-light-index').opacity, 0);
     assert.equal(style('tab-icon-light-schedule').opacity, 0);
@@ -52,10 +54,17 @@ test('one position drives the capsule, icon and label without JS renders between
     await React.act(async () => { renderer.update(render('chat')); });
     assert.equal(style('connected-tab-capsule').transform[0].translateX, 267);
     assert.equal(style('tab-icon-light-chat').opacity, 1);
-    assert.equal(style('tab-label-chat').color, '#FFFFFF');
+    assert.equal(style('tab-label-chat').color, '#343e48');
     assert.equal(style('tab-label-index').color, '#343e48');
-    assert.ok(api.animations.every(animation => animation.config.duration === 220 && animation.config.reduceMotion === 'system'));
+    // La burbuja se desliza con un muelle: se detiene sin tirón.
+    assert.ok(api.animations.length > 0);
+    assert.ok(api.animations.every(animation => animation.config.reduceMotion === 'system' && typeof animation.config.damping === 'number'));
     assert.equal(renderer.root.findByProps({ testID: 'connected-tab-capsule' }).props.style[0].backgroundColor, '#f78c26');
+    // La burbuja es un círculo pequeño centrado en el icono, no una cápsula ancha.
+    const capsule = renderer.root.findByProps({ testID: 'connected-tab-capsule' }).props.style[1];
+    assert.equal(capsule.width, capsule.height);
+    assert.equal(capsule.borderRadius, capsule.width / 2);
+    assert.ok(capsule.width < 44);
   } finally { if (renderer) await React.act(async () => renderer.unmount()); }
 });
 

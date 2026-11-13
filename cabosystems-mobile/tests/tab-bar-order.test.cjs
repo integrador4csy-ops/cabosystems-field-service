@@ -29,6 +29,11 @@ test('admin Maps tab is separate from the villa locations stack route',()=>{
  assert.match(root,/Stack\.Screen name="locations"/);
 });
 
+test('tab scenes stay attached so leaving the native map does not block the next tab',()=>{
+ const layout=fs.readFileSync(path.join(__dirname,'../app/(tabs)/_layout.tsx'),'utf8');
+ assert.match(layout,/detachInactiveScreens=\{false\}/);
+});
+
 test('Android Back returns to Tasks only while a secondary tab is focused',()=>{
  const source=fs.readFileSync(path.join(__dirname,'../app/(tabs)/_layout.tsx'),'utf8');
  const ast=ts.createSourceFile('tabs.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);let callback;

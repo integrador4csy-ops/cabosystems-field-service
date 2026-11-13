@@ -42,7 +42,7 @@ import {
 import { Colors, Spacing, BorderRadius, Shadow, Animation } from '@/constants/Theme';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
-import { useHeaderHeight } from '@/components/HeaderCaboSystems';
+import { HeaderCaboSystems, useHeaderHeight } from '@/components/HeaderCaboSystems';
 import { supabase } from '@/lib/supabase';
 import { pickImageSafe } from '@/lib/mediaPicker';
 import { uploadAvatarImage } from '@/lib/avatarUpload';
@@ -54,6 +54,8 @@ import {
   authenticateWithBiometrics,
   getStoredPassword,
   setBiometricEnabled,
+  getCachedBiometricStatus,
+  getCachedBiometricEnabled,
 } from '@/lib/biometrics';
 
 const LOGO_DARK = require('@/assets/images/Logo-CaboSystems-Field-Service-Dark.png');
@@ -173,10 +175,15 @@ export default function ProfileScreen() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
   // Biometría (Huella / Face ID)
-  const [biometricsEnabled, setBiometricsEnabled] = useState(false);
-  const [biometricAvailable, setBiometricAvailable] = useState(false);
-  const [biometricLabel, setBiometricLabel] = useState('Huella Dactilar');
-  const [biometryType, setBiometryType] = useState<'fingerprint' | 'facial' | 'iris' | 'generic'>('generic');
+  const [biometricsEnabled, setBiometricsEnabled] = useState(() => getCachedBiometricEnabled() ?? false);
+  const [biometricAvailable, setBiometricAvailable] = useState(() => {
+    const cached = getCachedBiometricStatus();
+    return cached ? (cached.available && cached.enrolled) : false;
+  });
+  const [biometricLabel, setBiometricLabel] = useState(() => getCachedBiometricStatus()?.label ?? 'Huella Dactilar');
+  const [biometryType, setBiometryType] = useState<'fingerprint' | 'facial' | 'iris' | 'generic'>(
+    () => getCachedBiometricStatus()?.biometryType ?? 'generic'
+  );
 
   // Modal para confirmación de contraseña al activar biometría
   const [bioPasswordModalVisible, setBioPasswordModalVisible] = useState(false);
@@ -186,15 +193,20 @@ export default function ProfileScreen() {
   const [bioError, setBioError] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     async function loadBiometrics() {
       const status = await getBiometricStatus();
+      const isEnabled = await isBiometricAuthEnabled();
+      if (!active) return;
       setBiometricAvailable(status.available && status.enrolled);
       setBiometricLabel(status.label);
       setBiometryType(status.biometryType);
-      const isEnabled = await isBiometricAuthEnabled();
       setBiometricsEnabled(isEnabled);
     }
     loadBiometrics();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleToggleBiometrics = async (value: boolean) => {
@@ -336,22 +348,12 @@ export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       {/* Header Minimalista en Modo Claro */}
-      <View style={styles.headerWrapper}>
-        <SafeAreaView edges={['top']} style={styles.safeArea}>
-          <View style={[styles.navContainer, isTablet && styles.navContainerTablet]}>
-            <View style={styles.logoGroup}>
-              <Image
-                source={LOGO_DARK}
-                style={[styles.logo, isTablet && styles.logoTablet]}
-                contentFit="contain"
-                contentPosition="left center"
-                priority="high"
-              />
-            </View>
-
-          </View>
-        </SafeAreaView>
-      </View>
+      <HeaderCaboSystems
+        seamless
+        showProjectSelector={false}
+        showNotificationCenter={false}
+        showProfileButton={false}
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -587,6 +589,7 @@ export default function ProfileScreen() {
       </ScrollView>
 
       {/* Modal de Confirmación de Cerrar Sesión */}
+      {logoutModalVisible ? (
       <Modal
         visible={logoutModalVisible}
         transparent
@@ -627,8 +630,10 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+      ) : null}
 
       {/* Modal Selector de Idioma (Español / Inglés) */}
+      {languageModalVisible ? (
       <Modal
         visible={languageModalVisible}
         transparent
@@ -732,8 +737,10 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+      ) : null}
 
       {/* Modal de Cambio de Contraseña  */}
+      {passwordModalVisible ? (
       <Modal
         visible={passwordModalVisible}
         transparent
@@ -851,8 +858,10 @@ export default function ProfileScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      ) : null}
 
       {/* Modal para Vincular Biometría con Contraseña */}
+      {bioPasswordModalVisible ? (
       <Modal
         visible={bioPasswordModalVisible}
         transparent
@@ -948,8 +957,10 @@ export default function ProfileScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      ) : null}
 
       {/* Modal Informativo de Soporte Técnico (TailAdmin Light Mode) */}
+      {supportModalVisible ? (
       <Modal
         visible={supportModalVisible}
         transparent
@@ -975,6 +986,7 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+      ) : null}
     </View>
   );
 }

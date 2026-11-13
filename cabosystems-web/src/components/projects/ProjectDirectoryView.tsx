@@ -373,9 +373,16 @@ export function ProjectDirectoryView() {
   const visibleByStatus = useMemo(() => statusFilters.length ? data.villas.filter(v => statusFilters.includes(v.estatus)) : data.villas, [data.villas, statusFilters]);
   const staffNames = useMemo(() => new Map(data.staff.map(person => [person.id, person.nombre])), [data.staff]);
   const normalizedDirectoryQuery = normalize(directorySearchQuery);
-  const matchingVillas = useMemo(() => visibleByStatus.filter(villa => !normalizedDirectoryQuery || normalize(`${villa.villa} ${villa.numero_proyecto || ''}`).includes(normalizedDirectoryQuery)), [visibleByStatus, normalizedDirectoryQuery]);
+  const matchingVillas = useMemo(() => visibleByStatus.filter(villa => !normalizedDirectoryQuery || normalize(`${villa.villa} ${villa.numero_proyecto || ''} ${villa.cliente || ''}`).includes(normalizedDirectoryQuery)), [visibleByStatus, normalizedDirectoryQuery]);
   const matchingDevelopmentIds = useMemo(() => new Set(matchingVillas.map(villa => villa.desarrollo_id)), [matchingVillas]);
-  const developments = data.developments.filter(item => !normalizedDirectoryQuery || matchingDevelopmentIds.has(item.id));
+  const developments = useMemo(() => data.developments.filter(item => !normalizedDirectoryQuery || matchingDevelopmentIds.has(item.id)), [data.developments, normalizedDirectoryQuery, matchingDevelopmentIds]);
+  useEffect(() => {
+    if (!normalizedDirectoryQuery || dirty.current) return;
+    if (developments.length > 0 && (!developmentId || !matchingDevelopmentIds.has(developmentId))) {
+      setDevelopmentId(developments[0].id);
+      setVillaId('');
+    }
+  }, [normalizedDirectoryQuery, matchingDevelopmentIds, developmentId, developments]);
   const villas = matchingVillas.filter(v => v.desarrollo_id === development?.id).sort((a, b) => a.villa.localeCompare(b.villa, language, { numeric: true }));
   const counts = useMemo(() => { const map = new Map<string, number>(); for (const villa of matchingVillas) map.set(villa.desarrollo_id, (map.get(villa.desarrollo_id) || 0) + 1); return map; }, [matchingVillas]);
   const toggleStatusFilter = (status: ProjectVilla['estatus']) => setStatusFilters(current => current.includes(status)

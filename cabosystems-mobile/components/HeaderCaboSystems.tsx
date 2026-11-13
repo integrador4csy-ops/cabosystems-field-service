@@ -1,8 +1,7 @@
 import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Modal, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal, ScrollView, useWindowDimensions, Image } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
 import { MapPin, X, ChevronDown, Check } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/Theme';
 import { useProjects } from '@/lib/projects';
@@ -14,7 +13,10 @@ interface HeaderProps {
   seamless?: boolean;
   selectorOnly?: boolean;
   showProjectSelector?: boolean;
+  showNotificationCenter?: boolean;
+  showProfileButton?: boolean;
   rightAccessory?: React.ReactNode;
+  accountAccessory?: React.ReactNode;
   projects?: Project[];
   selectedProjectId?: string;
   onSelectProject?: (project: Project) => void;
@@ -33,11 +35,37 @@ export function useHeaderHeight() {
   return insets.top + baseHeight;
 }
 
+export const CaboSystemsHeaderLogo = React.memo(function CaboSystemsHeaderLogo({
+  isTablet = false,
+}: {
+  isTablet?: boolean;
+}) {
+  return (
+    <View style={styles.logoContainer}>
+      {/*
+        defaultSource resuelve el recurso del APK de forma síncrona en Android:
+        el logo aparece en el primer frame de cada pestaña. Con expo-image la
+        escenarecién visible mostraba el hueco del logo durante el primer render.
+      */}
+      <Image
+        source={LOGO_DARK}
+        defaultSource={LOGO_DARK}
+        style={[styles.logo, isTablet && styles.logoTablet]}
+        resizeMode="contain"
+        fadeDuration={0}
+      />
+    </View>
+  );
+});
+
 export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
   seamless = false,
   selectorOnly = false,
   showProjectSelector = true,
+  showNotificationCenter = true,
+  showProfileButton = true,
   rightAccessory,
+  accountAccessory,
   projects: propProjects,
   selectedProjectId: propSelectedProjectId,
   onSelectProject: propOnSelectProject,
@@ -72,18 +100,9 @@ export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
       <SafeAreaView edges={selectorOnly ? [] : ['top']} style={selectorOnly ? styles.selectorOnlySafeArea : styles.safeArea}>
         <View style={[styles.container, isTablet && styles.containerTablet, selectorOnly && styles.selectorOnlyContainer]}>
           {/* Logo Minimalista CSY en Modo Claro */}
-          {!selectorOnly && <View style={styles.logoContainer}>
-            <Image
-              source={LOGO_DARK}
-              style={[styles.logo, isTablet && styles.logoTablet]}
-              contentFit="contain"
-              contentPosition="left center"
-              priority="high"
-            />
-          </View>}
+          {!selectorOnly && <CaboSystemsHeaderLogo isTablet={isTablet} />}
 
           {/* Selector de Villa Minimalista */}
-          {!selectorOnly && rightAccessory}
           {showProjectSelector && projects.length > 0 && (
             <Pressable
               style={({ pressed }) => [
@@ -119,7 +138,13 @@ export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
               <ChevronDown color={Colors.primary} size={14} strokeWidth={2.2} />
             </Pressable>
           )}
-          {!selectorOnly && <View style={styles.accountActions}><NotificationCenter /><ProfileNavButton /></View>}
+          {!selectorOnly && (
+            <View style={styles.accountActions}>
+              {rightAccessory}
+              {accountAccessory ? accountAccessory : showNotificationCenter ? <NotificationCenter /> : null}
+              {showProfileButton ? <ProfileNavButton /> : null}
+            </View>
+          )}
         </View>
       </SafeAreaView>
 
@@ -237,19 +262,18 @@ const styles = StyleSheet.create({
     minHeight: 78,
   },
   logoContainer: {
-    flex: 1,
-    minWidth: 0,
+    width: 162,
+    height: 54,
     justifyContent: 'center',
     alignItems: 'flex-start',
     transform: [{ translateY: -3 }],
   },
   logo: {
-    width: '100%',
-    maxWidth: 220,
+    width: 162,
     height: 54,
   },
   logoTablet: {
-    maxWidth: 250,
+    width: 180,
     height: 60,
   },
   selector: {
@@ -316,7 +340,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     maxWidth: 220,
   },
-  accountActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  accountActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(16, 24, 40, 0.45)',

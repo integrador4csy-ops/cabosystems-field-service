@@ -2,6 +2,7 @@ import { chatDayKey, chatDayLabel, useChatDayClock } from '@/lib/chatDay';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ViewInstance, TextInputInstance } from 'react-native';
 import { View, Text, StyleSheet, TextInput, Pressable, Modal, ActivityIndicator, KeyboardAvoidingView, Keyboard, Platform, Alert, BackHandler, useWindowDimensions } from 'react-native';
+import { afterTabPaint } from '@/lib/tabPreparation';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,7 +33,7 @@ import { prepareChatEmojis } from '@/lib/chatMediaWarmup';
 import { stickerLibrary } from '@/lib/stickerLibrary';
 import { useChatTyping } from '@/lib/useChatTyping';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
-import { getCachedChatRoom, saveChatRoom, forgetChatRoom, loadChatRoom, olderChatMessages, getStoredChatMessage, getSavedChatGroups, persistChatRoom, subscribeChatRooms, removeStoredChatMessage } from '@/lib/chatRoomCache';
+import { getCachedChatRoom, getCachedChatGroup, saveChatRoom, forgetChatRoom, loadChatRoom, olderChatMessages, getStoredChatMessage, getSavedChatGroups, persistChatRoom, subscribeChatRooms, removeStoredChatMessage } from '@/lib/chatRoomCache';
 
 const messageKey = (message: ChatMessage) => message.id;
 const messageType = (message: ChatMessage) => message.tipo;
@@ -46,17 +47,23 @@ export default function ChatRoomScreen() {
   const { typingNames, notifyTyping } = useChatTyping(id, userId, profile?.nombre || (language === 'en' ? 'Technician' : 'Técnico'));
   useEffect(() => {
     if (!userId) return;
-    void stickerLibrary.prepare(userId);
-    const idle = requestIdleCallback(() => { void prepareChatEmojis(); }, { timeout: 750 });
-    return () => cancelIdleCallback(idle);
+    const cancel = afterTabPaint(() => {
+      const timer = setTimeout(() => {
+        void stickerLibrary.prepare(userId);
+        void prepareChatEmojis();
+      }, 1000);
+      return () => clearTimeout(timer);
+    });
+    return cancel;
   }, [userId]);
   const cachedRoom = getCachedChatRoom(userId, id);
+  const knownGroup = cachedRoom?.group ?? getCachedChatGroup(userId, id) ?? getSavedChatGroups(userId).find(g => g.id === id) ?? null;
   const roomKey = `${userId}:${id}`;
   const [dataOwner, setDataOwner] = useState(roomKey);
-  const [group, setGroup] = useState<ChatGroup | null>(() => cachedRoom?.group ?? null);
+  const [group, setGroup] = useState<ChatGroup | null>(() => knownGroup);
   const [messages, setMessages] = useState<ChatMessage[]>(() => cachedRoom?.messages ?? []);
   const [pins, setPins] = useState<ChatPin[]>(() => cachedRoom?.pins ?? []);
-  const [loading, setLoading] = useState(() => !cachedRoom);
+  const [loading, setLoading] = useState(() => !cachedRoom && !knownGroup);
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
   const [selection, setSelection] = useState({ start: 0, end: 0 });
@@ -65,12 +72,6 @@ export default function ChatRoomScreen() {
   const [tools, setTools] = useState<ChatToolTarget | null>(null);
   const [showPins, setShowPins] = useState(false);
   const [mediaPanelOpen, setMediaPanelOpen] = useState(false);
-  const [mediaPanelReady, setMediaPanelReady] = useState(false);
-  useEffect(() => {
-    if (!group?.id) return;
-    const idle = requestIdleCallback(() => setMediaPanelReady(true), { timeout: 750 });
-    return () => cancelIdleCallback(idle);
-  }, [group?.id, userId]);
   const [reactionAnchor, setReactionAnchor] = useState<(ChatRect & { id: string }) | null>(null);
   const [rootBounds, setRootBounds] = useState<ChatRect | null>(null);
   const [feedBounds, setFeedBounds] = useState<ChatRect | null>(null);
@@ -95,6 +96,8 @@ export default function ChatRoomScreen() {
   useEffect(() => { errorCopy.current = c.failed; }, [c.failed]);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messagesRef = useRef(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
   const selected = messages.find((message) => message.id === selectedId) || null;
   const feedExtra = useMemo(() => ({ selectedId, highlighted, pinnedIds: pins }), [selectedId, highlighted, pins]);
   const measureSelection = useCallback(() => {
@@ -109,6 +112,7 @@ export default function ChatRoomScreen() {
     });
   }, []);
   const measureBounds = useCallback(() => {
+    if (!selectedIdRef.current) return;
     rootRef.current?.measureInWindow((x, y, width, height) => setRootBounds({ x, y, width, height }));
     feedRef.current?.measureInWindow((x, y, width, height) => setFeedBounds({ x, y, width, height }));
     measureSelection();
@@ -178,12 +182,15 @@ export default function ChatRoomScreen() {
       if (!active) return;
       const cached = local ?? getCachedChatRoom(userId, id);
       setDataOwner(roomKey);
-      setLoading(!cached); setGroup(cached?.group ?? null); setMessages(cached?.messages ?? []); setPins(cached?.pins ?? []); setText(''); setReplyTo(null); setSelectedId(null); setTools(null); setNotice(''); setMediaPanelOpen(false); setMediaPanelReady(false); setAttachMenuOpen(false); setActiveVideo(null);
-      return Promise.all([getChatGroupDetails(id, userId), refresh()]).then(async ([details, data]) => {
+      setLoading(!cached && !knownGroup); setGroup(cached?.group ?? knownGroup); setMessages(cached?.messages ?? []); setPins(cached?.pins ?? []); setText(''); setReplyTo(null); setSelectedId(null); setTools(null); setNotice(''); setMediaPanelOpen(false); setAttachMenuOpen(false); setActiveVideo(null);
+      afterTabPaint(() => {
         if (!active) return;
-        setGroup(details);
-        if (!details) await forgetChatRoom(userId, id);
-        else if (data) await persistChatRoom(userId, { group: details, ...data });
+        void Promise.all([getChatGroupDetails(id, userId), refresh()]).then(async ([details, data]) => {
+          if (!active) return;
+          setGroup(details);
+          if (!details) await forgetChatRoom(userId, id);
+          else if (data) await persistChatRoom(userId, { group: details, ...data });
+        }).catch(() => { if (active) setNotice(errorCopy.current); });
       });
     }).catch(() => { if (active) setNotice(errorCopy.current); }).finally(() => { if (active) setLoading(false); });
     const channel = supabase.channel(`chat_mobile_${id}`)
@@ -230,6 +237,8 @@ export default function ChatRoomScreen() {
     if (focusTimer.current) clearTimeout(focusTimer.current);
     selectedIdRef.current = message.id; selectedMeasure.current = measure;
     setReactionAnchor(null); setSelectedId(message.id); setMediaPanelOpen(false); Keyboard.dismiss();
+    rootRef.current?.measureInWindow((x, y, width, height) => setRootBounds({ x, y, width, height }));
+    feedRef.current?.measureInWindow((x, y, width, height) => setFeedBounds({ x, y, width, height }));
     measureSelection();
   }, [measureSelection]);
   const fail = useCallback(() => setNotice(c.failed), [c]);
@@ -334,10 +343,36 @@ export default function ChatRoomScreen() {
     if (tools?.kind === 'actions') { void reaction(tools.message.id, emoji); return; }
     const next = insertEmoji(text, emoji, selection); setText(next.text); notifyTyping(Boolean(next.text.trim())); setSelection({ start: next.cursor, end: next.cursor });
   };
-  const renderMessage = useCallback(({ item, index }: { item: ChatMessage; index: number }) => <View>
-    {(index === 0 || chatDayKey(messages[index - 1].created_at) !== chatDayKey(item.created_at)) ? <View style={{ alignItems: 'center', paddingVertical: 12 }}><Text style={{ backgroundColor: P.white, color: 'rgba(52,62,72,0.75)', borderWidth: 1, borderColor: 'rgba(52,62,72,0.15)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8, fontSize: 12, fontFamily: 'Outfit_500Medium' }}>{chatDayLabel(item.created_at, language, chatNow)}</Text></View> : null}
-    <ChatMessageBubble message={item} userId={userId} pinned={pinnedIds.has(item.id)} highlighted={highlighted === item.id} selected={selectedId === item.id}
-    onActions={selectMessage} onReply={reply} onReaction={reaction} onImage={setFullImage} onVideo={openVideo} onDocument={openDocument} onJump={jump} onError={fail} /></View>, [messages, language, chatNow, userId, pinnedIds, highlighted, selectedId, selectMessage, reply, reaction, openVideo, openDocument, jump, fail]);
+  const renderMessage = useCallback(({ item, index }: { item: ChatMessage; index: number }) => {
+    const prev = messagesRef.current[index - 1];
+    const showHeader = index === 0 || (prev && chatDayKey(prev.created_at) !== chatDayKey(item.created_at));
+    return (
+      <View>
+        {showHeader ? (
+          <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+            <Text style={{ backgroundColor: P.white, color: 'rgba(52,62,72,0.75)', borderWidth: 1, borderColor: 'rgba(52,62,72,0.15)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8, fontSize: 12, fontFamily: 'Outfit_500Medium' }}>
+              {chatDayLabel(item.created_at, language, chatNow)}
+            </Text>
+          </View>
+        ) : null}
+        <ChatMessageBubble
+          message={item}
+          userId={userId}
+          pinned={pinnedIds.has(item.id)}
+          highlighted={highlighted === item.id}
+          selected={selectedId === item.id}
+          onActions={selectMessage}
+          onReply={reply}
+          onReaction={reaction}
+          onImage={setFullImage}
+          onVideo={openVideo}
+          onDocument={openDocument}
+          onJump={jump}
+          onError={fail}
+        />
+      </View>
+    );
+  }, [language, chatNow, userId, pinnedIds, highlighted, selectedId, selectMessage, reply, reaction, openVideo, openDocument, jump, fail]);
   const selectedPin = pins.find((item) => item.mensaje_id === selected?.id);
   const canUnpinSelected = !selectedPin || selectedPin.pinned_by === userId || admin;
   const toolMessage = tools?.kind === 'actions' ? tools.message : null;
@@ -369,7 +404,7 @@ export default function ChatRoomScreen() {
     {notice ? <View accessibilityRole="alert" style={styles.notice}><Text style={styles.noticeText}>{notice}</Text><Pressable accessibilityLabel={c.close} onPress={() => setNotice('')} style={styles.iconButton}><X size={16} color={P.slate} /></Pressable></View> : null}
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View ref={feedRef} collapsable={false} style={styles.flex} onLayout={measureBounds}>
-      {loading || dataOwner !== roomKey ? <View style={styles.center}><ActivityIndicator color={P.accent} /><Text style={styles.empty}>{c.loading}</Text></View> : !group ? <View style={styles.center}><Text style={styles.empty}>{c.unavailable}</Text><Pressable onPress={() => { setLoading(true); Promise.all([getChatGroupDetails(id, userId), refresh()]).then(([details]) => setGroup(details)).catch(fail).finally(() => setLoading(false)); }} style={styles.retry}><Text style={styles.pinTitle}>{c.retry}</Text></Pressable></View> : <FlashList ref={listRef} data={messages} renderItem={renderMessage} keyExtractor={messageKey} getItemType={messageType} extraData={feedExtra} onStartReached={() => { void loadOlder().catch(fail); }} onStartReachedThreshold={0.2} onScroll={event => { atHistoryStart.current = event.nativeEvent.contentOffset.y < 80; measureSelection(); }} scrollEventThrottle={16}
+      {((loading || dataOwner !== roomKey) && messages.length === 0) ? <View style={styles.center}><ActivityIndicator color={P.accent} /><Text style={styles.empty}>{c.loading}</Text></View> : (!group && messages.length === 0) ? <View style={styles.center}><Text style={styles.empty}>{c.unavailable}</Text><Pressable onPress={() => { setLoading(true); Promise.all([getChatGroupDetails(id, userId), refresh()]).then(([details]) => setGroup(details)).catch(fail).finally(() => setLoading(false)); }} style={styles.retry}><Text style={styles.pinTitle}>{c.retry}</Text></Pressable></View> : <FlashList ref={listRef} data={messages} renderItem={renderMessage} keyExtractor={messageKey} getItemType={messageType} extraData={feedExtra} onStartReached={() => { void loadOlder().catch(fail); }} onStartReachedThreshold={0.2} onScroll={event => { atHistoryStart.current = event.nativeEvent.contentOffset.y < 80; measureSelection(); }} scrollEventThrottle={16}
         maintainVisibleContentPosition={{ startRenderingFromBottom: true, autoscrollToBottomThreshold: 0.2 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.feed} ListEmptyComponent={<Text style={styles.empty}>{c.emptyChat}</Text>} />}
       </View>
       <TypingIndicator names={typingNames} language={language} />
@@ -388,7 +423,7 @@ export default function ChatRoomScreen() {
           <Pressable accessibilityRole="button" accessibilityLabel={text.trim() ? c.send : c.recordAudio} disabled={sending || voice.starting || (textBlocked && Boolean(text.trim()))} onPress={() => { if (text.trim()) void send('texto'); else { Keyboard.dismiss(); setMediaPanelOpen(false); setAttachMenuOpen(false); void voice.start(); } }} style={[styles.send, (sending || voice.starting) && styles.disabled]}>{sending || voice.starting ? <ActivityIndicator size="small" color={P.white} /> : text.trim() ? <Send size={19} color={P.white} /> : <Mic size={21} color={P.white} />}</Pressable>
         </View>}
       </View> : null}
-      {(mediaPanelReady || mediaPanelOpen) && group ? <View style={!mediaPanelOpen ? styles.closedMediaPanel : undefined} pointerEvents={mediaPanelOpen ? 'auto' : 'none'} accessibilityElementsHidden={!mediaPanelOpen} importantForAccessibility={mediaPanelOpen ? 'auto' : 'no-hide-descendants'}>
+      {mediaPanelOpen && group ? <View pointerEvents="auto">
         <ComposerMediaPanel key={`${id}:${userId}`} userId={userId} textBlocked={textBlocked} sending={sending} onEmoji={chooseEmoji} onSticker={(url) => { void send('sticker', url); }} onClose={() => { Keyboard.dismiss(); setMediaPanelOpen(false); }} />
       </View> : null}
     </KeyboardAvoidingView>

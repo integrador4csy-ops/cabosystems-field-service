@@ -1,6 +1,7 @@
 import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator, ScrollView, AppState } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, ScrollView, AppState, Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import {
@@ -79,13 +80,58 @@ const keyExtractor = (item: TaskWithProject) => item.id;
 const EMPTY_TASKS: TaskWithProject[] = [];
 let taskDataCache: { owner: string; items: TaskWithProject[] } = { owner: '', items: [] };
 
+const tasksCachePath = (owner: string) => {
+  const root = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+  return root ? `${root}tasks-cache-${encodeURIComponent(owner)}.json` : null;
+};
+
+export async function readTasksDiskCache(owner: string) {
+  if (!owner) return null;
+  try {
+    const path = tasksCachePath(owner);
+    const raw = Platform.OS === 'web'
+      ? localStorage.getItem(`tasks-cache:${owner}`)
+      : path ? await FileSystem.readAsStringAsync(path) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.owner === owner && Array.isArray(parsed.items)) {
+      return parsed as { owner: string; items: TaskWithProject[] };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function writeTasksDiskCache(data: { owner: string; items: TaskWithProject[] }) {
+  if (!data?.owner) return;
+  try {
+    const raw = JSON.stringify(data);
+    if (Platform.OS === 'web') {
+      localStorage.setItem(`tasks-cache:${data.owner}`, raw);
+    } else {
+      const path = tasksCachePath(data.owner);
+      if (path) await FileSystem.writeAsStringAsync(path, raw);
+    }
+  } catch {}
+}
+
 export async function preloadMainTasks(userId: string): Promise<TaskWithProject[]> {
+  if (!userId) return [];
+  if (taskDataCache.owner !== userId) {
+    const saved = await readTasksDiskCache(userId);
+    if (saved && taskDataCache.owner !== userId) {
+      taskDataCache = saved;
+    }
+  }
   if (taskDataCache.owner === userId && taskDataCache.items.length) {
     return taskDataCache.items;
   }
   try {
     const tasks = await getAccessibleTasks(userId);
-    taskDataCache = { owner: userId, items: tasks };
+    const nextData = { owner: userId, items: tasks };
+    taskDataCache = nextData;
+    void writeTasksDiskCache(nextData);
     return tasks;
   } catch (e) {
     console.warn('Preload main tasks error:', e);
@@ -118,7 +164,21 @@ export default function DashboardScreen() {
   useEffect(() => {
     if (profile?.id && taskData.owner === profile.id) markMainReady();
   }, [profile?.id, taskData.owner, markMainReady]);
-  const [loading, setLoading] = useState(() => taskDataCache.owner !== profile?.id);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    if (taskDataCache.owner !== profile.id) {
+      void readTasksDiskCache(profile.id).then(saved => {
+        if (saved && taskDataCache.owner !== profile.id) {
+          taskDataCache = saved;
+          setTaskData(saved);
+          setLoading(false);
+          markMainReady();
+        }
+      });
+    }
+  }, [profile?.id, markMainReady]);
+  const [loading, setLoading] = useState(() => taskDataCache.owner !== profile?.id && taskDataCache.items.length === 0);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'en_proceso' | 'pendiente' | 'completada'>('all');
@@ -157,7 +217,7 @@ export default function DashboardScreen() {
       const version = ++requestVersion.current;
       if (isRefresh) {
         setRefreshing(true);
-      } else if (taskData.owner !== profile.id) {
+      } else if (taskData.owner !== profile.id && taskData.items.length === 0) {
         setLoading(true);
       }
       setError(null);
@@ -168,6 +228,7 @@ export default function DashboardScreen() {
         ]);
         if (version === requestVersion.current) {
           taskDataCache = { owner: profile.id, items: tsks };
+          void writeTasksDiskCache(taskDataCache);
           setTaskData(taskDataCache);
           lastLoadTimeRef.current = Date.now();
         }
@@ -297,85 +358,93 @@ export default function DashboardScreen() {
         </View>
         {/* Barra de Filtros Minimalista (Todas visibles en pantalla) */}
         <View style={styles.filterPillsContainer}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.filterPill,
-              statusFilter === 'all' && styles.filterPillActive,
-              pressed && { opacity: 0.8 },
-            ]}
-            onPress={() => setStatusFilter('all')}
-          >
-            <Text
-              style={[
-                styles.filterPillText,
-                statusFilter === 'all' && styles.filterPillTextActive,
-              ]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-            >
-              {en ? 'All' : tr("Todas")} ({filteredTasks.length})
-            </Text>
-          </Pressable>
+          {(() => {
+            const hasData = tasks.length > 0;
+            const countSuffix = (count: number) => (hasData || !loading ? ` (${count})` : '');
+            return (
+              <>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.filterPill,
+                    statusFilter === 'all' && styles.filterPillActive,
+                    pressed && { opacity: 0.8 },
+                  ]}
+                  onPress={() => setStatusFilter('all')}
+                >
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      statusFilter === 'all' && styles.filterPillTextActive,
+                    ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
+                    {en ? 'All' : tr("Todas")}{countSuffix(filteredTasks.length)}
+                  </Text>
+                </Pressable>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.filterPill,
-              statusFilter === 'pendiente' && styles.filterPillActive,
-              pressed && { opacity: 0.8 },
-            ]}
-            onPress={() => setStatusFilter('pendiente')}
-          >
-            <Text
-              style={[
-                styles.filterPillText,
-                statusFilter === 'pendiente' && styles.filterPillTextActive,
-              ]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-            >
-              {en ? 'To do' : tr("Pendientes")} ({stats.pendiente})
-            </Text>
-          </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.filterPill,
+                    statusFilter === 'pendiente' && styles.filterPillActive,
+                    pressed && { opacity: 0.8 },
+                  ]}
+                  onPress={() => setStatusFilter('pendiente')}
+                >
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      statusFilter === 'pendiente' && styles.filterPillTextActive,
+                    ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
+                    {en ? 'To do' : tr("Pendientes")}{countSuffix(stats.pendiente)}
+                  </Text>
+                </Pressable>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.filterPill,
-              statusFilter === 'en_proceso' && styles.filterPillActive,
-              pressed && { opacity: 0.8 },
-            ]}
-            onPress={() => setStatusFilter('en_proceso')}
-          >
-            <Text
-              style={[
-                styles.filterPillText,
-                statusFilter === 'en_proceso' && styles.filterPillTextActive,
-              ]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-            >
-              {en ? 'Doing' : tr("En proceso")} ({stats.en_proceso})
-            </Text>
-          </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.filterPill,
+                    statusFilter === 'en_proceso' && styles.filterPillActive,
+                    pressed && { opacity: 0.8 },
+                  ]}
+                  onPress={() => setStatusFilter('en_proceso')}
+                >
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      statusFilter === 'en_proceso' && styles.filterPillTextActive,
+                    ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
+                    {en ? 'Doing' : tr("En proceso")}{countSuffix(stats.en_proceso)}
+                  </Text>
+                </Pressable>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.filterPill,
-              statusFilter === 'completada' && styles.filterPillActive,
-              pressed && { opacity: 0.8 },
-            ]}
-            onPress={() => setStatusFilter('completada')}
-          >
-            <Text
-              style={[
-                styles.filterPillText,
-                statusFilter === 'completada' && styles.filterPillTextActive,
-              ]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-            >
-              {en ? 'Done' : tr("Completadas")} ({stats.completada})
-            </Text>
-          </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.filterPill,
+                    statusFilter === 'completada' && styles.filterPillActive,
+                    pressed && { opacity: 0.8 },
+                  ]}
+                  onPress={() => setStatusFilter('completada')}
+                >
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      statusFilter === 'completada' && styles.filterPillTextActive,
+                    ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
+                    {en ? 'Done' : tr("Completadas")}{countSuffix(stats.completada)}
+                  </Text>
+                </Pressable>
+              </>
+            );
+          })()}
         </View>
         {selectedProject ? <View style={styles.projectHeading}>
           <Text accessibilityRole="header" style={styles.projectTitle} numberOfLines={1}>
@@ -393,9 +462,7 @@ export default function DashboardScreen() {
   const { t: tr } = useInterfaceTranslation();
     if (loading && tasks.length === 0) {
       return (
-        <View style={styles.emptyContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-        </View>
+        <View style={styles.emptyContainer} />
       );
     }
     return (
