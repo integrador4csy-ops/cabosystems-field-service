@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   ReduceMotion,
@@ -40,13 +40,17 @@ export function ConnectedTabBarProvider({
   const index = tabs.indexOf(activeTab);
   const position = useSharedValue(Math.max(0, index));
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (index < 0) return;
-    // Muelle ágil y reactivo: se traslada con rapidez (~220ms) y asienta suavemente sin retraso
+    // Muelle ultra ágil e instantáneo (~130ms): se dispara antes del renderizado de la pantalla
+    // sin retraso perceptible y frena en seco en el destino (overshootClamping).
     position.value = withSpring(index, {
-      damping: 24,
-      stiffness: 300,
-      mass: 0.5,
+      damping: 26,
+      stiffness: 420,
+      mass: 0.2,
+      overshootClamping: true,
+      restDisplacementThreshold: 0.01,
+      restSpeedThreshold: 0.01,
       reduceMotion: ReduceMotion.System,
     });
   }, [index, position]);
