@@ -100,7 +100,7 @@ function ManagementRouteListbox({ value, onChange, copy, compact = false }: {
   compact?: boolean;
 }) {
   const height = compact ? 32 : 44;
-  return <AppSelect aria-label={copy.managementRoute} value={value} onChange={event => onChange(event.target.value as WarrantyArea)} style={compact ? { height, minHeight: height, fontSize: 12 } : { height, minHeight: height }}>
+  return <AppSelect aria-label={copy.managementRoute} value={value} onChange={event => onChange(event.target.value as WarrantyArea)} style={compact ? { height, minHeight: height, fontSize: 12 } : { height, minHeight: height, fontSize: 14 }}>
     {managementAreas.map(area => <option key={area} value={area}>{areaLabel(copy, area)}</option>)}
   </AppSelect>;
 }
@@ -354,16 +354,16 @@ export function WarrantyManagementView() {
     </div>
 
     {updateOpen && selected && canUpdate ? <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-slate-950/40 p-4" onMouseDown={event => { if (event.target === event.currentTarget && !saving) setUpdateOpen(false); }}><form onSubmit={submitUpdate} role="dialog" aria-modal="true" aria-labelledby="update-warranty-title" className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl"><div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4"><div><h3 id="update-warranty-title" className="text-lg font-semibold text-slate-900">{copy.followUp}</h3><p className="mt-0.5 text-xs text-slate-500">{warrantyFolio(selected.case_number)} · {selected.equipment}</p></div><button type="button" disabled={saving} onClick={() => setUpdateOpen(false)} aria-label={copy.cancel} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100"><X size={19} /></button></div><div className="grid gap-4 p-5 sm:grid-cols-2">
-      <div><p className="mb-1.5 text-xs font-medium text-slate-600">{copy.stage}</p><AppSelect aria-label={copy.stage} value={updateForm.status} onChange={event => setUpdateForm(current => ({ ...current, status: event.target.value as WarrantyStatus }))} style={{ height: 44, minHeight: 44 }}>{allowedWarrantyStatuses(selected.status).map(status => <option key={status} value={status}>{statusLabel(copy, status)}</option>)}</AppSelect></div>
-      <div><p className="mb-1.5 text-xs font-medium text-slate-600">{copy.managementRoute}</p><ManagementRouteListbox value={updateForm.area} onChange={area => setUpdateForm(current => ({ ...current, area }))} copy={copy} /></div>
+      <div><label className="mb-1.5 block text-xs font-medium text-slate-600">{copy.stage} <span className="text-brand-500">*</span></label><AppSelect aria-label={copy.stage} value={updateForm.status} onChange={event => setUpdateForm(current => ({ ...current, status: event.target.value as WarrantyStatus }))} style={{ height: 44, minHeight: 44, fontSize: 14 }}>{allowedWarrantyStatuses(selected.status).map(status => <option key={status} value={status}>{statusLabel(copy, status)}</option>)}</AppSelect></div>
+      <div><label className="mb-1.5 block text-xs font-medium text-slate-600">{copy.managementRoute} <span className="text-brand-500">*</span></label><ManagementRouteListbox value={updateForm.area} onChange={area => setUpdateForm(current => ({ ...current, area }))} copy={copy} /></div>
       <StartDateField className="sm:col-span-2" value={updateForm.warranty_until} onChange={val => setUpdateForm(current => ({ ...current, warranty_until: val }))} locale={locale} todayKey={todayKey} copy={copy} />
-      <label className="text-xs font-medium text-slate-600 sm:col-span-2">{copy.note}<textarea required rows={4} value={updateForm.last_note} onChange={event => setUpdateForm(current => ({ ...current, last_note: event.target.value }))} placeholder={copy.notePlaceholder} className="mt-1.5 w-full resize-none rounded-lg border border-slate-200 px-3 py-2.5 text-sm leading-5 outline-none focus:border-brand-500" /></label>
+      <div className="sm:col-span-2"><label className="mb-1.5 block text-xs font-medium text-slate-600">{copy.note} <span className="text-brand-500">*</span></label><textarea required rows={4} value={updateForm.last_note} onChange={event => setUpdateForm(current => ({ ...current, last_note: event.target.value }))} placeholder={copy.notePlaceholder} className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2.5 text-sm leading-5 outline-none focus:border-brand-500" /></div>
       {formError ? <p role="alert" className="text-xs text-orange-700 sm:col-span-2">{formError}</p> : null}
     </div><div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4"><button type="button" disabled={saving} onClick={() => setUpdateOpen(false)} className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50">{copy.cancel}</button><button disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-500 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50"><CheckCircle2 size={16} />{saving ? copy.saving : copy.save}</button></div></form></div> : null}
 
     {createOpen ? <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-slate-950/40 p-4" onMouseDown={event => { if (event.target === event.currentTarget && !saving) setCreateOpen(false); }}><form onSubmit={submitCreate} role="dialog" aria-modal="true" aria-labelledby="new-warranty-title" className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl"><div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4"><div><h3 id="new-warranty-title" className="text-lg font-semibold text-slate-900">{copy.newCase}</h3><p className="mt-1 text-xs text-slate-500">{copy.currentUser} <strong>{adminProfile?.nombre || user?.email}</strong></p></div><button type="button" disabled={saving} onClick={() => setCreateOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100"><X size={19} /></button></div><div className="grid gap-4 p-5 sm:grid-cols-2">
       <div className="sm:col-span-2">
-        <label className="block text-xs font-medium text-slate-600 mb-1.5">
+        <label className="mb-1.5 block text-xs font-medium text-slate-600">
           {copy.selectVilla} <span className="text-brand-500">*</span>
         </label>
         <WarrantyProjectSelect
@@ -375,13 +375,43 @@ export function WarrantyManagementView() {
           required
         />
       </div>
-      <label className="text-xs font-medium text-slate-600">{copy.villaArea} <span className="text-brand-500">*</span><input required value={createForm.location} onChange={event => setCreateForm(current => ({ ...current, location: event.target.value }))} placeholder={copy.villaAreaPlaceholder} className="mt-1.5 h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none placeholder:text-slate-400 focus:border-brand-500" /></label>
-      <label className="text-xs font-medium text-slate-600">{copy.equipment}<input required value={createForm.equipment} onChange={event => setCreateForm(current => ({ ...current, equipment: event.target.value }))} className="mt-1.5 h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-brand-500" /></label>
-      <label className="text-xs font-medium text-slate-600">{copy.serial} <span className="font-normal text-slate-400">({copy.optional})</span><input value={createForm.serial_number} onChange={event => setCreateForm(current => ({ ...current, serial_number: event.target.value }))} className="mt-1.5 h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-brand-500" /></label>
-      <label className="text-xs font-medium text-slate-600">{copy.macAddress} <span className="font-normal text-slate-400">({copy.optional})</span><input value={createForm.mac_address} onChange={event => setCreateForm(current => ({ ...current, mac_address: event.target.value }))} placeholder="AA:BB:CC:DD:EE:FF" autoCapitalize="characters" spellCheck={false} className="mt-1.5 h-11 w-full rounded-lg border border-slate-200 px-3 font-mono text-sm uppercase outline-none placeholder:font-sans placeholder:text-slate-400 focus:border-brand-500" /></label>
-      <div><p className="mb-1.5 text-xs font-medium text-slate-600">{copy.managementRoute}</p><ManagementRouteListbox value={createForm.area} onChange={area => setCreateForm(current => ({ ...current, area }))} copy={copy} /></div>
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-slate-600">
+          {copy.villaArea} <span className="text-brand-500">*</span>
+        </label>
+        <input required value={createForm.location} onChange={event => setCreateForm(current => ({ ...current, location: event.target.value }))} placeholder={copy.villaAreaPlaceholder} className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none placeholder:text-slate-400 focus:border-brand-500" />
+      </div>
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-slate-600">
+          {copy.equipment} <span className="text-brand-500">*</span>
+        </label>
+        <input required value={createForm.equipment} onChange={event => setCreateForm(current => ({ ...current, equipment: event.target.value }))} className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-brand-500" />
+      </div>
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-slate-600">
+          {copy.serial} <span className="font-normal text-slate-400">({copy.optional})</span>
+        </label>
+        <input value={createForm.serial_number} onChange={event => setCreateForm(current => ({ ...current, serial_number: event.target.value }))} className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-brand-500" />
+      </div>
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-slate-600">
+          {copy.macAddress} <span className="font-normal text-slate-400">({copy.optional})</span>
+        </label>
+        <input value={createForm.mac_address} onChange={event => setCreateForm(current => ({ ...current, mac_address: event.target.value }))} placeholder="AA:BB:CC:DD:EE:FF" autoCapitalize="characters" spellCheck={false} className="h-11 w-full rounded-lg border border-slate-200 px-3 font-mono text-sm uppercase outline-none placeholder:font-sans placeholder:text-slate-400 focus:border-brand-500" />
+      </div>
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-slate-600">
+          {copy.managementRoute}
+        </label>
+        <ManagementRouteListbox value={createForm.area} onChange={area => setCreateForm(current => ({ ...current, area }))} copy={copy} />
+      </div>
       <StartDateField value={createForm.warranty_until} onChange={val => setCreateForm(current => ({ ...current, warranty_until: val }))} locale={locale} todayKey={todayKey} copy={copy} />
-      <label className="text-xs font-medium text-slate-600 sm:col-span-2">{copy.issue}<textarea required rows={4} value={createForm.issue} onChange={event => setCreateForm(current => ({ ...current, issue: event.target.value }))} placeholder={copy.issuePlaceholder} className="mt-1.5 w-full resize-none rounded-lg border border-slate-200 px-3 py-2.5 text-sm leading-5 outline-none placeholder:text-slate-400 focus:border-brand-500" /></label>
+      <div className="sm:col-span-2">
+        <label className="mb-1.5 block text-xs font-medium text-slate-600">
+          {copy.issue} <span className="text-brand-500">*</span>
+        </label>
+        <textarea required rows={4} value={createForm.issue} onChange={event => setCreateForm(current => ({ ...current, issue: event.target.value }))} placeholder={copy.issuePlaceholder} className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2.5 text-sm leading-5 outline-none placeholder:text-slate-400 focus:border-brand-500" />
+      </div>
       {formError ? <p role="alert" className="text-xs text-orange-700 sm:col-span-2">{formError}</p> : null}
     </div><div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4"><button type="button" disabled={saving} onClick={() => setCreateOpen(false)} className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50">{copy.cancel}</button><button disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-500 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50"><CheckCircle2 size={16} />{saving ? copy.creating : copy.create}</button></div></form></div> : null}
   </section>;
