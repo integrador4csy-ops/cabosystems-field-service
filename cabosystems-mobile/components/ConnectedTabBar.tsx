@@ -42,11 +42,11 @@ export function ConnectedTabBarProvider({
 
   useEffect(() => {
     if (index < 0) return;
-    // Muelle continuo y fluido que anima el deslizamiento de la cápsula entre pestañas
+    // Muelle ágil y reactivo: se traslada con rapidez (~220ms) y asienta suavemente sin retraso
     position.value = withSpring(index, {
-      damping: 22,
-      stiffness: 180,
-      mass: 0.8,
+      damping: 24,
+      stiffness: 300,
+      mass: 0.5,
       reduceMotion: ReduceMotion.System,
     });
   }, [index, position]);
