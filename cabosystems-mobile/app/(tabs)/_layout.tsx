@@ -415,8 +415,9 @@ const styles = StyleSheet.create({
   barTint: { backgroundColor: '#FFFFFF' },
   tabLabel: {
     fontFamily: 'Outfit_600SemiBold',
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 10,
+    lineHeight: 14,
+    letterSpacing: -0.2,
     includeFontPadding: false,
     textAlign: 'center',
     alignSelf: 'stretch',
@@ -444,7 +445,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     overflow: 'visible',
     paddingVertical: 0,
-    marginHorizontal: 2,
+    marginHorizontal: 0,
   },
   iconPill: {
     width: 24,

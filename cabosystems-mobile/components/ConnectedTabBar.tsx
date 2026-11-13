@@ -162,7 +162,7 @@ export function ConnectedTabLabel({
       testID={`tab-label-${tab}`}
       numberOfLines={1}
       adjustsFontSizeToFit
-      minimumFontScale={0.75}
+      minimumFontScale={0.7}
       style={[s.label, motionStyle]}
     >
       {children}
@@ -222,11 +222,13 @@ const s = StyleSheet.create({
   },
   label: {
     fontFamily: 'Outfit_600SemiBold',
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 10,
+    lineHeight: 14,
+    letterSpacing: -0.2,
+    includeFontPadding: false,
     textAlign: 'center',
     marginTop: 2,
-    paddingHorizontal: 2,
+    paddingHorizontal: 0,
   },
   pressed: {
     opacity: 0.72,
