@@ -47,12 +47,12 @@ export function ConnectedTabBarProvider({
     if (typeof cancelAnimation === 'function') {
       cancelAnimation(position);
     }
-    // Muelle estable y reactivo: velocidad inicial reiniciada a 0 para no acumular inercia
-    // en cambios rápidos de pestañas, evitando picos de aceleración y cierres inesperados.
+    // Transición estándar Material 3 (~150ms): movimiento directo, sobredumping sin rebotes
+    // y velocidad limpia para responder al instante a toques rápidos.
     position.value = withSpring(index, {
-      damping: 25,
-      stiffness: 280,
-      mass: 0.35,
+      damping: 26,
+      stiffness: 300,
+      mass: 0.3,
       velocity: 0,
       overshootClamping: true,
       restDisplacementThreshold: 0.005,
@@ -191,8 +191,12 @@ export function ConnectedTabLabel({
 export function ConnectedTabButton(props: React.ComponentProps<typeof Pressable>) {
   return (
     <Pressable
+      delayPressIn={0}
+      android_ripple={{
+        color: 'rgba(247, 140, 38, 0.20)',
+        borderless: false,
+      }}
       {...props}
-      android_ripple={{ color: 'transparent', borderless: false }}
       style={[
         typeof props.style === 'function' ? undefined : props.style,
         s.button,
