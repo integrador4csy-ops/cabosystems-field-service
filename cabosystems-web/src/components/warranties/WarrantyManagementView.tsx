@@ -279,8 +279,28 @@ export function WarrantyManagementView() {
   return <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
     <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(320px,.85fr)_minmax(0,1.15fr)]">
       <div className="flex min-h-0 flex-col border-b border-slate-200 lg:border-b-0 lg:border-r">
-        <div className="border-b border-slate-100 p-4">
-          <div className="flex gap-1 overflow-x-auto" role="tablist">{(['all','open','waiting','closed'] as Filter[]).map(item => <button key={item} type="button" role="tab" aria-selected={filter === item} onClick={() => setFilter(item)} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold ${filter === item ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{copy[item]} <span className={filter === item ? 'text-white/65' : 'text-slate-400'}>{counts[item]}</span></button>)}</div>
+        <div className="border-b border-slate-100 p-3 sm:p-4">
+          <div className="flex w-full items-center gap-[3px] overflow-x-auto rounded-[9px] border border-slate-200 bg-slate-100 p-[3px]" role="tablist" aria-label={copy.title}>
+            {(['all','open','waiting','closed'] as Filter[]).map(item => (
+              <button
+                key={item}
+                type="button"
+                role="tab"
+                aria-selected={filter === item}
+                onClick={() => setFilter(item)}
+                className={`flex flex-1 min-w-max h-[30px] items-center justify-center gap-1.5 whitespace-nowrap rounded-[7px] px-3 text-xs transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${
+                  filter === item
+                    ? 'bg-brand-500 font-semibold text-white shadow-xs'
+                    : 'font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                }`}
+              >
+                <span>{copy[item]}</span>
+                <span className={`text-[11px] tabular-nums ${filter === item ? 'font-semibold text-white/85' : 'text-slate-400'}`}>
+                  {counts[item]}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
