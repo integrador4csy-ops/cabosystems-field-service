@@ -171,7 +171,7 @@ function RootLayoutNav() {
       <Stack
         screenOptions={{
           headerShown: false,
-          freezeOnBlur: true,
+          freezeOnBlur: false,
           animation: 'slide_from_right',
           animationDuration: 220,
           gestureEnabled: true,
