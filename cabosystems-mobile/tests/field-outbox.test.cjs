@@ -67,6 +67,9 @@ test('SQLite persists operations across restarts, isolates accounts and retains 
     await restarted.cacheFieldProjects('alice', [{ id: 'villa' }]);
     assert.equal((await restarted.readFieldProjects('bob')).length, 0);
     assert.equal((await restarted.readFieldProjects('alice'))[0].id, 'villa');
+    await restarted.saveLastActiveProjectId('alice', 'villa-123');
+    assert.equal(await restarted.readLastActiveProjectId('bob'), null);
+    assert.equal(await restarted.readLastActiveProjectId('alice'), 'villa-123');
     await assert.rejects(() => restarted.savePendingFieldRecord(arrival));
   } finally {
     connections.forEach(db => db.close());

@@ -2,8 +2,59 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { getMyProjects } from './api';
 import { useAuth } from './auth';
 import { Platform } from 'react-native';
-import { cacheFieldProjects, readFieldProjects } from './fieldOutboxStore';
+import * as SecureStore from 'expo-secure-store';
+import {
+  cacheFieldProjects,
+  readFieldProjects,
+  saveLastActiveProjectId,
+  readLastActiveProjectId,
+} from './fieldOutboxStore';
 import type { Project } from '@/types/database';
+
+const LAST_PROJECT_STORAGE_PREFIX = 'csy_last_selected_villa_';
+
+async function persistSelectedProjectId(owner: string, projectId: string) {
+  if (!owner || !projectId) return;
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(`${LAST_PROJECT_STORAGE_PREFIX}${owner}`, projectId);
+      }
+    } else {
+      await SecureStore.setItemAsync(`${LAST_PROJECT_STORAGE_PREFIX}${owner}`, projectId);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  if (Platform.OS !== 'web') {
+    void saveLastActiveProjectId(owner, projectId).catch(() => {});
+  }
+}
+
+async function loadPersistedSelectedProjectId(owner: string): Promise<string | null> {
+  if (!owner) return null;
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') {
+        const val = localStorage.getItem(`${LAST_PROJECT_STORAGE_PREFIX}${owner}`);
+        if (val) return val;
+      }
+      return null;
+    }
+    const secureVal = await SecureStore.getItemAsync(`${LAST_PROJECT_STORAGE_PREFIX}${owner}`);
+    if (secureVal) return secureVal;
+  } catch {
+    // Fallback to SQLite
+  }
+  if (Platform.OS !== 'web') {
+    try {
+      return await readLastActiveProjectId(owner);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
 
 interface ProjectsContextType {
   projects: Project[];
@@ -43,11 +94,17 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     const current = () => mountedRef.current && ownerRef.current === owner && requestRef.current === request;
     setLoading(true);
     try {
+      const lastSavedId = await loadPersistedSelectedProjectId(owner);
       if (Platform.OS !== 'web') {
         const cached = await readFieldProjects(owner).catch(() => []);
         if (current() && cached.length) {
-          setProjects(cached); setDataOwner(owner);
-          setSelectedProjectIdState(previous => cached.some(project => project.id === previous) ? previous : cached[0]?.id);
+          setProjects(cached);
+          setDataOwner(owner);
+          setSelectedProjectIdState((previous) => {
+            if (previous && cached.some((project) => project.id === previous)) return previous;
+            if (lastSavedId && cached.some((project) => project.id === lastSavedId)) return lastSavedId;
+            return cached[0]?.id;
+          });
         }
       }
       if (!current()) return;
@@ -58,6 +115,7 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
       if (Platform.OS !== 'web') void cacheFieldProjects(owner, data).catch(() => {});
       setSelectedProjectIdState((prev) => {
         if (prev && data.some((p) => p.id === prev)) return prev;
+        if (lastSavedId && data.some((p) => p.id === lastSavedId)) return lastSavedId;
         return data[0]?.id;
       });
     } catch (err) {
@@ -69,8 +127,15 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     mountedRef.current = true;
-    setProjects([]); setDataOwner(''); setSelectedProjectIdState(undefined);
+    setProjects([]);
+    setDataOwner('');
+    setSelectedProjectIdState(undefined);
     if (owner) {
+      void loadPersistedSelectedProjectId(owner).then((savedId) => {
+        if (mountedRef.current && ownerRef.current === owner && savedId) {
+          setSelectedProjectIdState((current) => current ?? savedId);
+        }
+      });
       refreshProjects();
     } else {
       setProjects([]);
@@ -86,10 +151,16 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
 
   const setSelectedProject = useCallback((project: Project) => {
     setSelectedProjectIdState(project.id);
+    if (ownerRef.current && project?.id) {
+      void persistSelectedProjectId(ownerRef.current, project.id);
+    }
   }, []);
 
   const setSelectedProjectId = useCallback((id: string) => {
     setSelectedProjectIdState(id);
+    if (ownerRef.current && id) {
+      void persistSelectedProjectId(ownerRef.current, id);
+    }
   }, []);
 
   const contextValue = useMemo(

@@ -14,7 +14,8 @@ async function db() {
           payload TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,
           next_attempt INTEGER NOT NULL DEFAULT 0, last_error TEXT);
         CREATE INDEX IF NOT EXISTS field_outbox_owner_state ON field_outbox(owner, state, sequence);
-        CREATE TABLE IF NOT EXISTS field_projects (owner TEXT PRIMARY KEY, payload TEXT NOT NULL);`);
+        CREATE TABLE IF NOT EXISTS field_projects (owner TEXT PRIMARY KEY, payload TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS field_active_project (owner TEXT PRIMARY KEY, project_id TEXT NOT NULL);`);
       return connection;
     })().catch(error => { database = undefined; throw error; });
   }
@@ -58,4 +59,11 @@ export async function readFieldProjects(owner: string): Promise<Project[]> {
   const row = await (await db()).getFirstAsync<{ payload: string }>('SELECT payload FROM field_projects WHERE owner = ?', owner);
   const value = row ? JSON.parse(row.payload) : [];
   return Array.isArray(value) ? value : [];
+}
+export async function saveLastActiveProjectId(owner: string, projectId: string) {
+  await (await db()).runAsync('INSERT OR REPLACE INTO field_active_project(owner, project_id) VALUES (?, ?)', owner, projectId);
+}
+export async function readLastActiveProjectId(owner: string): Promise<string | null> {
+  const row = await (await db()).getFirstAsync<{ project_id: string }>('SELECT project_id FROM field_active_project WHERE owner = ?', owner);
+  return row?.project_id || null;
 }
