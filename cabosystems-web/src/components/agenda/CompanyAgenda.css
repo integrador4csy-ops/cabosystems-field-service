@@ -189,32 +189,42 @@
 .calendar-filter-checkbox input:focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 3px; }
 .company-calendar-filters label span { overflow-wrap: anywhere; }
 .company-sync-status { min-height: 20px; margin: 0; padding: 0 16px 4px; font-size: 12px; line-height: 16px; color: var(--color-slate-600); }
-.company-dialog.company-event-dialog { max-width: 620px; display: flex; flex-direction: column; overflow: hidden; }
-.company-dialog.company-event-dialog > header { flex-shrink: 0; padding-block: 20px; }
-.company-event-heading { display: flex; align-items: center; gap: 12px; }
-.company-event-heading > svg { color: var(--color-slate-600); }
+.company-dialog.company-event-dialog { max-width: 480px; display: flex; flex-direction: column; overflow: hidden; border-radius: 12px; }
+.company-dialog.company-event-dialog > header { flex-shrink: 0; padding: 12px 18px; }
+.company-event-heading { display: flex; align-items: center; gap: 8px; }
+.company-event-heading > svg { color: var(--color-slate-600); width: 18px; height: 18px; }
+.company-event-heading h2 { font-size: 15px; font-weight: 600; margin: 0; }
+.company-dialog.company-event-dialog > header .workspace-icon { width: 30px; height: 30px; }
 .company-dialog.company-event-dialog form { display: flex; flex-direction: column; min-height: 0; padding: 0; overflow: hidden; }
 .company-dialog.company-event-dialog .company-event-fields { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.company-dialog.company-event-dialog fieldset { gap: 20px; padding: 24px; }
-.company-dialog.company-event-dialog .company-title-field input { font-size: 16px; font-weight: 500; }
-.company-dialog.company-event-dialog input:not([type="checkbox"]), .company-dialog.company-event-dialog .app-select-trigger { min-height: 44px; }
-.company-dialog.company-event-dialog textarea { min-height: 96px; }
-.company-schedule-fields { display: flex; flex-direction: column; gap: 16px; padding-block: 20px; border-block: 1px solid var(--color-slate-200); }
-.company-date-all-day { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: end; }
-.company-dialog.company-event-dialog label.company-all-day { min-height: 44px; padding: 10px 12px; border: 1px solid var(--color-slate-200); border-radius: 8px; background: var(--color-slate-50); cursor: pointer; }
-.company-dialog.company-event-dialog .company-checkbox-control { position: relative; display: inline-flex; flex: 0 0 20px; width: 20px; height: 20px; }
-.company-dialog.company-event-dialog .company-checkbox-control input { appearance: none; width: 20px; height: 20px; margin: 0; padding: 0; border: 1px solid var(--color-slate-400); border-radius: 4px; cursor: pointer; }
+.company-dialog.company-event-dialog fieldset { gap: 10px; padding: 14px 18px; }
+.company-dialog.company-event-dialog label { gap: 4px; font-size: 12px; font-weight: 500; }
+.company-dialog.company-event-dialog .company-title-field input { font-size: 13.5px; font-weight: 500; }
+.company-dialog.company-event-dialog input:not([type="checkbox"]), .company-dialog.company-event-dialog .app-select-trigger, .company-dialog.company-event-dialog .company-picker-trigger { min-height: 36px; height: 36px; padding: 6px 10px; font-size: 13px; border-radius: 7px; }
+.company-dialog.company-event-dialog .company-picker-trigger > svg { width: 15px; height: 15px; }
+.company-dialog.company-event-dialog textarea { min-height: 54px; height: 54px; padding: 6px 10px; font-size: 13px; border-radius: 7px; }
+.company-dialog.company-event-dialog .company-schedule-fields { display: flex; flex-direction: column; gap: 10px; padding-block: 10px; border-block: 1px solid var(--color-slate-200); }
+.company-dialog.company-event-dialog .company-date-all-day { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
+.company-dialog.company-event-dialog label.company-all-day { min-height: 36px; height: 36px; padding: 6px 10px; border: 1px solid var(--color-slate-200); border-radius: 7px; background: var(--color-slate-50); cursor: pointer; gap: 7px; font-size: 12.5px; }
+.company-dialog.company-event-dialog .company-form-row { gap: 10px; }
+.company-dialog.company-event-dialog .company-checkbox-control { position: relative; display: inline-flex; flex: 0 0 18px; width: 18px; height: 18px; }
+.company-dialog.company-event-dialog .company-checkbox-control input { appearance: none; width: 18px; height: 18px; margin: 0; padding: 0; border: 1px solid var(--color-slate-400); border-radius: 4px; cursor: pointer; }
 .company-dialog.company-event-dialog .company-checkbox-control input:checked { background: var(--color-brand-500); border-color: var(--color-brand-500); }
 .company-dialog.company-event-dialog .company-checkbox-control input:focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 3px; }
-.company-checkbox-control > svg { position: absolute; inset: 3px; color: #fff; opacity: 0; pointer-events: none; }
-.company-checkbox-control input:checked + svg { opacity: 1; }
-.company-dialog.company-event-dialog footer { flex-shrink: 0; padding: 16px 24px; border-top: 1px solid var(--color-slate-200); }
-.company-dialog.company-event-dialog .company-error, .company-dialog.company-event-dialog .company-delete-confirm { margin: 0; padding: 12px 24px; }
+.company-dialog.company-event-dialog .company-checkbox-control > svg { position: absolute; inset: 2px; width: 14px; height: 14px; color: #fff; opacity: 0; pointer-events: none; }
+.company-dialog.company-event-dialog .company-checkbox-control input:checked + svg { opacity: 1; }
+.company-dialog.company-event-dialog .company-recurrence { gap: 10px; padding: 10px 0; }
+.company-dialog.company-event-dialog .company-repeat-interval { gap: 10px; }
+.company-dialog.company-event-dialog .company-weekdays { gap: 4px; }
+.company-dialog.company-event-dialog .company-weekdays button { min-height: 30px; height: 30px; padding: 2px; border-radius: 6px; font-size: 12px; }
+.company-dialog.company-event-dialog footer { flex-shrink: 0; padding: 10px 18px; border-top: 1px solid var(--color-slate-200); gap: 8px; }
+.company-dialog.company-event-dialog footer > button { min-height: 34px; height: 34px; padding: 0 14px; font-size: 13px; border-radius: 7px; }
+.company-dialog.company-event-dialog .company-error, .company-dialog.company-event-dialog .company-delete-confirm { margin: 0; padding: 8px 18px; font-size: 12px; }
 @media (max-width: 600px) {
   .company-dialog.company-event-dialog form { padding: 0; }
-  .company-dialog.company-event-dialog fieldset { padding: 20px 16px; }
-  .company-dialog.company-event-dialog footer { padding-inline: 16px; }
-  .company-date-all-day { gap: 12px; }
+  .company-dialog.company-event-dialog fieldset { padding: 12px 14px; gap: 8px; }
+  .company-dialog.company-event-dialog footer { padding-inline: 14px; }
+  .company-dialog.company-event-dialog .company-date-all-day { gap: 8px; }
 }
 
 .agenda-search-event.has-calendar-color span { color: inherit; }

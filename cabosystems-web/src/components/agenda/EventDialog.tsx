@@ -59,7 +59,7 @@ export function EventDialog({ event, day, canManage: allowed, onClose, onSaved }
   };
   return <div className="company-dialog-backdrop">
     <div ref={ref} className="company-dialog company-event-dialog minimal-modal" role="dialog" aria-modal="true" aria-labelledby="event-dialog-title" tabIndex={-1}>
-      <header><div className="company-event-heading"><CalendarDays size={22} aria-hidden="true" /><h2 id="event-dialog-title">{!canManage ? t('Detalle del evento') : event ? t('Editar evento') : t('Nuevo evento')}</h2></div><button type="button" className="workspace-icon" disabled={busy} onClick={onClose} aria-label={t('Cerrar')}><X size={18} /></button></header>
+      <header><div className="company-event-heading"><CalendarDays size={18} aria-hidden="true" /><h2 id="event-dialog-title">{!canManage ? t('Detalle del evento') : event ? t('Editar evento') : t('Nuevo evento')}</h2></div><button type="button" className="workspace-icon" disabled={busy} onClick={onClose} aria-label={t('Cerrar')}><X size={16} /></button></header>
       <form onSubmit={submit}>
         <div className="company-event-fields">
         <fieldset disabled={!canManage || busy}>
@@ -70,7 +70,7 @@ export function EventDialog({ event, day, canManage: allowed, onClose, onSaved }
           <div className="company-schedule-fields">
           <div className="company-date-all-day">
           <label>{t('Fecha')}<AgendaDateTimeField type="date" required min="1900-01-01" max="9999-12-31" value={input.fecha} label={t('Fecha')} locale={locale} disabled={!canManage || busy} onChange={fecha => change({ fecha })} /></label>
-          <label className="company-all-day"><span className="company-checkbox-control"><input type="checkbox" checked={allDay} onChange={(e) => { setAllDay(e.target.checked); change(e.target.checked ? { hora: '', hora_fin: '' } : { hora: '09:00', hora_fin: '10:00' }); }} /><Check size={14} strokeWidth={3} aria-hidden="true" /></span>{t('Todo el día')}</label>
+          <label className="company-all-day"><span className="company-checkbox-control"><input type="checkbox" checked={allDay} onChange={(e) => { setAllDay(e.target.checked); change(e.target.checked ? { hora: '', hora_fin: '' } : { hora: '09:00', hora_fin: '10:00' }); }} /><Check size={13} strokeWidth={3} aria-hidden="true" /></span>{t('Todo el día')}</label>
           </div>
           {!allDay && <div className="company-form-row"><label>{c.startTime}<AgendaDateTimeField type="time" required value={input.hora || ''} label={c.startTime} locale={locale} disabled={!canManage || busy} onChange={hora => change({ hora })} /></label><label>{c.endTime}<AgendaDateTimeField type="time" required value={input.hora_fin || ''} label={c.endTime} locale={locale} disabled={!canManage || busy} onChange={hora_fin => change({ hora_fin })} /></label></div>}
           {input.calendar_id && <><label>{c.endDate}<AgendaDateTimeField type="date" min={input.fecha} max="9999-12-30" value={input.fecha_fin || ''} label={c.endDate} locale={locale} disabled={!canManage || busy} onChange={fecha_fin => change({ fecha_fin })} /></label><p className="company-field-help">{c.zone}</p></>}
@@ -79,7 +79,7 @@ export function EventDialog({ event, day, canManage: allowed, onClose, onSaved }
           {!event?.google && <RecurrenceFields input={input} disabled={!canManage || busy} onChange={change} />}
           {event && event.repeticion !== 'ninguna' && <p className="company-field-help">{canManage ? t('Los cambios se aplican a toda la serie de eventos.') : t('Este evento pertenece a una serie.')}</p>}
           <label>{t('Ubicación (opcional)')}<input maxLength={240} value={input.ubicacion || ''} onChange={(e) => change({ ubicacion: e.target.value })} /></label>
-          <label>{t('Descripción')}<textarea rows={4} maxLength={5000} value={input.descripcion || ''} onChange={(e) => change({ descripcion: e.target.value })} /></label>
+          <label>{t('Descripción')}<textarea rows={2} maxLength={5000} value={input.descripcion || ''} onChange={(e) => change({ descripcion: e.target.value })} /></label>
         </fieldset>
         </div>
         {error && <p role="alert" className="company-error">{error}</p>}
