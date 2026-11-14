@@ -421,8 +421,8 @@ const styles = StyleSheet.create({
   barTint: { backgroundColor: '#FFFFFF' },
   tabLabel: {
     fontFamily: 'Outfit_600SemiBold',
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 16,
     letterSpacing: -0.2,
     includeFontPadding: false,
     textAlign: 'center',

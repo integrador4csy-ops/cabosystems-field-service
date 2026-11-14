@@ -268,8 +268,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 0,
   },
   labelCompact: {
-    fontSize: 10.5,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 16,
     letterSpacing: -0.25,
   },
   labelSpacious: {
