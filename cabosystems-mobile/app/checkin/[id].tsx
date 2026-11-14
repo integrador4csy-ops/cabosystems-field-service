@@ -1106,10 +1106,11 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   cameraWrapper: {
-    minHeight: 260,
+    minHeight: 360,
     backgroundColor: '#000000',
     marginHorizontal: 12,
-    marginVertical: 8,
+    marginTop: 8,
+    marginBottom: 10,
     borderRadius: BorderRadius.xl,
     overflow: 'hidden',
     borderWidth: 1,
@@ -1117,7 +1118,7 @@ const styles = StyleSheet.create({
   },
   cameraContainer: {
     flex: 1,
-    height: 260,
+    height: 360,
   },
   cameraOverlay: {
     ...StyleSheet.absoluteFill,
@@ -1194,7 +1195,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.textWhite,
   },
   previewContainer: {
-    height: 260,
+    height: 360,
     position: 'relative',
   },
   previewBadge: {
@@ -1244,7 +1245,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   permissionContainer: {
-    height: 260,
+    height: 360,
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.xl,
@@ -1356,7 +1357,7 @@ const styles = StyleSheet.create({
   },
   infoSection: {
     paddingHorizontal: 12,
-    gap: 8,
+    gap: 10,
   },
   gpsCard: {
     flexDirection: 'row',

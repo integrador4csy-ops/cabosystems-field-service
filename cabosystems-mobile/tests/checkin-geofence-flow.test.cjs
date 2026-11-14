@@ -32,7 +32,7 @@ test('a completed check clears captured form state and keeps the compact action 
   assert.match(screen, /resetCompletedCheck\(\);\s*setFeedbackModal/);
   assert.match(screen, /styles\.embeddedActionDock/);
   assert.match(screen, /bottomInset \+ BOTTOM_BAR_HEIGHT \+ 8/);
-  assert.match(screen, /minHeight: 260/);
+  assert.match(screen, /minHeight: 360/);
   assert.match(screen, /minHeight: 82/);
   assert.match(screen, /currentProject\.desarrollo\} · \{currentProject\.villa/);
 });
