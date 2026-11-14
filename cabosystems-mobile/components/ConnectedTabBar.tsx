@@ -263,8 +263,8 @@ const s = StyleSheet.create({
     letterSpacing: -0.25,
   },
   labelSpacious: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 14,
+    lineHeight: 18,
     letterSpacing: -0.1,
   },
   pressed: {
