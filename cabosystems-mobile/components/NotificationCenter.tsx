@@ -31,13 +31,15 @@ function relativeTime(value: string, english: boolean) {
   return english ? `${days}d ago` : `Hace ${days} d`;
 }
 
+let cachedNotificationItems: AppNotification[] = [];
+
 export function NotificationCenter() {
   const { profile } = useAuth();
   const { t, language } = useTranslation();
   const router = useRouter();
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState<AppNotification[]>([]);
+  const [items, setItems] = useState<AppNotification[]>(() => cachedNotificationItems);
   const client = supabase as any;
 
   const load = useCallback(async () => {
@@ -45,7 +47,10 @@ export function NotificationCenter() {
     setLoading(true);
     const { data, error } = await client.from('app_notifications').select('*')
       .eq('user_id', profile.id).order('created_at', { ascending: false }).limit(30);
-    if (!error) setItems(data || []);
+    if (!error && data) {
+      cachedNotificationItems = data;
+      setItems(data);
+    }
     setLoading(false);
   }, [profile?.id]);
 

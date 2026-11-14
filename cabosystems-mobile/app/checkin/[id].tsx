@@ -741,7 +741,7 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
         onConfirm={confirmGeofence}
         saving={isSubmitting}
       />
-      <View style={{ height: headerHeight }}><HeaderCaboSystems showProjectSelector={false} /></View>
+      <View style={{ height: headerHeight }}><HeaderCaboSystems seamless showProjectSelector={false} /></View>
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}

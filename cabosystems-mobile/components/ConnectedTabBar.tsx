@@ -76,7 +76,9 @@ function useMotion() {
 
 export function ConnectedTabBackground() {
   const { width: windowWidth } = useWindowDimensions();
-  const [width, setWidth] = useState(Math.max(0, windowWidth - 32));
+  const isTablet = windowWidth >= 600;
+  const initialWidth = isTablet ? 560 : Math.max(0, windowWidth - 32);
+  const [width, setWidth] = useState(initialWidth);
   const { position, tabs, visible } = useMotion();
 
   // Ancho útil disponible para las ranuras de pestañas
@@ -128,8 +130,10 @@ export function ConnectedTabIcon({
   size?: number;
 }) {
   const { position, tabs, visible } = useMotion();
+  const { width: windowWidth } = useWindowDimensions();
   const index = tabs.indexOf(tab);
-  const iconSize = size ?? (tabs.length >= 5 ? 22 : 23.5);
+  const isTablet = windowWidth >= 600;
+  const iconSize = size ?? (isTablet ? 24 : (tabs.length >= 5 ? 22 : 23.5));
 
   const darkStyle = useAnimatedStyle(() => ({
     opacity: visible ? 1 - tabCoverage(position.value, index) : 1,
@@ -162,8 +166,10 @@ export function ConnectedTabLabel({
   children: React.ReactNode;
 }) {
   const { position, tabs, visible } = useMotion();
+  const { width: windowWidth } = useWindowDimensions();
   const index = tabs.indexOf(tab);
-  const isCompact = tabs.length >= 5;
+  const isTablet = windowWidth >= 600;
+  const isCompact = !isTablet && tabs.length >= 5;
 
   const motionStyle = useAnimatedStyle(() => {
     const coverage = visible ? tabCoverage(position.value, index) : 0;
@@ -177,6 +183,10 @@ export function ConnectedTabLabel({
     };
   });
 
+  const fontStyle = isTablet
+    ? (tabs.length >= 5 ? s.labelTabletAdmin : s.labelTabletTechnician)
+    : (isCompact ? s.labelCompact : s.labelSpacious);
+
   return (
     <Animated.Text
       testID={`tab-label-${tab}`}
@@ -187,7 +197,7 @@ export function ConnectedTabLabel({
       maxFontSizeMultiplier={1.1}
       style={[
         s.label,
-        isCompact ? s.labelCompact : s.labelSpacious,
+        fontStyle,
         motionStyle,
       ]}
     >
@@ -266,6 +276,16 @@ const s = StyleSheet.create({
     fontSize: 14,
     lineHeight: 18,
     letterSpacing: -0.1,
+  },
+  labelTabletAdmin: {
+    fontSize: 13,
+    lineHeight: 17,
+    letterSpacing: -0.1,
+  },
+  labelTabletTechnician: {
+    fontSize: 14,
+    lineHeight: 18,
+    letterSpacing: 0,
   },
   pressed: {
     opacity: 0.72,

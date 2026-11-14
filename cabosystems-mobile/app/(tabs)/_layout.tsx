@@ -5,6 +5,7 @@ import {
   StyleSheet,
   View,
   Text,
+  useWindowDimensions,
 } from 'react-native';
 import {
   ClipboardList,
@@ -252,12 +253,18 @@ function PreparedTabLayout() {
     );
   }, [tabOrder]);
   const bottomInset = Math.max(insets.bottom, BOTTOM_BAR_MIN_INSET);
+  const { width: windowWidth } = useWindowDimensions();
+  const isTablet = windowWidth >= 600;
+  const maxBarWidth = isTablet ? 560 : windowWidth;
+  const horizontalMargin = isTablet
+    ? Math.max(16, Math.round((windowWidth - maxBarWidth) / 2))
+    : (isAdmin ? 12 : 16);
 
   const tabBarStyle = useMemo(
     () => ({
       position: 'absolute' as const,
-      start: isAdmin ? 12 : 16,
-      end: isAdmin ? 12 : 16,
+      start: horizontalMargin,
+      end: horizontalMargin,
       marginHorizontal: 0,
       bottom: bottomInset,
       backgroundColor: 'transparent',
@@ -266,7 +273,7 @@ function PreparedTabLayout() {
       height: BOTTOM_BAR_HEIGHT,
       paddingTop: 6,
       paddingBottom: 6,
-      paddingHorizontal: isAdmin ? 5 : 6,
+      paddingHorizontal: isAdmin && !isTablet ? 5 : 6,
       overflow: 'visible' as const,
       shadowColor: '#000000',
       shadowOffset: { width: 0, height: 6 },
@@ -274,7 +281,7 @@ function PreparedTabLayout() {
       shadowRadius: 16,
       elevation: 6,
     }),
-    [bottomInset, isAdmin]
+    [bottomInset, horizontalMargin, isAdmin, isTablet]
   );
 
   return (
@@ -316,13 +323,9 @@ function PreparedTabLayout() {
           name="fab"
           options={
             isAdmin
-              ? { href: null, lazy: true }
+              ? { href: null }
               : {
                   title: t('nav.checkins'),
-                  // El check-in abre cámara y GPS: no se precarga como el resto
-                  // de pestañas. Además, su PRELOAD no lo reconoce ningún
-                  // navegador y expo-router avisa por consola en desarrollo.
-                  lazy: true,
                   tabBarButton: props => <FloatingActionButton {...props} />,
                 }
           }
