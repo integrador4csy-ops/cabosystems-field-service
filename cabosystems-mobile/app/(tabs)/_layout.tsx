@@ -137,6 +137,7 @@ function FloatingActionButton(props: any) {
         onHoverIn={() => setIsHovered(true)}
         onHoverOut={() => setIsHovered(false)}
         onPress={() => {
+          if (focused) return;
           const targetId = selectedProject?.id || 'villa';
           const checkType = isCheckedIn ? 'check_out' : 'check_in';
           router.navigate({ pathname: '/(tabs)/fab', params: { id: targetId, type: checkType } });
@@ -255,8 +256,8 @@ function PreparedTabLayout() {
   const tabBarStyle = useMemo(
     () => ({
       position: 'absolute' as const,
-      start: 12,
-      end: 12,
+      start: isAdmin ? 12 : 16,
+      end: isAdmin ? 12 : 16,
       marginHorizontal: 0,
       bottom: bottomInset,
       backgroundColor: 'transparent',
@@ -265,7 +266,7 @@ function PreparedTabLayout() {
       height: BOTTOM_BAR_HEIGHT,
       paddingTop: 6,
       paddingBottom: 6,
-      paddingHorizontal: 6,
+      paddingHorizontal: isAdmin ? 5 : 6,
       overflow: 'visible' as const,
       shadowColor: '#000000',
       shadowOffset: { width: 0, height: 6 },
@@ -273,7 +274,7 @@ function PreparedTabLayout() {
       shadowRadius: 16,
       elevation: 6,
     }),
-    [bottomInset]
+    [bottomInset, isAdmin]
   );
 
   return (

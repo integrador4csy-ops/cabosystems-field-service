@@ -121,7 +121,7 @@ export function ConnectedTabBackground() {
 export function ConnectedTabIcon({
   tab,
   Icon,
-  size = 22,
+  size,
 }: {
   tab: string;
   Icon: React.ComponentType<{ size: number; color: string; strokeWidth?: number }>;
@@ -129,6 +129,7 @@ export function ConnectedTabIcon({
 }) {
   const { position, tabs, visible } = useMotion();
   const index = tabs.indexOf(tab);
+  const iconSize = size ?? (tabs.length >= 5 ? 22 : 23.5);
 
   const darkStyle = useAnimatedStyle(() => ({
     opacity: visible ? 1 - tabCoverage(position.value, index) : 1,
@@ -140,14 +141,14 @@ export function ConnectedTabIcon({
   return (
     <View style={s.icon}>
       <Animated.View style={darkStyle}>
-        <Icon size={size} color={INK} strokeWidth={2.1} />
+        <Icon size={iconSize} color={INK} strokeWidth={2.1} />
       </Animated.View>
       <Animated.View
         testID={`tab-icon-light-${tab}`}
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, s.icon, lightStyle]}
       >
-        <Icon size={size} color="#FFFFFF" strokeWidth={2.1} />
+        <Icon size={iconSize} color="#FFFFFF" strokeWidth={2.1} />
       </Animated.View>
     </View>
   );
@@ -162,6 +163,7 @@ export function ConnectedTabLabel({
 }) {
   const { position, tabs, visible } = useMotion();
   const index = tabs.indexOf(tab);
+  const isCompact = tabs.length >= 5;
 
   const motionStyle = useAnimatedStyle(() => {
     const coverage = visible ? tabCoverage(position.value, index) : 0;
@@ -183,7 +185,11 @@ export function ConnectedTabLabel({
       minimumFontScale={0.8}
       allowFontScaling={false}
       maxFontSizeMultiplier={1.1}
-      style={[s.label, motionStyle]}
+      style={[
+        s.label,
+        isCompact ? s.labelCompact : s.labelSpacious,
+        motionStyle,
+      ]}
     >
       {children}
     </Animated.Text>
@@ -246,13 +252,20 @@ const s = StyleSheet.create({
   },
   label: {
     fontFamily: 'Outfit_600SemiBold',
-    fontSize: 11,
-    lineHeight: 15,
-    letterSpacing: -0.2,
     includeFontPadding: false,
     textAlign: 'center',
     marginTop: 2,
     paddingHorizontal: 0,
+  },
+  labelCompact: {
+    fontSize: 10.5,
+    lineHeight: 14,
+    letterSpacing: -0.25,
+  },
+  labelSpacious: {
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: -0.1,
   },
   pressed: {
     opacity: 0.72,

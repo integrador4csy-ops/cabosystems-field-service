@@ -56,6 +56,7 @@ import type { Project } from '@/types/database';
 import { HeaderCaboSystems, useHeaderHeight } from '@/components/HeaderCaboSystems';
 import { VillaGeofenceRegistrationModal, type GeofenceDraft } from '@/components/VillaGeofenceRegistrationModal';
 import { DEFAULT_VILLA_GEOFENCE_RADIUS_METERS, hasVillaCoordinates } from '@/lib/villaGeofence';
+import { afterTabPaint } from '@/lib/tabPreparation';
 
 function checkNativeModule(moduleName: string): boolean {
   if (Platform.OS === 'web') return false;
@@ -254,15 +255,7 @@ function NativeCameraViewInner({
     }
   };
 
-  if (!permission) {
-    return (
-      <View style={styles.permissionContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
-  }
-
-  if (!permission.granted) {
+  if (permission && !permission.granted) {
     return (
       <View style={styles.permissionContainer}>
         <CameraIcon size={48} color={Colors.primary} />
@@ -280,12 +273,14 @@ function NativeCameraViewInner({
 
   return (
     <View style={[styles.cameraContainer, fullscreen && styles.fullscreenCamera]}>
-      <CameraView
-        ref={cameraRef}
-        style={StyleSheet.absoluteFill}
-        facing={facing}
-        enableTorch={flash === 'on'}
-      />
+      {permission?.granted ? (
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          facing={facing}
+          enableTorch={flash === 'on'}
+        />
+      ) : null}
       <View style={styles.cameraOverlay} pointerEvents="none">
         <View style={[styles.corner, styles.topLeft]} />
         <View style={[styles.corner, styles.topRight]} />
@@ -305,6 +300,7 @@ function NativeCameraViewInner({
         <Pressable
           style={({ pressed }) => [styles.captureButton, pressed && { opacity: 0.8 }]}
           onPress={handleCapture}
+          disabled={permission && !permission.granted}
         >
           <View style={styles.captureButtonInner} />
         </Pressable>
@@ -318,67 +314,43 @@ function NativeCameraViewInner({
   );
 }
 
+let cachedCameraModule: { CameraView: any; useCameraPermissions: any } | null | undefined = undefined;
+
+function getCameraModule() {
+  if (cachedCameraModule !== undefined) return cachedCameraModule;
+  if (!checkNativeModule('ExpoCamera')) {
+    cachedCameraModule = null;
+    return null;
+  }
+  try {
+    const mod = require('expo-camera');
+    if (mod && mod.CameraView && mod.useCameraPermissions) {
+      cachedCameraModule = {
+        CameraView: mod.CameraView,
+        useCameraPermissions: mod.useCameraPermissions,
+      };
+      return cachedCameraModule;
+    }
+  } catch {
+    // fallback
+  }
+  cachedCameraModule = null;
+  return null;
+}
+
 function CameraSection({ onCapture, flash, onToggleFlash, fullscreen, onExpand }: CameraSectionProps) {
-  const [CameraView, setCameraView] = useState<any>(null);
-  const [useCameraPermissions, setUseCameraPermissions] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [hasNativeCamera, setHasNativeCamera] = useState(false);
   const cameraRef = useRef<any>(null);
   const [facing, setFacing] = useState<'back' | 'front'>('back');
+  const camMod = getCameraModule();
 
-  useEffect(() => {
-    let mounted = true;
-    const isAvailable = checkNativeModule('ExpoCamera');
-
-    if (!isAvailable) {
-      setHasNativeCamera(false);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const mod = require('expo-camera');
-      if (mod && mod.CameraView && mod.useCameraPermissions) {
-        if (mounted) {
-          setCameraView(() => mod.CameraView);
-          setUseCameraPermissions(() => mod.useCameraPermissions);
-          setHasNativeCamera(true);
-          setLoading(false);
-        }
-      } else {
-        if (mounted) {
-          setHasNativeCamera(false);
-          setLoading(false);
-        }
-      }
-    } catch {
-      if (mounted) {
-        setHasNativeCamera(false);
-        setLoading(false);
-      }
-    }
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  if (loading) {
-    return (
-      <View style={styles.permissionContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
-  }
-
-  if (!hasNativeCamera || !CameraView || !useCameraPermissions) {
+  if (!camMod) {
     return <FallbackCameraSection onCapture={onCapture} />;
   }
 
   return (
     <NativeCameraViewInner
-      CameraView={CameraView}
-      useCameraPermissions={useCameraPermissions}
+      CameraView={camMod.CameraView}
+      useCameraPermissions={camMod.useCameraPermissions}
       onCapture={onCapture}
       flash={flash}
       facing={facing}
@@ -401,7 +373,7 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
   };
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
-  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraActive, setCameraActive] = useState(true);
   const manualVillaRef = useRef<{ key: string; projectId: string } | null>(null);
   useFocusEffect(useCallback(() => {
     setCameraActive(true);
@@ -412,8 +384,8 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
 
   const [isCheckOut, setIsCheckOut] = useState<boolean>(type === 'check_out');
   const { projects, selectedProject, setSelectedProject } = useProjects();
-  const [currentProject, setCurrentProject] = useState<Project | null>(null);
-  const [projectLoading, setProjectLoading] = useState(true);
+  const [currentProject, setCurrentProject] = useState<Project | null>(() => selectedProject || projects[0] || null);
+  const [projectLoading, setProjectLoading] = useState(false);
   const [showVillaModal, setShowVillaModal] = useState(false);
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -462,15 +434,15 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
     let mounted = true;
     async function determineTypeAndVilla() {
       if (!cameraActive || !user?.id) return;
-      setProjectLoading(true);
+      if (!selectedProject && !currentProject) setProjectLoading(true);
       try {
         // 1. Detectar si la siguiente acción es salida o llegada
         if (type) {
           setIsCheckOut(type === 'check_out');
         } else {
           const latest = await getLatestFieldRecord(user.id);
-          if (mounted) {
-            setIsCheckOut(latest?.tipo === 'check_in');
+          if (mounted && latest) {
+            setIsCheckOut(latest.tipo === 'check_in');
           }
         }
 
@@ -521,7 +493,7 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
     return () => {
       mounted = false;
     };
-  }, [id, type, user?.id, projects, selectedProject, setSelectedProject, cameraActive, villaSelectionKey]);
+  }, [id, type, user?.id, projects, selectedProject?.id, setSelectedProject, cameraActive, villaSelectionKey]);
 
   const groupedVillas = useMemo(() => {
     const map = new Map<string, Project[]>();
@@ -534,7 +506,8 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
   }, [projects]);
 
   const fetchLocation = useCallback(async () => {
-    setLocationLoading(true); setLocationError(null); setLocationCoords(null);
+    setLocationLoading(true);
+    setLocationError(null);
     try {
       if (Platform.OS === 'web') {
         if (!navigator.geolocation) throw new Error('GPS no disponible en este navegador.');
@@ -547,8 +520,12 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
         const Location = require('expo-location') as typeof import('expo-location');
         const permission = await Location.requestForegroundPermissionsAsync();
         if (permission.status !== 'granted') throw new Error(tr("Permiso de GPS no concedido."));
-        const recent = await Location.getLastKnownPositionAsync({ maxAge: 60000, requiredAccuracy: 100 });
-        const position = recent || await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        const recent = await Location.getLastKnownPositionAsync({ maxAge: 120000, requiredAccuracy: 150 });
+        if (recent && Number.isFinite(recent.coords.latitude) && Number.isFinite(recent.coords.longitude)) {
+          locationTimestamp.current = recent.timestamp;
+          setLocationCoords(recent.coords);
+        }
+        const position = recent || await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         if (!Number.isFinite(position.coords.latitude) || !Number.isFinite(position.coords.longitude)) throw new Error(tr("No se pudo obtener una ubicación válida."));
         locationTimestamp.current = position.timestamp;
         setLocationCoords(position.coords);
@@ -561,7 +538,10 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
   }, [tr]);
 
   useEffect(() => {
-    if (cameraActive) void fetchLocation();
+    if (!cameraActive) return;
+    return afterTabPaint(() => {
+      void fetchLocation();
+    });
   }, [fetchLocation, cameraActive]);
 
   const handleCapturePhoto = (uri: string) => {
