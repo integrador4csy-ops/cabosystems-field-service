@@ -373,7 +373,7 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
   };
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
-  const [cameraActive, setCameraActive] = useState(true);
+  const [cameraActive, setCameraActive] = useState(false);
   const manualVillaRef = useRef<{ key: string; projectId: string } | null>(null);
   useFocusEffect(useCallback(() => {
     setCameraActive(true);

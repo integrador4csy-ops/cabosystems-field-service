@@ -20,6 +20,8 @@ type Motion = {
   position: SharedValue<number>;
   tabs: readonly string[];
   visible: boolean;
+  isTablet: boolean;
+  windowWidth: number;
 };
 
 const Context = createContext<Motion | null>(null);
@@ -41,6 +43,8 @@ export function ConnectedTabBarProvider({
 }) {
   const index = tabs.indexOf(activeTab);
   const position = useSharedValue(Math.max(0, index));
+  const { width: windowWidth } = useWindowDimensions();
+  const isTablet = windowWidth >= 600;
 
   useLayoutEffect(() => {
     if (index < 0) return;
@@ -62,8 +66,8 @@ export function ConnectedTabBarProvider({
   }, [index, position]);
 
   const value = useMemo(
-    () => ({ position, tabs, visible: index >= 0 }),
-    [position, tabs, index]
+    () => ({ position, tabs, visible: index >= 0, isTablet, windowWidth }),
+    [position, tabs, index, isTablet, windowWidth]
   );
   return <Context value={value}>{children}</Context>;
 }
@@ -75,11 +79,9 @@ function useMotion() {
 }
 
 export function ConnectedTabBackground() {
-  const { width: windowWidth } = useWindowDimensions();
-  const isTablet = windowWidth >= 600;
+  const { position, tabs, visible, isTablet, windowWidth } = useMotion();
   const initialWidth = isTablet ? 560 : Math.max(0, windowWidth - 32);
   const [width, setWidth] = useState(initialWidth);
-  const { position, tabs, visible } = useMotion();
 
   // Ancho útil disponible para las ranuras de pestañas
   const slot = tabs.length > 0 ? Math.max(0, width - BAR_PADDING * 2) / tabs.length : 0;
@@ -129,10 +131,8 @@ export function ConnectedTabIcon({
   Icon: React.ComponentType<{ size: number; color: string; strokeWidth?: number }>;
   size?: number;
 }) {
-  const { position, tabs, visible } = useMotion();
-  const { width: windowWidth } = useWindowDimensions();
+  const { position, tabs, visible, isTablet } = useMotion();
   const index = tabs.indexOf(tab);
-  const isTablet = windowWidth >= 600;
   const iconSize = size ?? (isTablet ? 24 : (tabs.length >= 5 ? 22 : 23.5));
 
   const darkStyle = useAnimatedStyle(() => ({
@@ -165,10 +165,8 @@ export function ConnectedTabLabel({
   tab: string;
   children: React.ReactNode;
 }) {
-  const { position, tabs, visible } = useMotion();
-  const { width: windowWidth } = useWindowDimensions();
+  const { position, tabs, visible, isTablet } = useMotion();
   const index = tabs.indexOf(tab);
-  const isTablet = windowWidth >= 600;
   const isCompact = !isTablet && tabs.length >= 5;
 
   const motionStyle = useAnimatedStyle(() => {

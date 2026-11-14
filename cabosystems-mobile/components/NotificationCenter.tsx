@@ -32,6 +32,65 @@ function relativeTime(value: string, english: boolean) {
 }
 
 let cachedNotificationItems: AppNotification[] = [];
+type NotificationListener = (items: AppNotification[]) => void;
+const notificationListeners = new Set<NotificationListener>();
+let activeUserId: string | null = null;
+let activeChannel: any = null;
+let isFetching = false;
+
+async function fetchNotifications(userId: string) {
+  if (!userId || isFetching) return;
+  isFetching = true;
+  try {
+    const { data, error } = await (supabase as any)
+      .from('app_notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(30);
+    if (!error && data) {
+      cachedNotificationItems = data;
+      for (const listener of notificationListeners) {
+        listener(data);
+      }
+    }
+  } catch (e) {
+    console.warn('Error fetching notifications:', e);
+  } finally {
+    isFetching = false;
+  }
+}
+
+function subscribeToNotifications(userId: string, listener: NotificationListener) {
+  notificationListeners.add(listener);
+  if (cachedNotificationItems.length > 0) {
+    listener(cachedNotificationItems);
+  }
+
+  if (activeUserId !== userId) {
+    if (activeChannel) {
+      void (supabase as any).removeChannel(activeChannel);
+      activeChannel = null;
+    }
+    activeUserId = userId;
+    void fetchNotifications(userId);
+    activeChannel = (supabase as any)
+      .channel(`mobile-notifications-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_notifications', filter: `user_id=eq.${userId}` }, () => {
+        void fetchNotifications(userId);
+      })
+      .subscribe();
+  }
+
+  return () => {
+    notificationListeners.delete(listener);
+    if (notificationListeners.size === 0 && activeChannel) {
+      void (supabase as any).removeChannel(activeChannel);
+      activeChannel = null;
+      activeUserId = null;
+    }
+  };
+}
 
 export function NotificationCenter() {
   const { profile } = useAuth();
@@ -42,47 +101,35 @@ export function NotificationCenter() {
   const [items, setItems] = useState<AppNotification[]>(() => cachedNotificationItems);
   const client = supabase as any;
 
-  const load = useCallback(async () => {
-    if (!profile?.id) return;
-    setLoading(true);
-    const { data, error } = await client.from('app_notifications').select('*')
-      .eq('user_id', profile.id).order('created_at', { ascending: false }).limit(30);
-    if (!error && data) {
-      cachedNotificationItems = data;
-      setItems(data);
-    }
-    setLoading(false);
-  }, [profile?.id]);
-
   useEffect(() => {
     if (!profile?.id) return;
-    void load();
-    const channel = client.channel(`mobile-notifications-${profile.id}-${++notificationChannelSequence}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_notifications', filter: `user_id=eq.${profile.id}` }, load)
-      .subscribe();
-    return () => { void client.removeChannel(channel); };
-  }, [profile?.id, load]);
+    return subscribeToNotifications(profile.id, setItems);
+  }, [profile?.id]);
 
   const unread = useMemo(() => items.filter((item) => !item.read_at).length, [items]);
 
   const markAllRead = useCallback(async () => {
     if (!profile?.id || unread === 0) return;
     const readAt = new Date().toISOString();
-    setItems((current) => current.map((item) => item.read_at ? item : { ...item, read_at: readAt }));
+    const updated = cachedNotificationItems.map((item) => item.read_at ? item : { ...item, read_at: readAt });
+    cachedNotificationItems = updated;
+    for (const listener of notificationListeners) listener(updated);
     await client.from('app_notifications').update({ read_at: readAt }).eq('user_id', profile.id).is('read_at', null);
-  }, [profile?.id, unread]);
+  }, [profile?.id, unread, client]);
 
   const openItem = useCallback(async (item: AppNotification) => {
     setVisible(false);
     if (!item.read_at) {
       const readAt = new Date().toISOString();
-      setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, read_at: readAt } : entry));
+      const updated = cachedNotificationItems.map((entry) => entry.id === item.id ? { ...entry, read_at: readAt } : entry);
+      cachedNotificationItems = updated;
+      for (const listener of notificationListeners) listener(updated);
       void client.from('app_notifications').update({ read_at: readAt }).eq('id', item.id);
     }
     if (item.target === 'checks') router.push('/(tabs)/checks' as any);
     else if (item.target === 'chat') router.push('/(tabs)/chat' as any);
     else router.push('/(tabs)' as any);
-  }, [router]);
+  }, [router, client]);
 
   return <>
     <Pressable accessibilityRole="button" accessibilityLabel={t('Notificaciones')} accessibilityState={{ expanded: visible }}

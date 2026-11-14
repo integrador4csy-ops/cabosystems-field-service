@@ -71,17 +71,16 @@ export function restoreChatRooms(userId: string): Promise<void> {
     const stored = await chatDatabase.listRooms(userId);
     if (ticket !== generation) return;
     for (const entry of stored) {
-      const messages = await chatDatabase.messages(userId, entry.group.id, undefined, 50).catch(() => []);
       if (ticket !== generation) return;
       const existing = rooms.get(entry.group.id);
       rooms.set(entry.group.id, {
         snapshot: {
           group: entry.group,
           pins: entry.pins,
-          messages: existing?.loaded && existing.snapshot.messages.length > 0 ? existing.snapshot.messages : messages,
+          messages: existing?.loaded ? existing.snapshot.messages : [],
         },
         savedAt: entry.savedAt,
-        loaded: true,
+        loaded: existing?.loaded ?? false,
       });
     }
   })().catch(() => { if (ticket === generation) restoration = null; reportStorageError(); });
