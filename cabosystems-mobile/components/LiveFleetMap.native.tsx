@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image as RNImage, Pressable, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, type LatLng } from 'react-native-maps';
-import { Image } from 'expo-image';
 import { Battery, MapPinned, Navigation, X, Zap } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BOTTOM_BAR_HEIGHT, BOTTOM_BAR_MIN_INSET } from '@/constants/NavigationLayout';
@@ -78,9 +77,9 @@ export function LiveFleetMap({ workers, loading, error, onRefresh, overlayTop = 
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
   const centered = useRef(false);
-  const markerTrackingSettled = useRef(false);
   const [mapReady, setMapReady] = useState(false);
   const [trackMarkerViews, setTrackMarkerViews] = useState(true);
+  const [failedAvatars, setFailedAvatars] = useState<Record<string, boolean>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = useMemo(() => workers.find(worker => worker.profile.id === selectedId) || null, [selectedId, workers]);
   const online = workers.filter(worker => !worker.isOffline).length;
@@ -115,13 +114,13 @@ export function LiveFleetMap({ workers, loading, error, onRefresh, overlayTop = 
   }, [selectedId, workers]);
 
   useEffect(() => {
-    if (!workers.length || markerTrackingSettled.current) return;
+    if (!workers.length) return;
+    setTrackMarkerViews(true);
     const timer = setTimeout(() => {
-      markerTrackingSettled.current = true;
       setTrackMarkerViews(false);
-    }, 1_500);
+    }, 3_000);
     return () => clearTimeout(timer);
-  }, [workers.length]);
+  }, [workers]);
 
   return <View style={styles.container}>
     <MapView
@@ -143,6 +142,7 @@ export function LiveFleetMap({ workers, loading, error, onRefresh, overlayTop = 
         const avatarUrl = worker.profile.avatar_url;
         const workerInitials = initials(worker.profile.nombre);
         const hasBattery = worker.location.bateria != null;
+        const hasAvatar = !!avatarUrl && !failedAvatars[worker.profile.id];
 
         return <Marker
           key={worker.profile.id}
@@ -164,8 +164,16 @@ export function LiveFleetMap({ workers, loading, error, onRefresh, overlayTop = 
           <View style={styles.markerContainer}>
             <View style={[styles.markerHalo, active && styles.markerHaloActive]}>
               <View style={[styles.marker, worker.isOffline && styles.markerOffline]}>
-                {avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} style={styles.markerImage} contentFit="cover" />
+                {hasAvatar ? (
+                  <RNImage
+                    source={{ uri: avatarUrl }}
+                    style={styles.markerImage}
+                    resizeMode="cover"
+                    fadeDuration={0}
+                    onError={() => {
+                      setFailedAvatars(prev => ({ ...prev, [worker.profile.id]: true }));
+                    }}
+                  />
                 ) : (
                   <Text style={styles.markerText}>{workerInitials}</Text>
                 )}
@@ -248,7 +256,7 @@ export function LiveFleetMap({ workers, loading, error, onRefresh, overlayTop = 
           <View style={styles.cardHeader}>
             <View style={styles.cardAvatarWrapper}>
               {avatarUrl ? (
-                <Image source={{ uri: avatarUrl }} style={styles.cardAvatarImage} contentFit="cover" />
+                <RNImage source={{ uri: avatarUrl }} style={styles.cardAvatarImage} resizeMode="cover" />
               ) : (
                 <Text style={styles.cardAvatarInitials}>{initialsText}</Text>
               )}
@@ -332,7 +340,7 @@ const styles = StyleSheet.create({
   markerHaloActive: { width: 54, height: 54, borderRadius: 27, borderColor: Colors.primary },
   marker: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: Colors.primary, overflow: 'hidden' },
   markerOffline: { backgroundColor: '#667085' },
-  markerImage: { width: '100%', height: '100%' },
+  markerImage: { width: 38, height: 38, borderRadius: 19 },
   markerText: { fontFamily: 'Outfit_700Bold', fontSize: 11, color: '#FFFFFF' },
   statusDot: { position: 'absolute', right: 1, bottom: 2, width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: '#FFFFFF' },
   markerBatteryPill: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.96)', borderWidth: 1, borderColor: '#fed7aa', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.12, shadowRadius: 2, elevation: 2 },
@@ -396,8 +404,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   cardAvatarImage: {
-    width: '100%',
-    height: '100%',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
   },
   cardAvatarInitials: {
     fontFamily: 'Outfit_700Bold',

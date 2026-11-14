@@ -75,7 +75,7 @@ export const TrackingSurface = React.memo(function TrackingSurface() {
 
   return <View style={styles.screen}>
     <View style={styles.panel}>
-      <FleetMapPanel query={query} overlayTop={contentTop + 6} />
+      {view === 'map' ? <FleetMapPanel query={query} overlayTop={contentTop + 6} /> : null}
       {view === 'checks' ? <View style={[styles.contentPanel, { paddingTop: contentTop + 10 }]}><ChecksHistoryContent embedded searchQuery={query} /></View> : null}
       {view === 'history' ? <View style={[styles.mapWrapper, styles.overlayPanel]}><MobileRouteHistory searchQuery={query} overlayTop={contentTop + 6} /></View> : null}
     </View>
@@ -106,22 +106,6 @@ export const TrackingSurface = React.memo(function TrackingSurface() {
  * la escena enfocada queda por encima de las inactivas y el fantasma desaparece.
  */
 export default function TrackingTab() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    const start = () => { if (!cancelled) setMounted(true); };
-    // La superficie nativa de Google Maps es costosa: se prepara cuando el
-    // hilo JS queda libre para no competir con el primer render de la app.
-    if (typeof requestIdleCallback === 'function') {
-      const handle = requestIdleCallback(start, { timeout: 2500 });
-      return () => { cancelled = true; cancelIdleCallback(handle); };
-    }
-    const timer = setTimeout(start, 1200);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, []);
-
-  if (!mounted) return <View style={styles.screen} />;
   return <TrackingSurface />;
 }
 

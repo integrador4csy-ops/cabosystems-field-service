@@ -230,8 +230,8 @@ function PreparedTabLayout() {
       stopSync = startChatBackgroundSync(owner);
     };
     const handle = typeof requestIdleCallback === 'function'
-      ? requestIdleCallback(start, { timeout: 3000 })
-      : setTimeout(start, 600);
+      ? requestIdleCallback(start, { timeout: 4000 })
+      : setTimeout(start, 2500);
     return () => {
       cancelled = true;
       if (typeof requestIdleCallback === 'function') cancelIdleCallback(handle as any);
@@ -337,6 +337,7 @@ function PreparedTabLayout() {
             title: t('nav.chat'),
             tabBarIcon: ChatIcon,
             tabBarLabel: ChatLabel,
+            lazy: true,
           }}
         />
         <Tabs.Screen
@@ -346,6 +347,7 @@ function PreparedTabLayout() {
             tabBarIcon: MapsIcon,
             tabBarLabel: MapsLabel,
             href: isAdmin ? undefined : null,
+            lazy: true,
           }}
         />
         <Tabs.Screen
@@ -355,6 +357,7 @@ function PreparedTabLayout() {
             tabBarIcon: UsersIcon,
             tabBarLabel: UsersLabel,
             href: isAdmin ? undefined : null,
+            lazy: true,
           }}
         />
         <Tabs.Screen
@@ -376,6 +379,7 @@ function PreparedTabLayout() {
             title: t('nav.schedule'),
             tabBarIcon: ScheduleIcon,
             tabBarLabel: ScheduleLabel,
+            lazy: true,
           }}
         />
       </Tabs>
