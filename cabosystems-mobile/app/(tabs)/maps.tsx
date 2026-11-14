@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, TextInput, View } from 'react-native';
 import { ClipboardCheck, MapPinned, Route, Search } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { usePathname } from 'expo-router';
 import { ChecksHistoryContent } from './checks';
 import { LiveFleetMap } from '@/components/LiveFleetMap';
 import { MobileRouteHistory } from '@/components/MobileRouteHistory';
@@ -15,7 +16,7 @@ import { EqualSegmentedTabs } from '@/components/EqualSegmentedTabs';
 
 type TrackingView = 'map' | 'checks' | 'history';
 
-const FleetMapPanel = React.memo(function FleetMapPanel({ query, overlayTop }: { query: string; overlayTop: number }) {
+const FleetMapPanel = React.memo(function FleetMapPanel({ query, overlayTop, active = true }: { query: string; overlayTop: number; active?: boolean }) {
   const [workers, setWorkers] = useState<FleetMapWorker[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -36,7 +37,9 @@ const FleetMapPanel = React.memo(function FleetMapPanel({ query, overlayTop }: {
   }, []);
 
   useEffect(() => {
+    if (!active) return;
     setLoading(true);
+    void load();
     const stopPolling = startForegroundPolling(load, 15_000);
     const channelName = `mobile-radar-ubicaciones-en-vivo-${Date.now()}-${requestGeneration.current}`;
     const channel = supabase.channel(channelName)
@@ -46,7 +49,7 @@ const FleetMapPanel = React.memo(function FleetMapPanel({ query, overlayTop }: {
       stopPolling();
       void supabase.removeChannel(channel);
     };
-  }, [load]);
+  }, [load, active]);
 
   const visibleWorkers = useMemo(() => {
     const value = query.trim().toLocaleLowerCase();
@@ -63,6 +66,8 @@ const FleetMapPanel = React.memo(function FleetMapPanel({ query, overlayTop }: {
 export const TrackingSurface = React.memo(function TrackingSurface() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const pathname = usePathname();
+  const isMapsActive = pathname.includes('maps');
   const [view, setView] = useState<TrackingView>('map');
   const [query, setQuery] = useState('');
   const contentTop = insets.top + 118;
@@ -75,7 +80,7 @@ export const TrackingSurface = React.memo(function TrackingSurface() {
 
   return <View style={styles.screen}>
     <View style={styles.panel}>
-      {view === 'map' ? <FleetMapPanel query={query} overlayTop={contentTop + 6} /> : null}
+      {view === 'map' ? <FleetMapPanel query={query} overlayTop={contentTop + 6} active={isMapsActive} /> : null}
       {view === 'checks' ? <View style={[styles.contentPanel, { paddingTop: contentTop + 10 }]}><ChecksHistoryContent embedded searchQuery={query} /></View> : null}
       {view === 'history' ? <View style={[styles.mapWrapper, styles.overlayPanel]}><MobileRouteHistory searchQuery={query} overlayTop={contentTop + 6} /></View> : null}
     </View>

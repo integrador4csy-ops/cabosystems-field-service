@@ -337,7 +337,6 @@ function PreparedTabLayout() {
             title: t('nav.chat'),
             tabBarIcon: ChatIcon,
             tabBarLabel: ChatLabel,
-            lazy: true,
           }}
         />
         <Tabs.Screen
@@ -347,7 +346,6 @@ function PreparedTabLayout() {
             tabBarIcon: MapsIcon,
             tabBarLabel: MapsLabel,
             href: isAdmin ? undefined : null,
-            lazy: true,
           }}
         />
         <Tabs.Screen
@@ -357,7 +355,6 @@ function PreparedTabLayout() {
             tabBarIcon: UsersIcon,
             tabBarLabel: UsersLabel,
             href: isAdmin ? undefined : null,
-            lazy: true,
           }}
         />
         <Tabs.Screen
@@ -379,7 +376,6 @@ function PreparedTabLayout() {
             title: t('nav.schedule'),
             tabBarIcon: ScheduleIcon,
             tabBarLabel: ScheduleLabel,
-            lazy: true,
           }}
         />
       </Tabs>
