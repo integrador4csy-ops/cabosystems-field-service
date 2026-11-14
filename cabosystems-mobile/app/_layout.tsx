@@ -172,13 +172,15 @@ function RootLayoutNav() {
         screenOptions={{
           headerShown: false,
           freezeOnBlur: false,
+          detachInactiveScreens: false,
           animation: 'slide_from_right',
           animationDuration: 220,
           gestureEnabled: true,
+          contentStyle: { backgroundColor: '#FFFFFF' },
         }}
       >
         <Stack.Screen name="(auth)" options={{ headerShown: false, animation: 'fade' }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'fade' }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="pending" options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="task/[id]" options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }} />
         <Stack.Screen name="checkin/[id]" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />

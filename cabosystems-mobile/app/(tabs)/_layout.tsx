@@ -67,7 +67,9 @@ const renderTabBarLabel = ({ color, children, focused }: any) => (
   <Text
     numberOfLines={1}
     adjustsFontSizeToFit
-    minimumFontScale={0.85}
+    minimumFontScale={0.7}
+    allowFontScaling={false}
+    maxFontSizeMultiplier={1.0}
     style={[styles.tabLabel, { color }, focused && styles.tabLabelActive]}
   >
     {children}
@@ -253,8 +255,8 @@ function PreparedTabLayout() {
   const tabBarStyle = useMemo(
     () => ({
       position: 'absolute' as const,
-      start: 16,
-      end: 16,
+      start: 12,
+      end: 12,
       marginHorizontal: 0,
       bottom: bottomInset,
       backgroundColor: 'transparent',
@@ -415,9 +417,9 @@ const styles = StyleSheet.create({
   barTint: { backgroundColor: '#FFFFFF' },
   tabLabel: {
     fontFamily: 'Outfit_600SemiBold',
-    fontSize: 10,
-    lineHeight: 14,
-    letterSpacing: -0.2,
+    fontSize: 9.5,
+    lineHeight: 13,
+    letterSpacing: -0.35,
     includeFontPadding: false,
     textAlign: 'center',
     alignSelf: 'stretch',
