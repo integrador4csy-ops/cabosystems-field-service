@@ -34,7 +34,7 @@ export const unstable_settings = {
 function RootLayoutNav() {
   const { session, profile, loading } = useAuth();
   const agendaOwner = profile?.activo && profile.id === session?.user.id ? profile.id : '';
-  useEffect(() => agendaOwner ? startAgendaWindow(agendaOwner, false) : undefined, [agendaOwner]);
+  useEffect(() => agendaOwner ? startAgendaWindow(agendaOwner, true) : undefined, [agendaOwner]);
   useEffect(() => session?.user.id ? startFieldSync(session.user.id) : undefined, [session?.user.id]);
   const segments = useSegments();
   const router = useRouter();

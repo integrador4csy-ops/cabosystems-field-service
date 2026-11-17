@@ -516,6 +516,7 @@ export default function DashboardScreen() {
         data={displayedTasks}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
+        estimatedItemSize={104}
         contentContainerStyle={listContentStyle}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={ListEmpty}

@@ -43,6 +43,7 @@ import {
   Send,
 } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, Shadow, Animation } from '@/constants/Theme';
+import { afterTabPaint } from '@/lib/tabPreparation';
 import { useAuth } from '@/lib/auth';
 import { HeaderCaboSystems, useHeaderHeight } from '@/components/HeaderCaboSystems';
 import { supabase } from '@/lib/supabase';
@@ -260,9 +261,11 @@ export default function UsersScreen() {
   useEffect(() => {
     const isStale = cachedUsersData?.owner !== profile?.id || Date.now() - lastFetchRef.current > 30000;
     if (isStale) {
-      fetchData(Boolean(cachedUsersData));
+      return afterTabPaint(() => {
+        void fetchData(Boolean(cachedUsersData));
+      });
     }
-  }, [fetchData]);
+  }, [fetchData, profile?.id]);
 
   // Filtramos solo colaboradores activos
   const activeCollaborators = useMemo(() => users.filter((u) => u.activo !== false), [users]);
@@ -630,6 +633,7 @@ export default function UsersScreen() {
         style={styles.scrollView}
         contentContainerStyle={listContentStyle}
         data={teamRows}
+        estimatedItemSize={76}
         keyExtractor={row => row.kind + '-' + row.item.id}
         getItemType={row => row.kind}
         renderItem={renderTeamRow}

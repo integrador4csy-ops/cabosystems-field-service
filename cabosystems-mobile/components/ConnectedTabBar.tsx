@@ -51,12 +51,12 @@ export function ConnectedTabBarProvider({
     if (typeof cancelAnimation === 'function') {
       cancelAnimation(position);
     }
-    // Transición estándar Material 3 (~150ms): movimiento directo, sobredumping sin rebotes
-    // y velocidad limpia para responder al instante a toques rápidos.
+    // Transición estándar Material 3 (~120ms): movimiento directo ultra-fluido, sobredumping sin rebotes
+    // y respuesta táctil instantánea a toques rápidos entre pestañas.
     position.value = withSpring(index, {
-      damping: 26,
-      stiffness: 300,
-      mass: 0.3,
+      damping: 28,
+      stiffness: 340,
+      mass: 0.25,
       velocity: 0,
       overshootClamping: true,
       restDisplacementThreshold: 0.005,

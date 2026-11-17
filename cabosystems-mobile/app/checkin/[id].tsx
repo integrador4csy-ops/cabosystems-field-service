@@ -714,17 +714,32 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
 
   const submitText = isCheckOut ? tr("Registrar Check-out") : tr("Registrar Check-in");
   const bottomInset = Math.max(insets.bottom, BOTTOM_BAR_MIN_INSET);
-  const submitControl = <Pressable
-    style={({ pressed }) => [
-      styles.submitButton,
-      (!photoUri || !locationCoords || isSubmitting || !currentProject) && styles.submitDisabled,
-      pressed && { opacity: 0.9 },
-    ]}
-    onPress={handleSubmit}
-    disabled={!photoUri || !locationCoords || isSubmitting || !currentProject}
-  >
-    {isSubmitting ? <><ActivityIndicator size="small" color={Colors.textWhite} /><Text style={styles.submitButtonText}>{tr("Guardando registro...")}</Text></> : <><Send size={18} color={Colors.textWhite} /><Text style={styles.submitButtonText}>{submitText}</Text></>}
-  </Pressable>;
+  const isReadyToSubmit = Boolean(photoUri && locationCoords && currentProject);
+  const showSubmit = isReadyToSubmit || isSubmitting;
+
+  const submitControl = showSubmit ? (
+    <Pressable
+      style={({ pressed }) => [
+        styles.submitButton,
+        isSubmitting && styles.submitDisabled,
+        pressed && !isSubmitting && { opacity: 0.9 },
+      ]}
+      onPress={handleSubmit}
+      disabled={isSubmitting}
+    >
+      {isSubmitting ? (
+        <>
+          <ActivityIndicator size="small" color={Colors.textWhite} />
+          <Text style={styles.submitButtonText}>{tr("Guardando registro...")}</Text>
+        </>
+      ) : (
+        <>
+          <Send size={18} color={Colors.textWhite} />
+          <Text style={styles.submitButtonText}>{submitText}</Text>
+        </>
+      )}
+    </Pressable>
+  ) : null;
 
   return (
     <View style={styles.container}>
@@ -750,7 +765,7 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: embedded
-            ? bottomInset + BOTTOM_BAR_HEIGHT + 92
+            ? (showSubmit ? bottomInset + BOTTOM_BAR_HEIGHT + 92 : bottomInset + BOTTOM_BAR_HEIGHT + 24)
             : Math.max(insets.bottom, Spacing.md) }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -891,10 +906,14 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
               />
             </View>
           </View>
-          {!embedded && <View style={styles.footer}>{submitControl}</View>}
+          {!embedded && submitControl ? <View style={styles.footer}>{submitControl}</View> : null}
         </ScrollView>
       </KeyboardAvoidingView>
-      {embedded && <View style={[styles.embeddedActionDock, { bottom: bottomInset + BOTTOM_BAR_HEIGHT + 8 }]}>{submitControl}</View>}
+      {embedded && submitControl ? (
+        <View style={[styles.embeddedActionDock, { bottom: bottomInset + BOTTOM_BAR_HEIGHT + 8 }]}>
+          {submitControl}
+        </View>
+      ) : null}
 
       <Modal visible={cameraFullscreen && cameraActive} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setCameraFullscreen(false)}>
         <View style={styles.fullscreenPage}>

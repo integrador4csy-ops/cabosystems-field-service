@@ -83,6 +83,7 @@ export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
   const isTablet = width >= 768;
 
   const grouped = useMemo(() => {
+    if (!visible) return [];
     const map = new Map<string, Project[]>();
     for (const project of projects) {
       const key = project.desarrollo;
@@ -90,7 +91,7 @@ export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
       map.get(key)!.push(project);
     }
     return Array.from(map.entries());
-  }, [projects]);
+  }, [projects, visible]);
 
   const selected = allProjectsSelected ? undefined : projects.find((p) => p.id === selectedProjectId) ?? projects[0];
   const displayCode = allProjectsSelected ? tr("Todas las villas") : selected?.villa || selected?.unidad || tr("Sin villa");
@@ -149,81 +150,83 @@ export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
       </SafeAreaView>
 
       {/* Bottom Sheet Material 3 Nativo */}
-      <Modal
-        visible={visible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setVisible(false)}
-      >
-        <Pressable style={styles.modalBackdrop} onPress={() => setVisible(false)}>
-          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.sheetHandleContainer}>
-              <View style={styles.sheetHandle} />
-            </View>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>{tr("Ubicación Activa")}</Text>
-                <Text style={styles.modalSubtitle}>{tr("Selecciona el desarrollo o villa a operar")}</Text>
+      {showProjectSelector && visible && (
+        <Modal
+          visible={visible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setVisible(false)}
+        >
+          <Pressable style={styles.modalBackdrop} onPress={() => setVisible(false)}>
+            <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.sheetHandleContainer}>
+                <View style={styles.sheetHandle} />
               </View>
-              <Pressable
-                onPress={() => setVisible(false)}
-                style={({ pressed }) => [styles.modalClose, pressed && { opacity: 0.7 }]}
-                hitSlop={10}
-              >
-                <X color={Colors.textSecondary} size={18} />
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
-              {onSelectAllProjects ? <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected: allProjectsSelected }}
-                android_ripple={{ color: 'rgba(247, 140, 38, 0.16)' }}
-                style={({ pressed }) => [
-                  styles.unitRow,
-                  allProjectsSelected && styles.unitRowSelected,
-                  Platform.OS !== 'android' && pressed && { opacity: 0.8 },
-                ]}
-                onPress={() => { onSelectAllProjects(); setVisible(false); }}
-              >
-                <Text style={[styles.unitCode, allProjectsSelected && styles.unitCodeSelected]}>{tr("Todas las villas")}</Text>
-                {allProjectsSelected ? <Check color="#FFFFFF" size={16} /> : null}
-              </Pressable> : null}
-              {grouped.map(([desarrollo, units]) => (
-                <View key={desarrollo} style={styles.devSection}>
-                  <Text style={styles.devName}>{desarrollo}</Text>
-                  {units.map((unit) => {
-                    const isSelected = unit.id === selected?.id;
-                    const unitName = unit.villa || unit.unidad;
-                    return (
-                      <Pressable
-                        key={unit.id}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: isSelected }}
-                        android_ripple={{ color: 'rgba(247, 140, 38, 0.16)' }}
-                        style={({ pressed }) => [
-                          styles.unitRow,
-                          isSelected && styles.unitRowSelected,
-                          Platform.OS !== 'android' && pressed && { opacity: 0.8 },
-                        ]}
-                        onPress={() => {
-                          onSelectProject?.(unit);
-                          setVisible(false);
-                        }}
-                      >
-                        <Text style={[styles.unitCode, isSelected && styles.unitCodeSelected]}>
-                          {unitName}
-                        </Text>
-                        {isSelected && <Check color="#FFFFFF" size={16} strokeWidth={2.8} />}
-                      </Pressable>
-                    );
-                  })}
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={styles.modalTitle}>{tr("Ubicación Activa")}</Text>
+                  <Text style={styles.modalSubtitle}>{tr("Selecciona el desarrollo o villa a operar")}</Text>
                 </View>
-              ))}
-            </ScrollView>
+                <Pressable
+                  onPress={() => setVisible(false)}
+                  style={({ pressed }) => [styles.modalClose, pressed && { opacity: 0.7 }]}
+                  hitSlop={10}
+                >
+                  <X color={Colors.textSecondary} size={18} />
+                </Pressable>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
+                {onSelectAllProjects ? <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: allProjectsSelected }}
+                  android_ripple={{ color: 'rgba(247, 140, 38, 0.16)' }}
+                  style={({ pressed }) => [
+                    styles.unitRow,
+                    allProjectsSelected && styles.unitRowSelected,
+                    Platform.OS !== 'android' && pressed && { opacity: 0.8 },
+                  ]}
+                  onPress={() => { onSelectAllProjects(); setVisible(false); }}
+                >
+                  <Text style={[styles.unitCode, allProjectsSelected && styles.unitCodeSelected]}>{tr("Todas las villas")}</Text>
+                  {allProjectsSelected ? <Check color="#FFFFFF" size={16} /> : null}
+                </Pressable> : null}
+                {grouped.map(([desarrollo, units]) => (
+                  <View key={desarrollo} style={styles.devSection}>
+                    <Text style={styles.devName}>{desarrollo}</Text>
+                    {units.map((unit) => {
+                      const isSelected = unit.id === selected?.id;
+                      const unitName = unit.villa || unit.unidad;
+                      return (
+                        <Pressable
+                          key={unit.id}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: isSelected }}
+                          android_ripple={{ color: 'rgba(247, 140, 38, 0.16)' }}
+                          style={({ pressed }) => [
+                            styles.unitRow,
+                            isSelected && styles.unitRowSelected,
+                            Platform.OS !== 'android' && pressed && { opacity: 0.8 },
+                          ]}
+                          onPress={() => {
+                            onSelectProject?.(unit);
+                            setVisible(false);
+                          }}
+                        >
+                          <Text style={[styles.unitCode, isSelected && styles.unitCodeSelected]}>
+                            {unitName}
+                          </Text>
+                          {isSelected && <Check color="#FFFFFF" size={16} strokeWidth={2.8} />}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ))}
+              </ScrollView>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
+      )}
     </View>
   );
 });
