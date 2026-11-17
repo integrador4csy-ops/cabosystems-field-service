@@ -69,11 +69,11 @@ serve(async (req) => {
       if (!caller?.activo || !visibleWarranty) return json({ error: 'Warranty access required' }, 403);
 
       const statusLabels: Record<string, string> = {
-        registered: 'Registrada',
-        review: 'Gestionando solicitud',
-        waiting: 'Solicitud enviada / en revisión',
-        resolved: 'Garantía aprobada · Cerrada',
-        rejected: 'Sin garantía · Cerrada',
+        registered: 'Abierto',
+        review: 'Abierto',
+        waiting: 'En revisión',
+        resolved: 'Cerrado',
+        rejected: 'Cerrado',
       };
       const managedBy = warranty.area === 'operations' ? 'Compras' : 'Operaciones';
       recipientIds = [warranty.responsible_id];

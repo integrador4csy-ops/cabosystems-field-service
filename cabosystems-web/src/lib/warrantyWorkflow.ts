@@ -1,14 +1,20 @@
 import type { WarrantyStatus } from './warrantyApi';
 
-export const warrantyStatusOrder: readonly WarrantyStatus[] = ['registered', 'review', 'waiting', 'resolved', 'rejected'];
+export const warrantyStatusOrder: readonly WarrantyStatus[] = ['registered', 'waiting', 'resolved'];
 
 const warrantyStatusTransitions: Record<WarrantyStatus, readonly WarrantyStatus[]> = {
-  registered: ['registered', 'review'],
-  review: ['review', 'waiting'],
-  waiting: ['waiting', 'resolved', 'rejected'],
+  registered: ['registered', 'waiting', 'resolved'],
+  review: ['registered', 'waiting', 'resolved'],
+  waiting: ['waiting', 'resolved'],
   resolved: ['resolved'],
-  rejected: ['rejected'],
+  rejected: ['resolved'],
 };
+
+export function canonicalWarrantyStatus(status: WarrantyStatus): WarrantyStatus {
+  if (status === 'review') return 'registered';
+  if (status === 'rejected') return 'resolved';
+  return status;
+}
 
 export function allowedWarrantyStatuses(current: WarrantyStatus): readonly WarrantyStatus[] {
   return warrantyStatusTransitions[current];

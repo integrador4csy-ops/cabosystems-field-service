@@ -12,7 +12,7 @@ import {
   warrantyFolio, type WarrantyArea, type WarrantyCase, type WarrantyProject,
   type WarrantyStatus,
 } from '../../lib/warrantyApi';
-import { allowedWarrantyStatuses, isClosedWarrantyStatus } from '../../lib/warrantyWorkflow';
+import { allowedWarrantyStatuses, canonicalWarrantyStatus, isClosedWarrantyStatus } from '../../lib/warrantyWorkflow';
 import { AppSelect } from '../ui/AppSelect';
 import { WarrantyDatePicker } from './WarrantyDatePicker';
 import { WarrantyProjectSelect } from './WarrantyProjectSelect';
@@ -26,11 +26,11 @@ const labels = {
   es: {
     title: 'Control de garantías', subtitle: 'Casos claros, responsables visibles y seguimiento en un solo lugar.',
     newCase: 'Nueva garantía', search: 'Buscar folio, villa, área, equipo o serie…', all: 'Todos', open: 'Abiertos', waiting: 'En revisión', closed: 'Cerrados',
-    registered: 'Registrada', review: 'Gestionando solicitud', statusWaiting: 'Solicitud enviada / en revisión', resolved: 'Garantía aprobada · Cerrada', rejected: 'Sin garantía · Cerrada',
+    registered: 'Abierto', review: 'Abierto', statusWaiting: 'En revisión', resolved: 'Cerrado', rejected: 'Cerrado',
     project: 'Proyecto', laboratory: 'Laboratorio', operations: 'Compras', supplier: 'Operaciones', client: 'Cliente',
     responsible: 'Responsable', noCases: 'No hay casos en esta vista', noCasesHint: 'Crea una garantía o cambia los filtros para ver otros casos.',
     caseData: 'Datos del caso', equipment: 'Equipo', serial: 'UID y/o serial', macAddress: 'MAC address', villa: 'Villa', villaArea: 'Área', villaAreaPlaceholder: 'Ej. Recámara principal, rack o terraza.', issue: 'Falla reportada', issuePlaceholder: 'Ej. El amplificador no enciende.', deadline: 'Fecha de inicio', noDeadline: 'Sin fecha de inicio',
-    followUp: 'Actualizar seguimiento', newUpdate: 'Nuevo avance', stage: 'Etapa', managementRoute: 'Gestión por', note: 'Nota del avance', notePlaceholder: 'Registra el correo, respuesta o decisión para conservar el hilo completo.', save: 'Guardar avance', saving: 'Guardando…',
+    followUp: 'Actualizar seguimiento', newUpdate: 'Nuevo avance', stage: 'Estatus', managementRoute: 'Gestión por', note: 'Nota del avance', notePlaceholder: 'Describe la situación actual, solicitud enviada o resolución (garantía aceptada o rechazada) para conservar el hilo completo.', save: 'Guardar avance', saving: 'Guardando…',
     closedCase: 'Caso cerrado. El historial queda disponible para consulta.',
     history: 'Historial', createdBy: 'Proceso levantado por', created: 'Caso registrado', cancel: 'Cancelar', create: 'Crear caso', creating: 'Creando…', deleteCase: 'Eliminar garantía', deleting: 'Eliminando…', deleteConfirm: '¿Eliminar {folio}? Esta acción también eliminará su historial y no se puede deshacer.', deleteError: 'No se pudo eliminar la garantía.',
     selectVilla: 'Villa', noVilla: 'Selecciona una villa', optional: 'Opcional', required: 'Completa los campos requeridos.', loadError: 'No se pudieron cargar las garantías.', saveError: 'No se pudo guardar el caso. Intenta de nuevo.',
@@ -39,11 +39,11 @@ const labels = {
   en: {
     title: 'Warranty control', subtitle: 'Clear cases, visible ownership and follow-up in one place.',
     newCase: 'New warranty', search: 'Search folio, villa, area, equipment or serial…', all: 'All', open: 'Open', waiting: 'In review', closed: 'Closed',
-    registered: 'Registered', review: 'Managing request', statusWaiting: 'Request sent / under review', resolved: 'Warranty approved · Closed', rejected: 'No warranty · Closed',
+    registered: 'Open', review: 'Open', statusWaiting: 'In review', resolved: 'Closed', rejected: 'Closed',
     project: 'Project', laboratory: 'Laboratory', operations: 'Purchasing', supplier: 'Operations', client: 'Client',
     responsible: 'Responsible', noCases: 'No cases in this view', noCasesHint: 'Create a warranty or change the filters to see other cases.',
     caseData: 'Case details', equipment: 'Equipment', serial: 'UID and/or serial', macAddress: 'MAC address', villa: 'Villa', villaArea: 'Area', villaAreaPlaceholder: 'E.g. Primary bedroom, rack or terrace.', issue: 'Reported issue', issuePlaceholder: 'E.g. The amplifier will not turn on.', deadline: 'Start date', noDeadline: 'No start date',
-    followUp: 'Update follow-up', newUpdate: 'New update', stage: 'Stage', managementRoute: 'Managed by', note: 'Progress note', notePlaceholder: 'Record the email, response or decision to keep the complete thread.', save: 'Save update', saving: 'Saving…',
+    followUp: 'Update follow-up', newUpdate: 'New update', stage: 'Status', managementRoute: 'Managed by', note: 'Progress note', notePlaceholder: 'Describe the current situation, request sent or resolution (warranty approved or rejected) to keep the complete thread.', save: 'Save update', saving: 'Saving…',
     closedCase: 'Case closed. The history remains available for reference.',
     history: 'History', createdBy: 'Process opened by', created: 'Case registered', cancel: 'Cancel', create: 'Create case', creating: 'Creating…', deleteCase: 'Delete warranty', deleting: 'Deleting…', deleteConfirm: 'Delete {folio}? This also deletes its history and cannot be undone.', deleteError: 'The warranty could not be deleted.',
     selectVilla: 'Villa', noVilla: 'Select a villa', optional: 'Optional', required: 'Complete the required fields.', loadError: 'Warranties could not be loaded.', saveError: 'The case could not be saved. Try again.',
@@ -60,10 +60,9 @@ function areaLabel(copy: typeof labels.es | typeof labels.en, area: WarrantyArea
 }
 
 function statusStyle(status: WarrantyStatus) {
-  if (status === 'resolved') return 'border-slate-900 bg-slate-900 text-white';
-  if (status === 'rejected') return 'border-slate-300 bg-white text-slate-600';
-  if (status === 'waiting') return 'border-orange-300 bg-orange-100 text-orange-800';
-  if (status === 'review') return 'border-orange-200 bg-orange-50 text-orange-700';
+  const normalized = canonicalWarrantyStatus(status);
+  if (normalized === 'resolved') return 'border-slate-900 bg-slate-900 text-white';
+  if (normalized === 'waiting') return 'border-orange-300 bg-orange-100 text-orange-800';
   return 'border-slate-200 bg-slate-100 text-slate-700';
 }
 
@@ -176,7 +175,7 @@ export function WarrantyManagementView() {
   const selected = cases.find(item => item.id === selectedId) ?? null;
   useEffect(() => {
     if (!selected) return;
-    setUpdateForm({ status: selected.status, area: managementAreas.includes(selected.area) ? selected.area : 'operations', warranty_until: selected.warranty_until || '', last_note: '' });
+    setUpdateForm({ status: canonicalWarrantyStatus(selected.status), area: managementAreas.includes(selected.area) ? selected.area : 'operations', warranty_until: selected.warranty_until || '', last_note: '' });
     setUpdateOpen(false);
     setFormError('');
   }, [selected?.id, selected?.status, selected?.area, selected?.warranty_until]);
@@ -238,7 +237,7 @@ export function WarrantyManagementView() {
 
   const openUpdate = () => {
     if (!selected) return;
-    setUpdateForm({ status: selected.status, area: managementAreas.includes(selected.area) ? selected.area : 'operations', warranty_until: selected.warranty_until || '', last_note: '' });
+    setUpdateForm({ status: canonicalWarrantyStatus(selected.status), area: managementAreas.includes(selected.area) ? selected.area : 'operations', warranty_until: selected.warranty_until || '', last_note: '' });
     setFormError('');
     setUpdateOpen(true);
   };

@@ -6,28 +6,61 @@ import ts from 'typescript';
 
 const workflowSource = readFileSync(new URL('../src/lib/warrantyWorkflow.ts', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(workflowSource, { compilerOptions: { module: ts.ModuleKind.ES2022 } }).outputText;
-const { allowedWarrantyStatuses, isClosedWarrantyStatus } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+const { allowedWarrantyStatuses, canonicalWarrantyStatus, isClosedWarrantyStatus } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 
-test('warranty workflow only permits the next operational stage', () => {
-  assert.deepEqual(allowedWarrantyStatuses('registered'), ['registered', 'review']);
-  assert.deepEqual(allowedWarrantyStatuses('review'), ['review', 'waiting']);
-  assert.deepEqual(allowedWarrantyStatuses('waiting'), ['waiting', 'resolved', 'rejected']);
+test('warranty workflow simplifies statuses to open, in review and closed', () => {
+  assert.deepEqual(allowedWarrantyStatuses('registered'), ['registered', 'waiting', 'resolved']);
+  assert.deepEqual(allowedWarrantyStatuses('review'), ['registered', 'waiting', 'resolved']);
+  assert.deepEqual(allowedWarrantyStatuses('waiting'), ['waiting', 'resolved']);
+  assert.equal(canonicalWarrantyStatus('review'), 'registered');
+  assert.equal(canonicalWarrantyStatus('rejected'), 'resolved');
+  assert.equal(canonicalWarrantyStatus('waiting'), 'waiting');
 });
 
-test('approved and no-warranty outcomes are terminal', () => {
+test('closed warranty outcomes remain terminal', () => {
   assert.equal(isClosedWarrantyStatus('resolved'), true);
   assert.equal(isClosedWarrantyStatus('rejected'), true);
   assert.deepEqual(allowedWarrantyStatuses('resolved'), ['resolved']);
-  assert.deepEqual(allowedWarrantyStatuses('rejected'), ['rejected']);
+  assert.deepEqual(allowedWarrantyStatuses('rejected'), ['resolved']);
 });
 
-test('database migration enforces the same sequence and management routes', () => {
-  const migration = readFileSync(new URL('../../supabase/migrations/20261111090000_warranty_status_workflow.sql', import.meta.url), 'utf8');
-  assert.match(migration, /registered'.*'review'/s);
-  assert.match(migration, /review'.*'waiting'/s);
-  assert.match(migration, /waiting'.*'resolved'.*'rejected'/s);
-  assert.match(migration, /old\.status in \('resolved', 'rejected'\)/);
-  assert.match(migration, /area in \('operations', 'supplier'\)/);
+test('database migration enforces the simplified 3-status workflow and terminal closure', async () => {
+  const baseMigration = readFileSync(new URL('../../supabase/migrations/20261111090000_warranty_status_workflow.sql', import.meta.url), 'utf8');
+  const simpleMigration = readFileSync(new URL('../../supabase/migrations/20261117120000_warranty_simple_statuses.sql', import.meta.url), 'utf8');
+  assert.match(baseMigration, /area in \('operations', 'supplier'\)/);
+  assert.match(simpleMigration, /old\.status in \('registered', 'review'\) and new\.status in \('registered', 'waiting', 'resolved', 'rejected'\)/);
+  assert.match(simpleMigration, /old\.status = 'waiting' and new\.status in \('waiting', 'resolved', 'rejected'\)/);
+  assert.match(simpleMigration, /old\.status in \('resolved', 'rejected'\)/);
+
+  const db = new PGlite();
+  await db.exec(`
+    create role anon;
+    create role authenticated;
+    create schema private;
+    create table public.warranty_cases(id text primary key, status text not null, area text not null default 'operations');
+    create table public.warranty_case_updates(id text primary key, status text not null, area text not null default 'operations');
+  `);
+  await db.exec(baseMigration);
+  await db.exec(simpleMigration);
+  await db.exec(`
+    insert into public.warranty_cases(id, status, area) values
+      ('c-open', 'registered', 'operations'),
+      ('c-legacy', 'review', 'operations'),
+      ('c-direct', 'registered', 'operations');
+  `);
+  await db.query("update public.warranty_cases set status = 'waiting' where id = 'c-open'");
+  await assert.rejects(db.query("update public.warranty_cases set status = 'registered' where id = 'c-open'"));
+  await db.query("update public.warranty_cases set status = 'resolved' where id = 'c-open'");
+  await assert.rejects(db.query("update public.warranty_cases set status = 'waiting' where id = 'c-open'"));
+  await db.query("update public.warranty_cases set status = 'registered' where id = 'c-legacy'");
+  await db.query("update public.warranty_cases set status = 'resolved' where id = 'c-direct'");
+  await db.close();
+});
+
+test('warranty view uses Abierto, En revisión and Cerrado labels', () => {
+  const view = readFileSync(new URL('../src/components/warranties/WarrantyManagementView.tsx', import.meta.url), 'utf8');
+  assert.match(view, /registered: 'Abierto', review: 'Abierto', statusWaiting: 'En revisión', resolved: 'Cerrado', rejected: 'Cerrado'/);
+  assert.match(view, /registered: 'Open', review: 'Open', statusWaiting: 'In review', resolved: 'Closed', rejected: 'Closed'/);
 });
 
 test('warranty updates notify the responsible person and open the warranty section', () => {
