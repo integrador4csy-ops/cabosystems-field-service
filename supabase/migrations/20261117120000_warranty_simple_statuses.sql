@@ -24,6 +24,11 @@ begin
 end;
 $$;
 
+drop trigger if exists warranty_case_validate_transition on public.warranty_cases;
+create trigger warranty_case_validate_transition
+before update on public.warranty_cases
+for each row execute function private.validate_warranty_status_transition();
+
 revoke all on function private.validate_warranty_status_transition() from public, anon, authenticated;
 
 comment on function private.validate_warranty_status_transition() is

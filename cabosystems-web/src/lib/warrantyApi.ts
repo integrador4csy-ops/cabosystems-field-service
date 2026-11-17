@@ -120,12 +120,15 @@ export async function createWarrantyCase(input: CreateWarrantyCaseInput): Promis
 }
 
 export async function updateWarrantyCase(id: string, input: UpdateWarrantyCaseInput): Promise<WarrantyCase> {
-  const { error } = await client.from('warranty_cases').update({
+  const { data: updatedRow, error } = await client.from('warranty_cases').update({
     ...input,
     last_note: input.last_note.trim(),
     warranty_until: input.warranty_until || null,
-  }).eq('id', id);
+  }).eq('id', id).select('id').maybeSingle();
   if (error) throw error;
+  if (!updatedRow?.id) {
+    throw new Error('No se pudo actualizar la garantía (sin permisos o caso no encontrado).');
+  }
   void supabase.functions.invoke('operations-push-notifications', {
     body: { kind: 'warranty_update', entityId: id },
   }).then(({ error: notificationError }) => {
