@@ -308,31 +308,37 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
       try {
         const { connection, token } = await service.eventSession(actor);
         if (!token) return { attendees: [] };
-        const primary = connection.selected_calendars.find(c => c.primary) || connection.selected_calendars[0];
-        const calendarId = primary?.id || 'primary';
-        const res = await google(`${calendarPath(calendarId)}?maxResults=100&fields=items(attendees,creator,organizer)`, token);
-        const items = (res.items || []) as Array<{
-          attendees?: Array<{ email?: string; displayName?: string }>;
-          creator?: { email?: string; displayName?: string };
-          organizer?: { email?: string; displayName?: string };
-        }>;
         const map = new Map<string, { email: string; displayName?: string }>();
-        for (const item of items) {
-          if (item.creator?.email && item.creator.email.includes('@')) {
-            const email = item.creator.email.toLowerCase().trim();
-            map.set(email, { email, displayName: item.creator.displayName });
-          }
-          if (item.organizer?.email && item.organizer.email.includes('@')) {
-            const email = item.organizer.email.toLowerCase().trim();
-            map.set(email, { email, displayName: item.organizer.displayName });
-          }
-          for (const a of (item.attendees || [])) {
-            if (a.email && a.email.includes('@')) {
-              const email = a.email.toLowerCase().trim();
-              map.set(email, { email, displayName: a.displayName });
+        const targetCalendars = (connection.selected_calendars || []).slice(0, 4);
+        const calendarIds = targetCalendars.length > 0 ? targetCalendars.map(c => c.id) : ['primary'];
+        await Promise.all(calendarIds.map(async (calendarId) => {
+          try {
+            const res = await google(`${calendarPath(calendarId)}?maxResults=250&fields=items(attendees,creator,organizer)`, token);
+            const items = (res.items || []) as Array<{
+              attendees?: Array<{ email?: string; displayName?: string }>;
+              creator?: { email?: string; displayName?: string };
+              organizer?: { email?: string; displayName?: string };
+            }>;
+            const register = (entry?: { email?: string; displayName?: string }) => {
+              if (!entry?.email || !entry.email.includes('@')) return;
+              const email = entry.email.toLowerCase().trim();
+              if (email.endsWith('calendar.google.com')) return;
+              const existing = map.get(email);
+              if (!existing) {
+                map.set(email, { email, displayName: entry.displayName });
+              } else if (!existing.displayName && entry.displayName) {
+                existing.displayName = entry.displayName;
+              }
+            };
+            for (const item of items) {
+              register(item.creator);
+              register(item.organizer);
+              for (const a of (item.attendees || [])) register(a);
             }
+          } catch {
+            // Continue with other calendars if one fails
           }
-        }
+        }));
         return { attendees: Array.from(map.values()) };
       } catch {
         return { attendees: [] };

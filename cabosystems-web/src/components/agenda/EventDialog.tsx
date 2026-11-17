@@ -131,7 +131,7 @@ export function EventDialog({ event, day, canManage: allowed, canManageCompany: 
       const name = (c.nombre || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       const email = c.email.toLowerCase();
       return name.includes(q) || email.includes(q);
-    }).slice(0, 5);
+    }).slice(0, 8);
   }, [collaborators, guestQuery, input.attendees]);
   const customEmailMatch = useMemo(() => {
     const q = guestQuery.trim().toLowerCase();
