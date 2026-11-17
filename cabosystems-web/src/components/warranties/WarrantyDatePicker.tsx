@@ -306,10 +306,10 @@ export function WarrantyDatePicker({
             role="dialog"
             aria-modal="true"
             aria-label={isEn ? 'Choose date' : 'Seleccionar fecha'}
-            className={`fixed z-[1300] border border-brand-500/45 bg-white p-2.5 shadow-lg ${
+            className={`fixed z-[1300] border border-brand-500 bg-white p-2.5 shadow-lg ${
               openedUpwards
-                ? 'rounded-t-xl rounded-b-none border-b-0'
-                : 'rounded-b-xl rounded-t-none border-t-0'
+                ? 'rounded-t-lg rounded-b-none border-b-0'
+                : 'rounded-b-lg rounded-t-none border-t-0'
             }`}
             style={{ visibility: 'hidden' }}
           >
