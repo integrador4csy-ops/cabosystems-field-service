@@ -92,7 +92,7 @@ function subscribeToNotifications(userId: string, listener: NotificationListener
   };
 }
 
-export function NotificationCenter() {
+export const NotificationCenter = React.memo(function NotificationCenter() {
   const { profile } = useAuth();
   const { t, language } = useTranslation();
   const router = useRouter();
@@ -162,7 +162,7 @@ export function NotificationCenter() {
       </Pressable>
     </Modal>
   </>;
-}
+});
 
 const styles = StyleSheet.create({
   trigger: { width: 44, height: 44, flexShrink: 0, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F6F7F8', position: 'relative' },
