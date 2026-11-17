@@ -148,9 +148,9 @@ export function EventDialog({ event, day, canManage: allowed, canManageCompany: 
         <div className="company-event-fields">
         <fieldset disabled={!canManage || busy}>
           <label className="company-title-field">{t('Título')}<input required maxLength={160} value={input.titulo} onChange={(e) => change({ titulo: e.target.value })} /></label>
-          {event ? <p className="company-field-help">{c.calendar}: {event.google ? resolveCalendarDisplayName({ id: event.google.calendarId || '', name: event.google.calendarName }, userEmail, userFullName) : c.local}</p> : <label>{c.calendar}<AppSelect aria-label={c.calendar} disabled={!canManage || busy} value={input.calendar_id || ''} onChange={(e) => change({ calendar_id: e.target.value })}>{canManageCompany && <option value="">{c.local}</option>}{calendars.map((calendar) => <option key={calendar.id} value={calendar.id}>{resolveCalendarDisplayName(calendar, userEmail, userFullName)}</option>)}</AppSelect></label>}
+
           {event?.google?.availabilityOnly && <p className="company-field-help">{en ? 'Availability only. Google shares busy times without event details.' : 'Solo disponibilidad. Google comparte los horarios ocupados sin los detalles de los eventos.'}</p>}
-          {calendarError && <p role="status" className="company-field-help">{c.calendarError}</p>}
+
           <div className="company-schedule-fields">
             <div className="company-schedule-header">
               <span className="company-schedule-title">{c.schedule}</span>
@@ -359,7 +359,44 @@ export function EventDialog({ event, day, canManage: allowed, canManageCompany: 
             ) : null}
             {input.calendar_id && input.attendees && input.attendees.length > 0 ? <p className="company-field-help">{c.guestsHelp}</p> : null}
           </div>
-          <label>{t('Ubicación (opcional)')}<input maxLength={240} value={input.ubicacion || ''} onChange={(e) => change({ ubicacion: e.target.value })} /></label>
+          <div className="company-form-row">
+            {event ? (
+              <label>
+                {c.calendar}
+                <input
+                  type="text"
+                  disabled
+                  value={event.google ? resolveCalendarDisplayName({ id: event.google.calendarId || '', name: event.google.calendarName }, userEmail, userFullName) : c.local}
+                />
+              </label>
+            ) : (
+              <label>
+                {c.calendar}
+                <AppSelect
+                  aria-label={c.calendar}
+                  disabled={!canManage || busy}
+                  value={input.calendar_id || ''}
+                  onChange={(e) => change({ calendar_id: e.target.value })}
+                >
+                  {canManageCompany && <option value="">{c.local}</option>}
+                  {calendars.map((calendar) => (
+                    <option key={calendar.id} value={calendar.id}>
+                      {resolveCalendarDisplayName(calendar, userEmail, userFullName)}
+                    </option>
+                  ))}
+                </AppSelect>
+              </label>
+            )}
+            <label>
+              {t('Ubicación (opcional)')}
+              <input
+                maxLength={240}
+                value={input.ubicacion || ''}
+                onChange={(e) => change({ ubicacion: e.target.value })}
+              />
+            </label>
+          </div>
+          {calendarError && <p role="status" className="company-field-help">{c.calendarError}</p>}
           <label>{t('Descripción')}<textarea rows={2} maxLength={5000} value={input.descripcion || ''} onChange={(e) => change({ descripcion: e.target.value })} /></label>
         </fieldset>
         </div>
