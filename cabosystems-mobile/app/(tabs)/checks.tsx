@@ -195,14 +195,15 @@ export function ChecksHistoryContent({
   return (
     <View style={styles.screen}>
       {!embedded ? (
-        <View style={{ height: headerHeight }}>
-          <HeaderCaboSystems seamless showProjectSelector={false} />
-        </View>
+        <HeaderCaboSystems seamless showProjectSelector={false} />
       ) : null}
 
       <ScrollView
         style={styles.mainScroll}
-        contentContainerStyle={[styles.mainScrollContent, { paddingBottom: contentBottom }]}
+        contentContainerStyle={[styles.mainScrollContent, {
+          paddingTop: !embedded ? headerHeight + 12 : 0,
+          paddingBottom: contentBottom,
+        }]}
         showsVerticalScrollIndicator={false}
       >
         {!embedded ? (

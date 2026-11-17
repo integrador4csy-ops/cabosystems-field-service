@@ -280,7 +280,11 @@ function NativeCameraViewInner({
           facing={facing}
           enableTorch={flash === 'on'}
         />
-      ) : null}
+      ) : (
+        <View style={styles.cameraPlaceholder}>
+          <ActivityIndicator color={Colors.primary} size="small" />
+        </View>
+      )}
       <View style={styles.cameraOverlay} pointerEvents="none">
         <View style={[styles.corner, styles.topLeft]} />
         <View style={[styles.corner, styles.topRight]} />
@@ -756,7 +760,7 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
         onConfirm={confirmGeofence}
         saving={isSubmitting}
       />
-      <View style={{ height: headerHeight }}><HeaderCaboSystems seamless showProjectSelector={false} /></View>
+      <HeaderCaboSystems seamless showProjectSelector={false} />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -764,9 +768,12 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
       >
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: embedded
-            ? (showSubmit ? bottomInset + BOTTOM_BAR_HEIGHT + 92 : bottomInset + BOTTOM_BAR_HEIGHT + 24)
-            : Math.max(insets.bottom, Spacing.md) }]}
+          contentContainerStyle={[styles.scrollContent, {
+            paddingTop: headerHeight + 8,
+            paddingBottom: embedded
+              ? (showSubmit ? bottomInset + BOTTOM_BAR_HEIGHT + 92 : bottomInset + BOTTOM_BAR_HEIGHT + 24)
+              : Math.max(insets.bottom, Spacing.md),
+          }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -1118,6 +1125,13 @@ const styles = StyleSheet.create({
   cameraContainer: {
     flex: 1,
     height: 360,
+    backgroundColor: '#0D1117',
+  },
+  cameraPlaceholder: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0D1117',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cameraOverlay: {
     ...StyleSheet.absoluteFill,
