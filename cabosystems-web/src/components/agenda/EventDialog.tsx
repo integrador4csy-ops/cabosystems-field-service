@@ -32,7 +32,6 @@ export function EventDialog({ event, day, canManage: allowed, canManageCompany: 
     local: en ? 'CaboSystems only' : 'Solo CaboSystems',
     endDate: en ? 'End date' : 'Fecha de fin',
     endTime: en ? 'End time' : 'Hora de fin',
-    zone: en ? 'Google times use Los Cabos time.' : 'Las horas de Google se muestran en horario de Los Cabos.',
     occurrence: en ? 'Changes and deletion apply only to this occurrence. Manage the full series in Google Calendar.' : 'Los cambios y la eliminación afectan solo esta ocurrencia. La serie completa se administra en Google Calendar.',
     calendarError: en ? 'Could not load Google calendars. You can still save locally.' : 'No se pudieron consultar los calendarios de Google. Puedes guardar solo en CaboSystems.',
     localRestricted: en ? 'Only administrators can create company calendar events.' : 'Solo administradores pueden crear eventos en el calendario general de la empresa.',
@@ -254,8 +253,6 @@ export function EventDialog({ event, day, canManage: allowed, canManageCompany: 
                 </>
               )}
             </div>
-
-            {input.calendar_id && <p className="company-field-help">{c.zone}</p>}
           </div>
           {event?.google?.recurring && <p className="company-field-help">{c.occurrence}</p>}
           {!event?.google && <RecurrenceFields input={input} disabled={!canManage || busy} onChange={change} />}
