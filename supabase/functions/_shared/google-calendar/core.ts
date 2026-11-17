@@ -1,7 +1,9 @@
 import { challenge, digest, randomToken, seal, unseal } from './crypto.ts';
 import type { GoogleSearchIndex } from './search-index.ts';
 
-export const SCOPES = ['https://www.googleapis.com/auth/calendar.calendarlist.readonly', 'https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.events.freebusy'];
+export const CALENDAR_SCOPES = ['https://www.googleapis.com/auth/calendar.calendarlist.readonly', 'https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.events.freebusy'];
+export const PEOPLE_SCOPES = ['https://www.googleapis.com/auth/contacts.readonly', 'https://www.googleapis.com/auth/contacts.other.readonly'];
+export const SCOPES = [...CALENDAR_SCOPES, ...PEOPLE_SCOPES];
 export interface Calendar { id: string; name: string; timeZone: string; accessRole: string; primary: boolean; backgroundColor?: string }
 export interface Actor { id: string; rol: string; activo: boolean }
 export interface Connection {
@@ -140,7 +142,7 @@ export function createCalendarService(options: Options) {
       const verifier = await unseal(state.verifier_ciphertext, clientSecret, clientId, 'pkce-verifier');
       const data = await googleJson('https://oauth2.googleapis.com/token', { method: 'POST', body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: 'authorization_code', code, code_verifier: verifier }) });
       const granted = typeof data.scope === 'string' ? data.scope.split(/\s+/) : [];
-      if (!SCOPES.every((scope) => granted.includes(scope))) throw new CalendarError('Faltan permisos de Calendar. Vuelve a conectar y autoriza los permisos solicitados.');
+      if (!CALENDAR_SCOPES.every((scope) => granted.includes(scope))) throw new CalendarError('Faltan permisos de Calendar. Vuelve a conectar y autoriza los permisos solicitados.');
       if (typeof data.refresh_token !== 'string' || !data.refresh_token || typeof data.access_token !== 'string' || data.token_type !== 'Bearer') throw new CalendarError('Google no concedió acceso renovable. Vuelve a conectar y autoriza el acceso.');
       const list = await calendars(data.access_token);
       const primary = list.find((calendar) => calendar.primary);

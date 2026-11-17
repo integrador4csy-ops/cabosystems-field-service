@@ -45,7 +45,7 @@ export async function getAgendaCollaborators(): Promise<AgendaCollaborator[]> {
     const [profilesRes, invsRes, googleAttendees] = await Promise.all([
       supabase.from('profiles').select('id, nombre, avatar_url, rol').eq('activo', true),
       supabase.from('invitaciones').select('id, email, rol').order('created_at', { ascending: false }),
-      googleRequest<{ attendees: Array<{ email: string; displayName?: string }> }>({ action: 'attendees' }).catch(() => null),
+      googleRequest<{ attendees: Array<{ email: string; displayName?: string; avatarUrl?: string }> }>({ action: 'attendees' }).catch(() => null),
     ]);
 
     const map = new Map<string, AgendaCollaborator>();
@@ -116,13 +116,16 @@ export async function getAgendaCollaborators(): Promise<AgendaCollaborator[]> {
           if (g.displayName && (!existing.nombre || existing.nombre === existing.email)) {
             existing.nombre = g.displayName;
           }
+          if (g.avatarUrl && !existing.avatar_url) {
+            existing.avatar_url = g.avatarUrl;
+          }
         } else {
           map.set(clean, {
             id: clean,
             email: clean,
             nombre: g.displayName || clean.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
             rol: 'invitado',
-            avatar_url: null,
+            avatar_url: g.avatarUrl || null,
           });
         }
       }

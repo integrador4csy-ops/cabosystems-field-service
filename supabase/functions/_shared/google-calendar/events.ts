@@ -8,7 +8,8 @@ class GoogleError extends CalendarError {}
 export function createEventService(service: Service, fetcher: typeof fetch = fetch) {
   async function google(path: string, token: string, options: RequestInit = {}): Promise<Record<string, unknown>> {
     let response: Response;
-    try { response = await fetcher(`https://www.googleapis.com/calendar/v3/${path}`, { ...options, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...options.headers }, signal: AbortSignal.timeout(15000), redirect: 'error' }); }
+    const url = path.startsWith('https://') ? path : `https://www.googleapis.com/calendar/v3/${path}`;
+    try { response = await fetcher(url, { ...options, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...options.headers }, signal: AbortSignal.timeout(15000), redirect: 'error' }); }
     catch { throw new CalendarError('No se pudo contactar con Google. Actualiza antes de volver a guardar.', 502); }
     if (!response.ok) {
       const messages: Record<number, string> = { 400: 'Google rechazó los datos del evento. Revisa las fechas y la repetición.', 401: 'Vuelve a autorizar la cuenta Google.', 403: 'La cuenta conectada no tiene permiso para esta operación en Google.', 404: 'El evento ya no existe o el calendario ya no está disponible.', 409: 'El evento ya existe. Actualiza la agenda.', 412: 'El evento cambió en Google. Actualiza antes de editar o eliminar.', 429: 'Google está limitando las consultas. Intenta de nuevo en unos momentos.' };
@@ -308,7 +309,60 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
       try {
         const { connection, token } = await service.eventSession(actor);
         if (!token) return { attendees: [] };
-        const map = new Map<string, { email: string; displayName?: string }>();
+        const map = new Map<string, { email: string; displayName?: string; avatarUrl?: string }>();
+
+        const register = (entry?: { email?: string; displayName?: string; avatarUrl?: string }) => {
+          if (!entry?.email || !entry.email.includes('@')) return;
+          const email = entry.email.toLowerCase().trim();
+          if (email.endsWith('calendar.google.com')) return;
+          const existing = map.get(email);
+          if (!existing) {
+            map.set(email, { email, displayName: entry.displayName, avatarUrl: entry.avatarUrl });
+          } else {
+            if (!existing.displayName && entry.displayName) existing.displayName = entry.displayName;
+            if (!existing.avatarUrl && entry.avatarUrl) existing.avatarUrl = entry.avatarUrl;
+          }
+        };
+
+        // 1. Google People API: Saved Contacts
+        try {
+          const peopleRes = await google('https://people.googleapis.com/v1/people/me/connections?pageSize=1000&personFields=names,emailAddresses,photos', token);
+          const connections = (peopleRes.connections || []) as Array<{
+            names?: Array<{ displayName?: string }>;
+            emailAddresses?: Array<{ value?: string }>;
+            photos?: Array<{ url?: string; default?: boolean }>;
+          }>;
+          for (const person of connections) {
+            const displayName = person.names?.[0]?.displayName;
+            const photo = person.photos?.find(p => !p.default)?.url || person.photos?.[0]?.url;
+            for (const em of (person.emailAddresses || [])) {
+              if (em.value) register({ email: em.value, displayName, avatarUrl: photo });
+            }
+          }
+        } catch {
+          // May be skipped if user hasn't yet reconnected with contacts scope
+        }
+
+        // 2. Google People API: Other Contacts (frequently emailed or invited)
+        try {
+          const otherRes = await google('https://people.googleapis.com/v1/otherContacts?pageSize=1000&readMask=names,emailAddresses,photos', token);
+          const otherContacts = (otherRes.otherContacts || []) as Array<{
+            names?: Array<{ displayName?: string }>;
+            emailAddresses?: Array<{ value?: string }>;
+            photos?: Array<{ url?: string; default?: boolean }>;
+          }>;
+          for (const person of otherContacts) {
+            const displayName = person.names?.[0]?.displayName;
+            const photo = person.photos?.find(p => !p.default)?.url || person.photos?.[0]?.url;
+            for (const em of (person.emailAddresses || [])) {
+              if (em.value) register({ email: em.value, displayName, avatarUrl: photo });
+            }
+          }
+        } catch {
+          // May be skipped if not authorized
+        }
+
+        // 3. Google Calendar Events
         const targetCalendars = (connection.selected_calendars || []).slice(0, 4);
         const calendarIds = targetCalendars.length > 0 ? targetCalendars.map(c => c.id) : ['primary'];
         await Promise.all(calendarIds.map(async (calendarId) => {
@@ -319,17 +373,6 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
               creator?: { email?: string; displayName?: string };
               organizer?: { email?: string; displayName?: string };
             }>;
-            const register = (entry?: { email?: string; displayName?: string }) => {
-              if (!entry?.email || !entry.email.includes('@')) return;
-              const email = entry.email.toLowerCase().trim();
-              if (email.endsWith('calendar.google.com')) return;
-              const existing = map.get(email);
-              if (!existing) {
-                map.set(email, { email, displayName: entry.displayName });
-              } else if (!existing.displayName && entry.displayName) {
-                existing.displayName = entry.displayName;
-              }
-            };
             for (const item of items) {
               register(item.creator);
               register(item.organizer);
