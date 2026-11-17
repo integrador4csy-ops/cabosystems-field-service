@@ -112,24 +112,28 @@ export async function createWarrantyCase(input: CreateWarrantyCaseInput): Promis
     warranty_until: input.warranty_until || null,
     project_id: input.project_id || null,
   };
-  const { data, error } = await client.from('warranty_cases').insert(payload).select(caseSelection).single();
+  const { data, error } = await client.from('warranty_cases').insert(payload).select('id').single();
   if (error) throw error;
-  return normalizeCase(data);
+  const { data: freshCase, error: fetchError } = await client.from('warranty_cases').select(caseSelection).eq('id', data.id).single();
+  if (fetchError) throw fetchError;
+  return normalizeCase(freshCase);
 }
 
 export async function updateWarrantyCase(id: string, input: UpdateWarrantyCaseInput): Promise<WarrantyCase> {
-  const { data, error } = await client.from('warranty_cases').update({
+  const { error } = await client.from('warranty_cases').update({
     ...input,
     last_note: input.last_note.trim(),
     warranty_until: input.warranty_until || null,
-  }).eq('id', id).select(caseSelection).single();
+  }).eq('id', id);
   if (error) throw error;
   void supabase.functions.invoke('operations-push-notifications', {
     body: { kind: 'warranty_update', entityId: id },
   }).then(({ error: notificationError }) => {
     if (notificationError) console.warn('Warranty notification failed:', notificationError);
   }).catch((notificationError) => console.warn('Warranty notification failed:', notificationError));
-  return normalizeCase(data);
+  const { data: freshCase, error: fetchError } = await client.from('warranty_cases').select(caseSelection).eq('id', id).single();
+  if (fetchError) throw fetchError;
+  return normalizeCase(freshCase);
 }
 
 export async function deleteWarrantyCase(id: string): Promise<void> {

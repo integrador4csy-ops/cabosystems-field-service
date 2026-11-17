@@ -168,6 +168,7 @@ export function WarrantyManagementView() {
     if (!user?.id) return;
     const channel = supabase.channel(`warranty-cases-${user.id}-${++warrantyChannelSequence}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'warranty_cases' }, () => { void load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'warranty_case_updates' }, () => { void load(); })
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [user?.id, load]);
