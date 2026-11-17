@@ -123,12 +123,14 @@ export function EventDialog({ event, day, canManage: allowed, canManageCompany: 
     change({ attendees: (input.attendees || []).filter(a => a.email.toLowerCase() !== email.toLowerCase()) });
   };
   const matchingGuests = useMemo(() => {
-    const q = guestQuery.trim().toLowerCase();
+    const q = guestQuery.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     if (!q) return [];
     return collaborators.filter(c => {
       const already = (input.attendees || []).some(a => a.email.toLowerCase() === c.email.toLowerCase());
       if (already) return false;
-      return (c.nombre && c.nombre.toLowerCase().includes(q)) || c.email.toLowerCase().includes(q);
+      const name = (c.nombre || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const email = c.email.toLowerCase();
+      return name.includes(q) || email.includes(q);
     }).slice(0, 5);
   }, [collaborators, guestQuery, input.attendees]);
   const customEmailMatch = useMemo(() => {
@@ -187,12 +189,13 @@ export function EventDialog({ event, day, canManage: allowed, canManageCompany: 
                   }}
                 />
                 {guestDropdownOpen && (matchingGuests.length > 0 || customEmailMatch) && (
-                  <div className="company-attendees-dropdown" role="listbox">
+                  <div className="company-attendees-dropdown" role="listbox" onMouseDown={(e) => e.preventDefault()}>
                     {matchingGuests.map(collab => (
                       <button
                         type="button"
                         key={collab.id}
                         className="company-attendee-option"
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => addGuest({ email: collab.email, displayName: collab.nombre, avatar_url: collab.avatar_url || undefined })}
                       >
                         {collab.avatar_url ? (

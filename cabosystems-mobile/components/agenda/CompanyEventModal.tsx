@@ -95,12 +95,14 @@ export function CompanyEventModal({ event, day, canManage: allowed, canManageCom
     change({ attendees: (input.attendees || []).filter(a => a.email.toLowerCase() !== email.toLowerCase()) });
   };
   const matchingGuests = useMemo(() => {
-    const q = guestQuery.trim().toLowerCase();
+    const q = guestQuery.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     if (!q) return [];
     return collaborators.filter(collab => {
       const already = (input.attendees || []).some(a => a.email.toLowerCase() === collab.email.toLowerCase());
       if (already) return false;
-      return (collab.nombre && collab.nombre.toLowerCase().includes(q)) || collab.email.toLowerCase().includes(q);
+      const name = (collab.nombre || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const email = collab.email.toLowerCase();
+      return name.includes(q) || email.includes(q);
     }).slice(0, 5);
   }, [collaborators, guestQuery, input.attendees]);
   const customEmailMatch = useMemo(() => {

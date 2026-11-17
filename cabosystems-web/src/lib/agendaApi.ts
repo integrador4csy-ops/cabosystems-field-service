@@ -16,14 +16,94 @@ export interface AgendaCollaborator {
   rol?: string | null;
 }
 
+export const KNOWN_CSY_COLLABORATORS: Record<string, string> = {
+  'danielh@csy.mx': 'Daniel Helguera',
+  'gsandoval@csy.mx': 'Gerardo Sandoval Castro',
+  'carlosp@csy.mx': 'Carlos Perez',
+  'integrador1@csy.mx': 'Integrador 1',
+  'integrador2@csy.mx': 'Integrador 2',
+  'integrador3@csy.mx': 'Integrador 3',
+  'integrador4csy@gmail.com': 'Integrador 4',
+  'carlosjesusfregosozapata@gmail.com': 'Carlos Jesus Fregoso Zapata',
+  'operaciones1csy@gmail.com': 'Operaciones CaboSystems',
+  'alessandra@csy.mx': 'Alessandra Collins Carrillo',
+};
+
 export async function getAgendaCollaborators(): Promise<AgendaCollaborator[]> {
-  const { data, error } = await supabase.from('profiles')
-    .select('id, nombre, email, avatar_url, rol')
-    .eq('activo', true)
-    .not('email', 'is', null)
-    .order('nombre');
-  if (error) throw error;
-  return (data || []).filter(p => p.email && p.email.trim()) as AgendaCollaborator[];
+  try {
+    const [profilesRes, invsRes] = await Promise.all([
+      supabase.from('profiles').select('id, nombre, avatar_url, rol').eq('activo', true),
+      supabase.from('invitaciones').select('id, email, rol').order('created_at', { ascending: false }),
+    ]);
+
+    const map = new Map<string, AgendaCollaborator>();
+
+    for (const [email, name] of Object.entries(KNOWN_CSY_COLLABORATORS)) {
+      const clean = email.toLowerCase().trim();
+      map.set(clean, {
+        id: clean,
+        email: clean,
+        nombre: name,
+        rol: 'colaborador',
+        avatar_url: null,
+      });
+    }
+
+    for (const inv of (invsRes.data || [])) {
+      if (!inv.email) continue;
+      const clean = inv.email.toLowerCase().trim();
+      const existing = map.get(clean);
+      if (existing) {
+        existing.id = inv.id;
+        if (inv.rol) existing.rol = inv.rol;
+      } else {
+        const derivedName = clean.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        map.set(clean, {
+          id: inv.id,
+          email: clean,
+          nombre: derivedName,
+          rol: inv.rol || 'colaborador',
+          avatar_url: null,
+        });
+      }
+    }
+
+    for (const p of (profilesRes.data || [])) {
+      if (!p.nombre) continue;
+      let matched: AgendaCollaborator | undefined;
+      for (const item of map.values()) {
+        if (item.nombre.toLowerCase() === p.nombre.toLowerCase()) {
+          matched = item;
+          break;
+        }
+      }
+      if (matched) {
+        matched.id = p.id;
+        matched.avatar_url = p.avatar_url || matched.avatar_url;
+        matched.rol = p.rol || matched.rol;
+        matched.nombre = p.nombre;
+      } else {
+        const fallbackEmail = `${p.nombre.toLowerCase().replace(/[^a-z0-9]/g, '')}@csy.mx`;
+        map.set(fallbackEmail, {
+          id: p.id,
+          email: fallbackEmail,
+          nombre: p.nombre,
+          rol: p.rol,
+          avatar_url: p.avatar_url,
+        });
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  } catch {
+    return Object.entries(KNOWN_CSY_COLLABORATORS).map(([email, nombre]) => ({
+      id: email,
+      email,
+      nombre,
+      rol: 'colaborador',
+      avatar_url: null,
+    }));
+  }
 }
 
 async function googleRequest<T>(body: Record<string, unknown>): Promise<T> {
