@@ -18,15 +18,14 @@ export interface AgendaCollaborator {
 
 export const KNOWN_CSY_COLLABORATORS: Record<string, string> = {
   'danielh@csy.mx': 'Daniel Helguera',
+  'operaciones1csy@gmail.com': 'Alessandra Collins Carrillo',
   'gsandoval@csy.mx': 'Gerardo Sandoval Castro',
   'carlosp@csy.mx': 'Carlos Perez',
+  'carlosjesusfregosozapata@gmail.com': 'Carlos Jesus Fregoso Zapata',
   'integrador1@csy.mx': 'Integrador 1',
   'integrador2@csy.mx': 'Integrador 2',
   'integrador3@csy.mx': 'Integrador 3',
   'integrador4csy@gmail.com': 'Integrador 4',
-  'carlosjesusfregosozapata@gmail.com': 'Carlos Jesus Fregoso Zapata',
-  'operaciones1csy@gmail.com': 'Operaciones CaboSystems',
-  'alessandra@csy.mx': 'Alessandra Collins Carrillo',
 };
 
 export const INITIAL_COLLABORATORS: AgendaCollaborator[] = Object.entries(KNOWN_CSY_COLLABORATORS).map(([email, nombre]) => ({
@@ -39,9 +38,10 @@ export const INITIAL_COLLABORATORS: AgendaCollaborator[] = Object.entries(KNOWN_
 
 export async function getAgendaCollaborators(): Promise<AgendaCollaborator[]> {
   try {
-    const [profilesRes, invsRes] = await Promise.all([
+    const [profilesRes, invsRes, googleAttendees] = await Promise.all([
       supabase.from('profiles').select('id, nombre, avatar_url, rol').eq('activo', true),
       supabase.from('invitaciones').select('id, email, rol').order('created_at', { ascending: false }),
+      googleRequest<{ attendees: Array<{ email: string; displayName?: string }> }>({ action: 'attendees' }).catch(() => null),
     ]);
 
     const map = new Map<string, AgendaCollaborator>();
@@ -102,15 +102,31 @@ export async function getAgendaCollaborators(): Promise<AgendaCollaborator[]> {
       }
     }
 
+    if (googleAttendees?.attendees) {
+      for (const g of googleAttendees.attendees) {
+        if (!g.email) continue;
+        const clean = g.email.toLowerCase().trim();
+        if (!clean.includes('@') || clean.endsWith('calendar.google.com')) continue;
+        const existing = map.get(clean);
+        if (existing) {
+          if (g.displayName && (!existing.nombre || existing.nombre === existing.email)) {
+            existing.nombre = g.displayName;
+          }
+        } else {
+          map.set(clean, {
+            id: clean,
+            email: clean,
+            nombre: g.displayName || clean.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+            rol: 'invitado',
+            avatar_url: null,
+          });
+        }
+      }
+    }
+
     return Array.from(map.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
   } catch {
-    return Object.entries(KNOWN_CSY_COLLABORATORS).map(([email, nombre]) => ({
-      id: email,
-      email,
-      nombre,
-      rol: 'colaborador',
-      avatar_url: null,
-    }));
+    return INITIAL_COLLABORATORS;
   }
 }
 

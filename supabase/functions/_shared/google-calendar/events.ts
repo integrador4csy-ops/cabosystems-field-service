@@ -304,6 +304,40 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
       try { await service.searchIndex?.invalidate(connection.revision, calendar.id); } catch { /* Retry through the normal incremental refresh. */ }
       return { deleted: true };
     },
+    async attendees(actor: Actor) {
+      try {
+        const { connection, token } = await service.eventSession(actor);
+        if (!token) return { attendees: [] };
+        const primary = connection.selected_calendars.find(c => c.primary) || connection.selected_calendars[0];
+        const calendarId = primary?.id || 'primary';
+        const res = await google(`${calendarPath(calendarId)}?maxResults=100&fields=items(attendees,creator,organizer)`, token);
+        const items = (res.items || []) as Array<{
+          attendees?: Array<{ email?: string; displayName?: string }>;
+          creator?: { email?: string; displayName?: string };
+          organizer?: { email?: string; displayName?: string };
+        }>;
+        const map = new Map<string, { email: string; displayName?: string }>();
+        for (const item of items) {
+          if (item.creator?.email && item.creator.email.includes('@')) {
+            const email = item.creator.email.toLowerCase().trim();
+            map.set(email, { email, displayName: item.creator.displayName });
+          }
+          if (item.organizer?.email && item.organizer.email.includes('@')) {
+            const email = item.organizer.email.toLowerCase().trim();
+            map.set(email, { email, displayName: item.organizer.displayName });
+          }
+          for (const a of (item.attendees || [])) {
+            if (a.email && a.email.includes('@')) {
+              const email = a.email.toLowerCase().trim();
+              map.set(email, { email, displayName: a.displayName });
+            }
+          }
+        }
+        return { attendees: Array.from(map.values()) };
+      } catch {
+        return { attendees: [] };
+      }
+    },
   };
 }
 
@@ -331,6 +365,7 @@ export function eventsHandler(service: Service, fetcher: typeof fetch = fetch) {
         case 'search': result = await events.search(actor, body.query, body.today); break;
         case 'list': result = await events.list(actor, body.from, body.to); break;
         case 'calendars': result = await events.selected(actor); break;
+        case 'attendees': result = await events.attendees(actor); break;
         case 'save': result = await events.save(actor, body); break;
         case 'delete': result = await events.remove(actor, body.id, body.etag); break;
         default: throw new CalendarError('Acción inválida.');
