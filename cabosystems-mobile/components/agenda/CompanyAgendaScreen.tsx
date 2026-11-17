@@ -10,7 +10,7 @@ import { useTranslation } from '@/lib/i18n';
 import { dateKey, parseDateKey } from '@/lib/agenda';
 import { moveAgendaPeriod } from '@/lib/agendaGestures';
 import { getAgendaWindow } from '@/lib/agendaWindowService';
-import { canManageCompanyAgenda, companyDays, companyRows, type CompanyRow, type CompanyView } from '@/lib/companyAgenda';
+import { canCreateAgendaEvent, canManageCompanyAgenda, companyDays, companyRows, type CompanyRow, type CompanyView } from '@/lib/companyAgenda';
 import { saveCompanyEvent, deleteCompanyEvent, getCompanyBirthdays, getLocalEvents, type CompanyBirthdayProfile } from '@/lib/companyAgendaApi';
 import { cacheCompanyAgenda, readCompanyAgendaCache } from '@/lib/companyAgendaCache';
 import { COMPANY_AGENDA_COPY } from '@/lib/companyAgendaCopy';
@@ -67,7 +67,7 @@ export default function CompanyAgendaScreen() {
   const hydrated = Boolean(owner);
   const personalColors = useCalendarColors(owner);
   useFocusEffect(useCallback(() => afterTabPaint(() => { void personalColors.reload(); }), [personalColors.reload]));
-  const canManage = canManageCompanyAgenda(profile);
+  const canManageCompany = canManageCompanyAgenda(profile);
   const { language } = useTranslation(); const c = COMPANY_AGENDA_COPY[language];
   const locale = language === 'es' ? 'es-MX' : 'en-US'; const insets = useSafeAreaInsets();
   const [{ anchor, position, pageEpoch }, setPeriod] = useState(() => ({
@@ -87,6 +87,7 @@ export default function CompanyAgendaScreen() {
   const [dialog, setDialog] = useState<{ owner: string; event: CompanyEvent | null; day: string } | null>(null);
   const [syncModalVisible, setSyncModalVisible] = useState(false);
   const [calendars, setCalendars] = useState<{ owner: string; items: AgendaGoogleCalendar[] }>({ owner: '', items: [] });
+  const canCreate = canCreateAgendaEvent(profile, calendars.items);
   const [hiddenCalendars, setHiddenCalendars] = useState<string[]>([]);
   const [birthdayProfiles, setBirthdayProfiles] = useState<CompanyBirthdayProfile[]>(() => cachedBirthdayProfiles ?? []);
   const [birthdaysReady, setBirthdaysReady] = useState(() => Boolean(cachedBirthdayProfiles));
@@ -272,10 +273,10 @@ export default function CompanyAgendaScreen() {
   }, [preview, previewCache, owner, view, anchor, nativePaging, query]);
   return <View style={s.page}>
     <StatusBar style="dark" />
-    <CompanyAgendaTopBar copy={c} canManage={canManage} onCreate={() => setDialog({ owner, event: null, day: anchor })} onSync={() => setSyncModalVisible(true)} />
+    <CompanyAgendaTopBar copy={c} canManage={canCreate} onCreate={() => setDialog({ owner, event: null, day: anchor })} onSync={() => setSyncModalVisible(true)} />
     {controls}
     {nativePaging && !query.trim() ? <FocusAwareAgendaNativePager key={`${owner}:${view}:${pageEpoch}`} anchor={anchor} pagePosition={position} view={view} enabled={hydrated && !dialog} renderPage={nativePage} onMove={swipeMove} style={s.listArea} /> : <FocusAwareAgendaSwipeArea scopeKey={`${owner}:${view}:${pageEpoch}`} pagePosition={position} previousPages={previousPages} nextPages={nextPages} periodKey={`${owner}:${view}:${from}:${to}`} canGoPrevious={moveAgendaPeriod(anchor, view, -1) !== anchor} canGoNext={moveAgendaPeriod(anchor, view, 1) !== anchor} style={s.listArea} enabled={hydrated && !query.trim() && !dialog} onMove={swipeMove}><CompanyAgendaSearchResults periodKey={`${view}:${from}:${to}`} colors={personalColors.colors} client={searchClient} key={owner} query={query.trim()} today={today} locale={locale} hiddenCalendars={hiddenCalendars} revision={searchRevision} header={header} bottomInset={insets.bottom} onOpen={openEvent} onClear={() => setQuery('')} onDate={day => { setQuery(''); setAnchor(day); setView('day'); }} fallback={{ rows, renderItem: renderRow, refreshing, onRefresh: () => void load(true), empty: loading && periodCache.read(from, to) === null ? <View style={s.empty}><ActivityIndicator color={P.accent} /><Text style={s.help}>{c.loading}</Text></View> : <View style={s.empty}><CalendarDays size={26} color={P.slate} /><Text style={s.emptyText}>{c.empty}</Text></View> }} /></FocusAwareAgendaSwipeArea>}
-    {dialog && dialog.owner === owner ? <CompanyEventModal key={`${owner}-${dialog.event?.id || dialog.day}`} event={dialog.event} day={dialog.day} canManage={canManage} copy={c} locale={locale} onClose={() => setDialog(null)} onSave={save} onDelete={remove} /> : null}
+    {dialog && dialog.owner === owner ? <CompanyEventModal key={`${owner}-${dialog.event?.id || dialog.day}`} event={dialog.event} day={dialog.day} canManageCompany={canManageCompany} availableCalendars={calendars.items} copy={c} locale={locale} onClose={() => setDialog(null)} onSave={save} onDelete={remove} /> : null}
     <GoogleCalendarSyncModal visible={syncModalVisible} onClose={() => setSyncModalVisible(false)} onSyncDone={() => { setSyncModalVisible(false); void load(true); }} copy={c} locale={locale} />
   </View>;
 }

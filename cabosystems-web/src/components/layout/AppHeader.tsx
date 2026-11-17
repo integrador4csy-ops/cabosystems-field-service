@@ -74,7 +74,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const isWarranty = activeItem === 'garantias';
   const isTeam = isCollaborators || activeItem === 'invitaciones';
   const isHistory = activeItem === 'historial' || (activeItem === 'radar' && trackingSection === 'history');
-  const canManageEvents = Boolean(user && adminProfile?.activo && ['admin', 'supervisor_instalacion'].includes(adminProfile.rol || ''));
+  const canManageEvents = Boolean(user && adminProfile?.activo);
   const canManageChat = Boolean(user && adminProfile?.activo && ['admin', 'supervisor_instalacion'].includes(adminProfile.rol || ''));
   const hasSearch = isRadar || isTasks || isChat || isCollaborators || isDirectory || isWarranty;
   const sectionQuery = isAgenda ? agendaSearchQuery : isTasks ? taskSearchQuery : isChat ? chatSearchQuery : isCollaborators ? teamSearchQuery : isDirectory ? directorySearchQuery : isWarranty ? warrantySearchQuery : searchQuery;

@@ -562,17 +562,26 @@ test('selected Google calendars load every page and preserve distinct events acr
   await assert.rejects(events.list(admin, '2026-02-30', '2026-03-01'), /periodo/);
 });
 
-test('active viewers can read Google events but cannot save, delete or escape selected calendars', async () => {
-  const f = await connectedFixture(); const events = createEventService(f.service, async () => Response.json({ items: [remoteEvent()] }));
+test('active collaborators can manage Google events in selected writable calendars but inactive users and unselected calendars are rejected', async () => {
+  const f = await connectedFixture(); const events = createEventService(f.service, async (url, options) => {
+    if (options?.method === 'DELETE') return new Response(null, { status: 204 });
+    if (options?.method === 'POST') return Response.json(remoteEvent({ id: 'created', summary: 'Nuevo evento' }));
+    if (!options?.method || options.method === 'GET') {
+      if (new URL(url).pathname.endsWith('/events')) return Response.json({ items: [remoteEvent()] });
+      return Response.json(remoteEvent());
+    }
+    return Response.json(remoteEvent());
+  });
   f.actor({ ...admin, rol: 'aux_instalacion' });
   assert.equal((await events.list(admin, '2026-10-20', '2026-10-20')).events.length, 1);
-  await assert.rejects(events.save(admin, { input: eventInput(), calendarId: 'office' }), (error) => error.status === 403);
-  await assert.rejects(events.remove(admin, eventIdentity('office', 'event1'), '"v1"'), (error) => error.status === 403);
-  f.actor({ ...admin, rol: 'supervisor_instalacion' });
+  const saved = await events.save(admin, { input: eventInput(), calendarId: 'office', requestId: 'a'.repeat(32) });
+  assert.equal(saved.event.titulo, 'Nuevo evento');
+  await events.remove(admin, eventIdentity('office', 'event1'), '"v1"');
   await assert.rejects(events.save(admin, { input: eventInput(), calendarId: 'not-selected' }), (error) => error.status === 403);
   await assert.rejects(events.save(admin, { input: eventInput(), id: eventIdentity('office', '../acl'), etag: '"v1"' }), /válido/);
   f.actor({ ...admin, activo: false });
   await assert.rejects(events.list(admin, '2026-10-20', '2026-10-20'), (error) => error.status === 403);
+  await assert.rejects(events.save(admin, { input: eventInput(), calendarId: 'office' }), (error) => error.status === 403);
 });
 
 test('Google updates use If-Match and refuse to overwrite a newer version', async () => {

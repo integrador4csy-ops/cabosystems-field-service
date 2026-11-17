@@ -7,6 +7,14 @@ export type CompanyRow = { kind: 'heading'; date: string; count: number } | { ki
 export function canManageCompanyAgenda(profile: { id?: string; activo?: boolean; rol?: string } | null | undefined) {
   return Boolean(profile?.id && profile.activo === true && ['admin', 'supervisor_instalacion'].includes(profile.rol || ''));
 }
+export function canCreateAgendaEvent(
+  profile: { id?: string; activo?: boolean; rol?: string } | null | undefined,
+  calendars?: Array<{ id: string; editable?: boolean }>
+) {
+  if (!profile?.id || profile.activo !== true) return false;
+  if (canManageCompanyAgenda(profile)) return true;
+  return Boolean(calendars?.some(cal => cal.editable !== false));
+}
 export function companyDays(anchor: string, view: CompanyView): string[] {
   if (view === 'day') return [anchor];
   if (view === 'week') return weekDates(anchor);

@@ -84,7 +84,7 @@ test('agenda renders with Expo Router focus alone and disables swipes when the r
     '@/lib/agenda': dates,
     '@/lib/agendaGestures': gestures,
     '@/lib/agendaPreviewCache': evaluate(fs.readFileSync(path.join(__dirname, '../lib/agendaPreviewCache.ts'), 'utf8'), {}),
-    '@/lib/companyAgenda': { canManageCompanyAgenda: () => false, companyDays: date => [date], companyRows: () => [] },
+    '@/lib/companyAgenda': { canManageCompanyAgenda: () => false, canCreateAgendaEvent: () => false, companyDays: date => [date], companyRows: () => [] },
     '@/lib/agendaWindowService': { getAgendaWindow: () => windowManager },
     '@/lib/companyAgendaApi': { getCompanyEvents: async () => [], getGoogleCalendars: async () => [], getCompanyBirthdays: async () => [] }, '@/lib/companyAgendaCache': {},
     '@/lib/companyAgendaCopy': copy, '@/lib/companyAgendaPresentation': { birthdaysForMonth: () => [], eventSchedule: () => '' },

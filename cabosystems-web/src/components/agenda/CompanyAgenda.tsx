@@ -43,7 +43,7 @@ export function CompanyAgenda() {
     reload(); window.addEventListener('focus', reload);
     return () => window.removeEventListener('focus', reload);
   }, [activeItem, personalColors.reload]);
-  const canManage = Boolean(user && adminProfile?.activo && ['admin', 'supervisor_instalacion'].includes(adminProfile.rol || ''));
+  const canManageCompany = Boolean(user && adminProfile?.activo && ['admin', 'supervisor_instalacion'].includes(adminProfile.rol || ''));
   const canConnectGoogle = Boolean(user && adminProfile?.activo);
   const [searchRevision, setSearchRevision] = useState(0);
   const searching = Boolean(agendaSearchQuery.trim());
@@ -87,6 +87,8 @@ export function CompanyAgenda() {
   const prefetchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const calendarsReady = useRef(false);
   const createVersion = useRef(agendaCreateVersion);
+  const hasWritableCalendars = calendars.some(cal => cal.editable !== false);
+  const canCreate = Boolean(user && adminProfile?.activo && (canManageCompany || hasWritableCalendars));
   const days = useMemo(() => agendaDays(anchor, view), [anchor, view]);
   const from = days[0]; const to = days[days.length - 1];
   const month = useMemo(() => agendaDays(anchor, 'month'), [anchor]);
@@ -150,9 +152,10 @@ export function CompanyAgenda() {
   useEffect(() => {
     if (createVersion.current !== agendaCreateVersion) {
       createVersion.current = agendaCreateVersion;
-      if (canManage) setDialog({ event: null, day: anchor });
+      if (canCreate) setDialog({ event: null, day: anchor });
+      else if (canConnectGoogle && !canManageCompany) setGoogleOpen(true);
     }
-  }, [agendaCreateVersion, anchor, canManage]);
+  }, [agendaCreateVersion, anchor, canCreate, canConnectGoogle, canManageCompany]);
   const byDay = useMemo(() => {
     const result = new Map<string, CompanyEvent[]>();
     const search = agendaSearchQuery.trim().toLocaleLowerCase(locale);
@@ -228,12 +231,12 @@ export function CompanyAgenda() {
       {!loading && !error && byDay.size === 0 && <p className="company-empty" role="status">{t('No hay eventos en este periodo.')}</p>}
       {view === 'month' ? <table className="company-calendar"><thead><tr>{days.slice(0, 7).map((day) => <th key={day} scope="col">{parseDateKey(day).toLocaleDateString(locale, { weekday: 'short' })}</th>)}</tr></thead><tbody>{Array.from({ length: days.length / 7 }, (_, index) => <tr key={index}>{days.slice(index * 7, index * 7 + 7).map((day) => {
         const items = byDay.get(day) || [];
-        return <td key={day} className={`${day.slice(0, 7) !== anchor.slice(0, 7) ? 'is-outside-month' : ''} ${day === today ? 'is-today' : ''}`}><div className="company-day-heading"><button type="button" className="agenda-month-date" aria-label={parseDateKey(day).toLocaleDateString(locale, { dateStyle: 'full' })} aria-current={day === today ? 'date' : undefined} onClick={() => { setAnchor(day); setView('day'); }}>{parseDateKey(day).getDate()}</button>{canManage && <button type="button" className="workspace-icon company-add" aria-label={t('Crear evento para el {date}', { date: parseDateKey(day).toLocaleDateString(locale) })} onClick={() => setDialog({ event: null, day })}><Plus size={14} /></button>}</div>{items.slice(0, 3).map(renderEvent)}{items.length > 3 && <button className="company-more" onClick={() => { setAnchor(day); setView('day'); }}>{t('Ver {count} más', { count: items.length - 3 })}</button>}</td>;
-      })}</tr>)}</tbody></table> : <div className={`company-columns ${view === 'day' ? 'is-day' : ''}`}>{days.map((day) => <section key={day} className={day === today ? 'is-today' : ''}><header className="company-day-heading"><h3>{parseDateKey(day).toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' })}</h3>{canManage && <button className="workspace-icon company-add" aria-label={t('Crear evento para el {date}', { date: parseDateKey(day).toLocaleDateString(locale) })} onClick={() => setDialog({ event: null, day })}><Plus size={16} /></button>}</header>{(byDay.get(day) || []).map(renderEvent)}{!loading && !error && !byDay.has(day) && <p className="company-empty">{t('Sin eventos')}</p>}</section>)}</div>}
+        return <td key={day} className={`${day.slice(0, 7) !== anchor.slice(0, 7) ? 'is-outside-month' : ''} ${day === today ? 'is-today' : ''}`}><div className="company-day-heading"><button type="button" className="agenda-month-date" aria-label={parseDateKey(day).toLocaleDateString(locale, { dateStyle: 'full' })} aria-current={day === today ? 'date' : undefined} onClick={() => { setAnchor(day); setView('day'); }}>{parseDateKey(day).getDate()}</button>{canCreate && <button type="button" className="workspace-icon company-add" aria-label={t('Crear evento para el {date}', { date: parseDateKey(day).toLocaleDateString(locale) })} onClick={() => setDialog({ event: null, day })}><Plus size={14} /></button>}</div>{items.slice(0, 3).map(renderEvent)}{items.length > 3 && <button className="company-more" onClick={() => { setAnchor(day); setView('day'); }}>{t('Ver {count} más', { count: items.length - 3 })}</button>}</td>;
+      })}</tr>)}</tbody></table> : <div className={`company-columns ${view === 'day' ? 'is-day' : ''}`}>{days.map((day) => <section key={day} className={day === today ? 'is-today' : ''}><header className="company-day-heading"><h3>{parseDateKey(day).toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' })}</h3>{canCreate && <button className="workspace-icon company-add" aria-label={t('Crear evento para el {date}', { date: parseDateKey(day).toLocaleDateString(locale) })} onClick={() => setDialog({ event: null, day })}><Plus size={16} /></button>}</header>{(byDay.get(day) || []).map(renderEvent)}{!loading && !error && !byDay.has(day) && <p className="company-empty">{t('Sin eventos')}</p>}</section>)}</div>}
     </div>}
     </div>
     </div>
-    {dialog && <EventDialog key={dialog.event?.id || dialog.day} {...dialog} canManage={canManage} onClose={() => setDialog(null)} onSaved={() => { setDialog(null); setSearchRevision(value => value + 1); void load(true); }} />}
+    {dialog && <EventDialog key={dialog.event?.id || dialog.day} {...dialog} canManageCompany={canManageCompany} availableCalendars={calendars} onClose={() => setDialog(null)} onSaved={() => { setDialog(null); setSearchRevision(value => value + 1); void load(true); }} />}
     {googleOpen && canConnectGoogle && <GoogleCalendarDialog key={user!.id} onClose={() => { setGoogleOpen(false); setSearchRevision(value => value + 1); void load(true); }} />}
   </section>;
 }

@@ -12,26 +12,37 @@ import { useDialog } from '../ui/useDialog';
 import { RecurrenceFields } from './RecurrenceFields';
 import { AgendaDateTimeField } from './AgendaDateTimeField';
 
-export function EventDialog({ event, day, canManage: allowed, onClose, onSaved }: {
-  event: CompanyEvent | null; day: string; canManage: boolean; onClose: () => void; onSaved: () => void;
+export function EventDialog({ event, day, canManage: allowed, canManageCompany: allowedCompany, availableCalendars, onClose, onSaved }: {
+  event: CompanyEvent | null; day: string; canManage?: boolean; canManageCompany?: boolean; availableCalendars?: AgendaGoogleCalendar[]; onClose: () => void; onSaved: () => void;
 }) {
   const { t, locale } = useTranslation();
   const { user, adminProfile } = useAdminAuth();
   const userEmail = user?.email || adminProfile?.email;
   const userFullName = adminProfile?.nombre || (user?.user_metadata?.nombre as string);
-  const canManage = allowed && event?.google?.editable !== false;
+  const canManageCompany = allowedCompany !== undefined ? allowedCompany : (allowed ?? Boolean(user && adminProfile?.activo && ['admin', 'supervisor_instalacion'].includes(adminProfile.rol || '')));
+  const isGoogle = Boolean(event?.google);
+  const canManage = event ? (isGoogle ? event.google?.editable !== false : canManageCompany) : true;
   const en = locale.startsWith('en');
-  const c = { startTime: en ? 'Start time' : 'Hora de inicio', invalidTime: en ? 'Enter a valid start and end time. Local events must end after they start on the same day.' : 'Indica inicio y fin válidos. Los eventos locales deben terminar después del inicio en el mismo día.', calendar: en ? 'Calendar' : 'Calendario', local: en ? 'CaboSystems only' : 'Solo CaboSystems', endDate: en ? 'Last day' : 'Último día', endTime: en ? 'End time' : 'Hora de fin', zone: en ? 'Google times use Los Cabos time.' : 'Las horas de Google se muestran en horario de Los Cabos.', occurrence: en ? 'Changes and deletion apply only to this occurrence. Manage the full series in Google Calendar.' : 'Los cambios y la eliminación afectan solo esta ocurrencia. La serie completa se administra en Google Calendar.', calendarError: en ? 'Could not load Google calendars. You can still save locally.' : 'No se pudieron consultar los calendarios de Google. Puedes guardar solo en CaboSystems.' };
-  const [calendars, setCalendars] = useState<AgendaGoogleCalendar[]>([]);
+  const c = { startTime: en ? 'Start time' : 'Hora de inicio', invalidTime: en ? 'Enter a valid start and end time. Local events must end after they start on the same day.' : 'Indica inicio y fin válidos. Los eventos locales deben terminar después del inicio en el mismo día.', calendar: en ? 'Calendar' : 'Calendario', local: en ? 'CaboSystems only' : 'Solo CaboSystems', endDate: en ? 'Last day' : 'Último día', endTime: en ? 'End time' : 'Hora de fin', zone: en ? 'Google times use Los Cabos time.' : 'Las horas de Google se muestran en horario de Los Cabos.', occurrence: en ? 'Changes and deletion apply only to this occurrence. Manage the full series in Google Calendar.' : 'Los cambios y la eliminación afectan solo esta ocurrencia. La serie completa se administra en Google Calendar.', calendarError: en ? 'Could not load Google calendars. You can still save locally.' : 'No se pudieron consultar los calendarios de Google. Puedes guardar solo en CaboSystems.', localRestricted: en ? 'Only administrators can create company calendar events.' : 'Solo administradores pueden crear eventos en el calendario general de la empresa.' };
+  const [calendars, setCalendars] = useState<AgendaGoogleCalendar[]>(() => (availableCalendars || []).filter(cal => cal.editable !== false));
   const [calendarError, setCalendarError] = useState(false);
   const [allDay, setAllDay] = useState(event ? !event.hora : false);
-  const [input, setInput] = useState<EventInput>(() => ({ titulo: event?.google?.availabilityOnly ? (en ? 'Busy' : 'Ocupado') : event?.titulo || '', descripcion: event?.descripcion || '', tipo: 'evento', fecha: event?.fecha || day, hora: event ? event.hora?.slice(0, 5) || '' : '09:00', ubicacion: event?.ubicacion || '', repeticion: event?.repeticion || 'ninguna', intervalo: event?.intervalo || 1, dias_semana: event?.dias_semana || [], repetir_hasta: event?.repetir_hasta || null, calendar_id: event?.google?.calendarId || '', google_etag: event?.google?.etag, request_id: agendaRequestId(), fecha_fin: event?.google?.endDate || '', hora_fin: event ? (event.google?.endTime || event.hora_fin)?.slice(0, 5) || '' : '10:00' }));
+  const initialCalendarId = event?.google?.calendarId || (!canManageCompany ? ((availableCalendars || []).find(cal => cal.editable !== false)?.id || '') : '');
+  const [input, setInput] = useState<EventInput>(() => ({ titulo: event?.google?.availabilityOnly ? (en ? 'Busy' : 'Ocupado') : event?.titulo || '', descripcion: event?.descripcion || '', tipo: 'evento', fecha: event?.fecha || day, hora: event ? event.hora?.slice(0, 5) || '' : '09:00', ubicacion: event?.ubicacion || '', repeticion: event?.repeticion || 'ninguna', intervalo: event?.intervalo || 1, dias_semana: event?.dias_semana || [], repetir_hasta: event?.repetir_hasta || null, calendar_id: initialCalendarId, google_etag: event?.google?.etag, request_id: agendaRequestId(), fecha_fin: event?.google?.endDate || '', hora_fin: event ? (event.google?.endTime || event.hora_fin)?.slice(0, 5) || '' : '10:00' }));
   useEffect(() => {
-    if (event || !canManage) return;
+    if (event) return;
     let active = true;
-    void getGoogleCalendars().then((items) => { if (active) setCalendars(items.filter(calendar => calendar.editable !== false)); }).catch(() => { if (active) setCalendarError(true); });
+    void getGoogleCalendars().then((items) => {
+      if (active) {
+        const writable = items.filter(calendar => calendar.editable !== false);
+        setCalendars(writable);
+        if (!canManageCompany && writable.length > 0) {
+          setInput(curr => curr.calendar_id ? curr : { ...curr, calendar_id: writable[0].id });
+        }
+      }
+    }).catch(() => { if (active) setCalendarError(true); });
     return () => { active = false; };
-  }, [event, canManage]);
+  }, [event, canManageCompany]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -40,6 +51,7 @@ export function EventDialog({ event, day, canManage: allowed, onClose, onSaved }
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!canManage || busy || confirmDelete) return;
+    if (!input.calendar_id && !canManageCompany) { setError(c.localRestricted); return; }
     if (!input.titulo.trim()) { setError(t('El título es obligatorio.')); return; }
     if (!allDay && (!input.hora || !input.hora_fin || !input.calendar_id && input.hora_fin <= input.hora)) { setError(c.invalidTime); return; }
     if (!validRecurrence(input)) { setError(t('Revisa la repetición: elige días, un intervalo válido y una fecha final igual o posterior al inicio.')); return; }
@@ -52,6 +64,7 @@ export function EventDialog({ event, day, canManage: allowed, onClose, onSaved }
   };
   const remove = async () => {
     if (!event || !canManage || busy) return;
+    if (!event.google && !canManageCompany) { setError(c.localRestricted); return; }
     setBusy(true); setError('');
     try { await deleteCompanyEvent(event.id, event.google?.etag); onSaved(); }
     catch (reason) { setError(event.google && reason instanceof Error && reason.message ? reason.message : t('No se pudo eliminar el evento. Intenta de nuevo.')); }
@@ -64,7 +77,7 @@ export function EventDialog({ event, day, canManage: allowed, onClose, onSaved }
         <div className="company-event-fields">
         <fieldset disabled={!canManage || busy}>
           <label className="company-title-field">{t('Título')}<input required maxLength={160} value={input.titulo} onChange={(e) => change({ titulo: e.target.value })} /></label>
-          {event ? <p className="company-field-help">{c.calendar}: {event.google ? resolveCalendarDisplayName({ id: event.google.calendarId || '', name: event.google.calendarName }, userEmail, userFullName) : c.local}</p> : <label>{c.calendar}<AppSelect aria-label={c.calendar} disabled={!canManage || busy} value={input.calendar_id || ''} onChange={(e) => change({ calendar_id: e.target.value })}><option value="">{c.local}</option>{calendars.map((calendar) => <option key={calendar.id} value={calendar.id}>{resolveCalendarDisplayName(calendar, userEmail, userFullName)}</option>)}</AppSelect></label>}
+          {event ? <p className="company-field-help">{c.calendar}: {event.google ? resolveCalendarDisplayName({ id: event.google.calendarId || '', name: event.google.calendarName }, userEmail, userFullName) : c.local}</p> : <label>{c.calendar}<AppSelect aria-label={c.calendar} disabled={!canManage || busy} value={input.calendar_id || ''} onChange={(e) => change({ calendar_id: e.target.value })}>{canManageCompany && <option value="">{c.local}</option>}{calendars.map((calendar) => <option key={calendar.id} value={calendar.id}>{resolveCalendarDisplayName(calendar, userEmail, userFullName)}</option>)}</AppSelect></label>}
           {event?.google?.availabilityOnly && <p className="company-field-help">{en ? 'Availability only. Google shares busy times without event details.' : 'Solo disponibilidad. Google comparte los horarios ocupados sin los detalles de los eventos.'}</p>}
           {calendarError && <p role="status" className="company-field-help">{c.calendarError}</p>}
           <div className="company-schedule-fields">

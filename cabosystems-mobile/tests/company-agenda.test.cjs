@@ -36,6 +36,14 @@ test('only active administrators and installation supervisors may manage the com
   for (const rol of ['admin', 'supervisor_instalacion']) assert.equal(model.canManageCompanyAgenda({ id: 'person', activo: true, rol }), true);
   for (const profile of [null, { id: 'person', activo: false, rol: 'admin' }, { rol: 'admin', activo: true }, { id: 'person', activo: true, rol: 'aux_operaciones' }, { id: 'person', activo: true, rol: 'integrador' }]) assert.equal(model.canManageCompanyAgenda(profile), false);
 });
+test('active collaborators with writable calendars or management roles can create agenda events', () => {
+  assert.equal(model.canCreateAgendaEvent({ id: 'person', activo: true, rol: 'admin' }, []), true);
+  assert.equal(model.canCreateAgendaEvent({ id: 'person', activo: true, rol: 'supervisor_instalacion' }, []), true);
+  assert.equal(model.canCreateAgendaEvent({ id: 'person', activo: true, rol: 'integrador' }, [{ id: 'cal1', editable: true }]), true);
+  assert.equal(model.canCreateAgendaEvent({ id: 'person', activo: true, rol: 'integrador' }, [{ id: 'cal1', editable: false }]), false);
+  assert.equal(model.canCreateAgendaEvent({ id: 'person', activo: true, rol: 'integrador' }, []), false);
+  assert.equal(model.canCreateAgendaEvent({ id: 'person', activo: false, rol: 'admin' }, [{ id: 'cal1', editable: true }]), false);
+});
 test('filters search company content without project membership and group by occurrence, preserving the series date', () => {
   const entries = recurrence.expandCompanyEvents([event({ repeticion: 'semanal', dias_semana: [1, 7] }), event({ id: 'delivery', titulo: 'Entrega de casa', tipo: 'evento' })], '2026-10-19', '2026-10-25');
   const rows = model.companyRows(entries, 'revision oficina', 'recordatorio');

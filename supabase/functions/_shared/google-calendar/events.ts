@@ -19,7 +19,7 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
   }
   const calendarPath = (id: string) => `calendars/${encodeURIComponent(id)}/events`;
   async function session(actor: Actor, calendarId: unknown) {
-    const current = await service.eventSession(actor, true);
+    const current = await service.eventSession(actor);
     if (!current.token || !current.connection.selected_calendars.some((item) => item.id === calendarId)) throw new CalendarError('El calendario no está seleccionado para la agenda.', 403);
     const calendar = (await service.eventCalendars(actor.id, current.token)).find(item => item.id === calendarId);
     if (!calendar || !isWritable(calendar)) throw new CalendarError('Este calendario es de solo consulta. No puedes crear, editar ni eliminar sus eventos.', 403);
@@ -258,7 +258,7 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
         if (current.locked || current.eventType && current.eventType !== 'default') throw new CalendarError('Este tipo de evento se administra en Google Calendar.', 403);
         let patch;
         try { patch = eventBody(input, current); } catch (error) { throw new CalendarError((error as Error).message); }
-        await service.verifyEventSession(actor, connection.revision, true);
+        await service.verifyEventSession(actor, connection.revision);
         event = await google(`${path}?sendUpdates=none`, token, { method: 'PATCH', headers: { 'If-Match': body.etag }, body: JSON.stringify(patch) }) as unknown as GoogleEvent;
       } else {
         if (typeof body.requestId !== 'string' || !/^[a-f0-9]{32}$/.test(body.requestId)) throw new CalendarError('Vuelve a abrir el formulario para crear el evento.');
@@ -267,7 +267,7 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
         const fingerprint = await digest(JSON.stringify(payload));
         const eventId = `c${body.requestId}`;
         (payload.extendedProperties as { private: Record<string, string> }).private.csyRequest = fingerprint;
-        await service.verifyEventSession(actor, connection.revision, true);
+        await service.verifyEventSession(actor, connection.revision);
         try {
           event = await google(`${calendarPath(calendar.id)}?sendUpdates=none`, token, { method: 'POST', body: JSON.stringify({ ...payload, id: eventId }) }) as unknown as GoogleEvent;
         } catch (error) {
@@ -297,7 +297,7 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
       if (current.status === 'cancelled') return { deleted: true };
       if (current.etag !== etag) throw new CalendarError('El evento cambió en Google. Actualiza antes de eliminar.', 409);
       if (current.locked || current.eventType && current.eventType !== 'default') throw new CalendarError('Este evento se administra en Google Calendar.', 403);
-      await service.verifyEventSession(actor, connection.revision, true);
+      await service.verifyEventSession(actor, connection.revision);
       await google(`${path}?sendUpdates=none`, token, { method: 'DELETE', headers: { 'If-Match': etag } });
       try { await service.searchIndex?.invalidate(connection.revision, calendar.id); } catch { /* Retry through the normal incremental refresh. */ }
       return { deleted: true };

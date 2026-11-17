@@ -17,8 +17,8 @@ import { AgendaTimePicker } from './AgendaTimePicker';
 import { CompanyChoice } from './CompanyChoice';
 import { TaskFilterSelect } from '@/components/TaskFilterSelect';
 
-export function CompanyEventModal({ event, day, canManage: allowed, copy: c, locale, onClose, onSave, onDelete }: {
-  event: CompanyEvent | null; day: string; canManage: boolean; copy: CompanyAgendaCopy; locale: string;
+export function CompanyEventModal({ event, day, canManage: allowed, canManageCompany: allowedCompany, availableCalendars, copy: c, locale, onClose, onSave, onDelete }: {
+  event: CompanyEvent | null; day: string; canManage?: boolean; canManageCompany?: boolean; availableCalendars?: AgendaGoogleCalendar[]; copy: CompanyAgendaCopy; locale: string;
   onClose: () => void; onSave: (id: string | undefined, input: EventInput) => Promise<void>; onDelete: (id: string, etag?: string) => Promise<void>;
 }) {
   const insets = useSafeAreaInsets();
@@ -33,17 +33,28 @@ export function CompanyEventModal({ event, day, canManage: allowed, copy: c, loc
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
     }));
   });
-  const canManage = allowed && event?.google?.editable !== false;
-  const [calendars, setCalendars] = useState<AgendaGoogleCalendar[]>([]);
+  const canManageCompany = allowedCompany !== undefined ? allowedCompany : Boolean(allowed);
+  const isGoogle = Boolean(event?.google);
+  const canManage = event ? (isGoogle ? event.google?.editable !== false : canManageCompany) : true;
+  const [calendars, setCalendars] = useState<AgendaGoogleCalendar[]>(() => (availableCalendars || []).filter(item => item.editable !== false));
   const [calendarError, setCalendarError] = useState(false);
   const [allDay, setAllDay] = useState(event ? !event.hora : false);
+  const initialCalendarId = event?.google?.calendarId || (!canManageCompany ? ((availableCalendars || []).find(item => item.editable !== false)?.id || '') : '');
   useEffect(() => {
-    if (event || !canManage) return;
+    if (event) return;
     let active = true;
-    void getGoogleCalendars().then(items => { if (active) setCalendars(items.filter(calendar => calendar.editable !== false)); }).catch(() => { if (active) setCalendarError(true); });
+    void getGoogleCalendars().then(items => {
+      if (active) {
+        const writable = items.filter(calendar => calendar.editable !== false);
+        setCalendars(writable);
+        if (!canManageCompany && writable.length > 0) {
+          setInput(curr => curr.calendar_id ? curr : { ...curr, calendar_id: writable[0].id });
+        }
+      }
+    }).catch(() => { if (active) setCalendarError(true); });
     return () => { active = false; };
-  }, [event, canManage]);
-  const [input, setInput] = useState<EventInput>(() => ({ titulo: event?.google?.availabilityOnly ? (locale.startsWith('en') ? 'Busy' : 'Ocupado') : event?.titulo || '', descripcion: event?.descripcion || '', tipo: 'evento', fecha: event?.fecha || day, hora: event ? event.hora?.slice(0, 5) || '' : '09:00', ubicacion: event?.ubicacion || '', repeticion: event?.repeticion || 'ninguna', intervalo: event?.intervalo || 1, dias_semana: event?.dias_semana || [], repetir_hasta: event?.repetir_hasta || null, calendar_id: event?.google?.calendarId || '', google_etag: event?.google?.etag, request_id: randomUUID().replace(/-/g, ''), fecha_fin: event?.google?.endDate || '', hora_fin: event ? (event.google?.endTime || event.hora_fin)?.slice(0, 5) || '' : '10:00' }));
+  }, [event, canManageCompany]);
+  const [input, setInput] = useState<EventInput>(() => ({ titulo: event?.google?.availabilityOnly ? (locale.startsWith('en') ? 'Busy' : 'Ocupado') : event?.titulo || '', descripcion: event?.descripcion || '', tipo: 'evento', fecha: event?.fecha || day, hora: event ? event.hora?.slice(0, 5) || '' : '09:00', ubicacion: event?.ubicacion || '', repeticion: event?.repeticion || 'ninguna', intervalo: event?.intervalo || 1, dias_semana: event?.dias_semana || [], repetir_hasta: event?.repetir_hasta || null, calendar_id: initialCalendarId, google_etag: event?.google?.etag, request_id: randomUUID().replace(/-/g, ''), fecha_fin: event?.google?.endDate || '', hora_fin: event ? (event.google?.endTime || event.hora_fin)?.slice(0, 5) || '' : '10:00' }));
   const [mode, setMode] = useState<string>(() => event && (event.intervalo > 1 || event.repeticion === 'diaria') ? 'custom' : event?.repeticion || 'ninguna');
   const [busy, setBusy] = useState(false); const [deleting, setDeleting] = useState(false); const [error, setError] = useState('');
   const disabled = !canManage || busy;
@@ -55,6 +66,7 @@ export function CompanyEventModal({ event, day, canManage: allowed, copy: c, loc
   };
   const submit = async () => {
     if (disabled || deleting) return;
+    if (!input.calendar_id && !canManageCompany) { setError(locale.startsWith('en') ? 'Only administrators can create company calendar events.' : 'Solo administradores pueden crear eventos en el calendario general de la empresa.'); return; }
     if (!validCompanyEvent(input)) { setError(c.invalid); return; }
     if (!allDay && (!input.hora || !input.hora_fin || !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.hora_fin) || !input.calendar_id && input.hora_fin <= input.hora)) { setError(c.invalid); return; }
     setBusy(true); setError('');
@@ -63,6 +75,7 @@ export function CompanyEventModal({ event, day, canManage: allowed, copy: c, loc
   };
   const remove = async () => {
     if (!event || disabled) return;
+    if (!event.google && !canManageCompany) { setError(locale.startsWith('en') ? 'Only administrators can delete company calendar events.' : 'Solo administradores pueden eliminar eventos del calendario general de la empresa.'); return; }
     setBusy(true); setError('');
     try { await onDelete(event.id, event.google?.etag); onClose(); } catch (reason) { setError(event.google && reason instanceof Error && reason.message ? reason.message : c.deleteFailed); } finally { setBusy(false); }
   };
@@ -93,7 +106,7 @@ export function CompanyEventModal({ event, day, canManage: allowed, copy: c, loc
           {textField(c.titleLabel, input.titulo, titulo => change({ titulo }), 160)}
           {textField(c.location, input.ubicacion || '', ubicacion => change({ ubicacion }), 240)}
           {textField(c.description, input.descripcion || '', descripcion => change({ descripcion }), 5000, true)}
-          {event ? <Text style={s.help}>{c.calendar}: {event.google?.calendarName || c.localCalendar}</Text> : <View style={s.field}>{disabled ? <Text style={s.readonly}>{calendars.find(calendar => calendar.id === input.calendar_id)?.name || c.localCalendar}</Text> : <TaskFilterSelect anchored label={c.calendar} value={input.calendar_id || ''} options={[{ value: '', label: c.localCalendar }, ...calendars.map(calendar => ({ value: calendar.id, label: calendar.name }))]} onChange={calendar_id => change({ calendar_id })} />}</View>}
+          {event ? <Text style={s.help}>{c.calendar}: {event.google?.calendarName || c.localCalendar}</Text> : <View style={s.field}>{disabled ? <Text style={s.readonly}>{calendars.find(calendar => calendar.id === input.calendar_id)?.name || (canManageCompany ? c.localCalendar : '')}</Text> : <TaskFilterSelect anchored label={c.calendar} value={input.calendar_id || ''} options={[...(canManageCompany ? [{ value: '', label: c.localCalendar }] : []), ...calendars.map(calendar => ({ value: calendar.id, label: calendar.name }))]} onChange={calendar_id => change({ calendar_id })} />}</View>}
           {calendarError ? <Text style={s.help}>{c.calendarFailed}</Text> : null}
           <View style={s.scheduleSection}>
           <View style={s.checkboxRow}><Text style={s.buttonText}>{c.allDay}</Text><Switch accessibilityLabel={c.allDay} disabled={disabled} value={allDay} trackColor={{ false: P.line, true: P.accent }} thumbColor={P.white} onValueChange={value => { setAllDay(value); change(value ? { hora: '', hora_fin: '' } : { hora: '09:00', hora_fin: '10:00' }); }} /></View>
