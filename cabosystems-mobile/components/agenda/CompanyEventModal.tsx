@@ -11,7 +11,7 @@ import { isoWeekday } from '@/lib/companyAgendaRecurrence';
 import { validCompanyEvent } from '@/lib/companyAgenda';
 import type { CompanyAgendaCopy } from '@/lib/companyAgendaCopy';
 import type { AgendaGoogleCalendar, CompanyEvent, EventAttendee, EventInput, RecurrenceFrequency } from '@/types/companyAgenda';
-import { getAgendaCollaborators, getGoogleCalendars, type AgendaCollaborator } from '@/lib/companyAgendaApi';
+import { getAgendaCollaborators, getGoogleCalendars, INITIAL_COLLABORATORS, type AgendaCollaborator } from '@/lib/companyAgendaApi';
 import { AgendaDatePicker } from './AgendaDatePicker';
 import { AgendaTimePicker } from './AgendaTimePicker';
 import { CompanyChoice } from './CompanyChoice';
@@ -39,7 +39,7 @@ export function CompanyEventModal({ event, day, canManage: allowed, canManageCom
   const [calendars, setCalendars] = useState<AgendaGoogleCalendar[]>(() => (availableCalendars || []).filter(item => item.editable !== false));
   const [calendarError, setCalendarError] = useState(false);
   const [allDay, setAllDay] = useState(event ? !event.hora : false);
-  const [collaborators, setCollaborators] = useState<AgendaCollaborator[]>([]);
+  const [collaborators, setCollaborators] = useState<AgendaCollaborator[]>(INITIAL_COLLABORATORS);
   const [guestQuery, setGuestQuery] = useState('');
   const [guestDropdownOpen, setGuestDropdownOpen] = useState(false);
   const initialCalendarId = event?.google?.calendarId || (!canManageCompany ? ((availableCalendars || []).find(item => item.editable !== false)?.id || '') : '');

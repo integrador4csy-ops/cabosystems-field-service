@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { CalendarDays, Check, UserPlus, Users, X } from 'lucide-react';
 import { useTranslation } from '../../context/LanguageContext';
-import { deleteCompanyEvent, getAgendaCollaborators, getGoogleCalendars, saveCompanyEvent, type AgendaCollaborator } from '../../lib/agendaApi';
+import { deleteCompanyEvent, getAgendaCollaborators, getGoogleCalendars, INITIAL_COLLABORATORS, saveCompanyEvent, type AgendaCollaborator } from '../../lib/agendaApi';
 import { resolveCalendarDisplayName } from '../../lib/agendaPresentation';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { validRecurrence } from '../../lib/agendaRecurrence';
@@ -43,7 +43,7 @@ export function EventDialog({ event, day, canManage: allowed, canManageCompany: 
   const [calendars, setCalendars] = useState<AgendaGoogleCalendar[]>(() => (availableCalendars || []).filter(cal => cal.editable !== false));
   const [calendarError, setCalendarError] = useState(false);
   const [allDay, setAllDay] = useState(event ? !event.hora : false);
-  const [collaborators, setCollaborators] = useState<AgendaCollaborator[]>([]);
+  const [collaborators, setCollaborators] = useState<AgendaCollaborator[]>(INITIAL_COLLABORATORS);
   const [guestQuery, setGuestQuery] = useState('');
   const [guestDropdownOpen, setGuestDropdownOpen] = useState(false);
   const guestInputRef = useRef<HTMLInputElement>(null);

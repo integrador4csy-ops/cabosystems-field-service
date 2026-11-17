@@ -30,6 +30,14 @@ export const KNOWN_CSY_COLLABORATORS: Record<string, string> = {
   'alessandra@csy.mx': 'Alessandra Collins Carrillo',
 };
 
+export const INITIAL_COLLABORATORS: AgendaCollaborator[] = Object.entries(KNOWN_CSY_COLLABORATORS).map(([email, nombre]) => ({
+  id: email,
+  email,
+  nombre,
+  rol: 'colaborador',
+  avatar_url: null,
+}));
+
 export async function getAgendaCollaborators(): Promise<AgendaCollaborator[]> {
   try {
     const [profilesRes, invsRes] = await Promise.all([
@@ -58,7 +66,7 @@ export async function getAgendaCollaborators(): Promise<AgendaCollaborator[]> {
         existing.id = inv.id;
         if (inv.rol) existing.rol = inv.rol;
       } else {
-        const derivedName = clean.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const derivedName = clean.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
         map.set(clean, {
           id: inv.id,
           email: clean,
