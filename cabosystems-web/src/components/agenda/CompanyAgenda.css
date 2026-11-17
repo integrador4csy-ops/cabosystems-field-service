@@ -203,10 +203,13 @@
 .company-dialog.company-event-dialog input:not([type="checkbox"]), .company-dialog.company-event-dialog .app-select-trigger, .company-dialog.company-event-dialog .company-picker-trigger { min-height: 38px; height: 38px; padding: 8px 12px; font-size: 13.5px; border-radius: 8px; }
 .company-dialog.company-event-dialog .company-picker-trigger > svg { width: 15px; height: 15px; }
 .company-dialog.company-event-dialog textarea { min-height: 60px; height: 60px; padding: 8px 12px; font-size: 13.5px; border-radius: 8px; }
-.company-dialog.company-event-dialog .company-schedule-fields { display: flex; flex-direction: column; gap: 12px; padding-block: 12px; border-block: 1px solid var(--color-slate-200); }
-.company-dialog.company-event-dialog .company-date-all-day { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; }
-.company-dialog.company-event-dialog label.company-all-day { min-height: 38px; height: 38px; padding: 8px 12px; border: 1px solid var(--color-slate-200); border-radius: 8px; background: var(--color-slate-50); cursor: pointer; gap: 8px; font-size: 13px; }
-.company-dialog.company-event-dialog .company-form-row { gap: 12px; }
+.company-dialog.company-event-dialog .company-schedule-fields { display: flex; flex-direction: column; gap: 10px; padding-block: 12px; border-block: 1px solid var(--color-slate-200); }
+.company-schedule-header { display: flex; align-items: center; justify-content: space-between; }
+.company-schedule-title { font-size: 13px; font-weight: 600; color: var(--color-slate-700); }
+.company-dialog.company-event-dialog label.company-all-day { min-height: 32px; height: 32px; padding: 4px 10px; border: 1px solid var(--color-slate-200); border-radius: 8px; background: var(--color-slate-50); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 500; color: var(--color-slate-700); }
+.company-schedule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.company-grid-full { grid-column: 1 / -1; }
+.company-dialog.company-event-dialog .company-form-row { gap: 10px; }
 .company-dialog.company-event-dialog .company-checkbox-control { position: relative; display: inline-flex; flex: 0 0 18px; width: 18px; height: 18px; }
 .company-dialog.company-event-dialog .company-checkbox-control input { appearance: none; width: 18px; height: 18px; margin: 0; padding: 0; border: 1px solid var(--color-slate-400); border-radius: 4px; cursor: pointer; }
 .company-dialog.company-event-dialog .company-checkbox-control input:checked { background: var(--color-brand-500); border-color: var(--color-brand-500); }
@@ -246,7 +249,7 @@
   .company-dialog.company-event-dialog form { padding: 0; }
   .company-dialog.company-event-dialog fieldset { padding: 12px 14px; gap: 8px; }
   .company-dialog.company-event-dialog footer { padding-inline: 14px; }
-  .company-dialog.company-event-dialog .company-date-all-day { gap: 8px; }
+  .company-dialog.company-event-dialog .company-schedule-grid { gap: 8px; }
 }
 
 .agenda-search-event.has-calendar-color span { color: inherit; }

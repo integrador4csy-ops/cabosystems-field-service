@@ -24,11 +24,13 @@ export function EventDialog({ event, day, canManage: allowed, canManageCompany: 
   const canManage = event ? (isGoogle ? event.google?.editable !== false : canManageCompany) : true;
   const en = locale.startsWith('en');
   const c = {
+    schedule: en ? 'Schedule' : 'Horario',
+    startDate: en ? 'Start date' : 'Fecha de inicio',
     startTime: en ? 'Start time' : 'Hora de inicio',
     invalidTime: en ? 'Enter a valid start and end time. Local events must end after they start on the same day.' : 'Indica inicio y fin válidos. Los eventos locales deben terminar después del inicio en el mismo día.',
     calendar: en ? 'Calendar' : 'Calendario',
     local: en ? 'CaboSystems only' : 'Solo CaboSystems',
-    endDate: en ? 'Last day' : 'Último día',
+    endDate: en ? 'End date' : 'Fecha de fin',
     endTime: en ? 'End time' : 'Hora de fin',
     zone: en ? 'Google times use Los Cabos time.' : 'Las horas de Google se muestran en horario de Los Cabos.',
     occurrence: en ? 'Changes and deletion apply only to this occurrence. Manage the full series in Google Calendar.' : 'Los cambios y la eliminación afectan solo esta ocurrencia. La serie completa se administra en Google Calendar.',
@@ -151,12 +153,109 @@ export function EventDialog({ event, day, canManage: allowed, canManageCompany: 
           {event?.google?.availabilityOnly && <p className="company-field-help">{en ? 'Availability only. Google shares busy times without event details.' : 'Solo disponibilidad. Google comparte los horarios ocupados sin los detalles de los eventos.'}</p>}
           {calendarError && <p role="status" className="company-field-help">{c.calendarError}</p>}
           <div className="company-schedule-fields">
-          <div className="company-date-all-day">
-          <label>{t('Fecha')}<AgendaDateTimeField type="date" required min="1900-01-01" max="9999-12-31" value={input.fecha} label={t('Fecha')} locale={locale} disabled={!canManage || busy} onChange={fecha => change({ fecha })} /></label>
-          <label className="company-all-day"><span className="company-checkbox-control"><input type="checkbox" checked={allDay} onChange={(e) => { setAllDay(e.target.checked); change(e.target.checked ? { hora: '', hora_fin: '' } : { hora: '09:00', hora_fin: '10:00' }); }} /><Check size={13} strokeWidth={3} aria-hidden="true" /></span>{t('Todo el día')}</label>
-          </div>
-          {!allDay && <div className="company-form-row"><label>{c.startTime}<AgendaDateTimeField type="time" required value={input.hora || ''} label={c.startTime} locale={locale} disabled={!canManage || busy} onChange={hora => change({ hora })} /></label><label>{c.endTime}<AgendaDateTimeField type="time" required value={input.hora_fin || ''} label={c.endTime} locale={locale} disabled={!canManage || busy} onChange={hora_fin => change({ hora_fin })} /></label></div>}
-          {input.calendar_id && <><label>{c.endDate}<AgendaDateTimeField type="date" min={input.fecha} max="9999-12-30" value={input.fecha_fin || ''} label={c.endDate} locale={locale} disabled={!canManage || busy} onChange={fecha_fin => change({ fecha_fin })} /></label><p className="company-field-help">{c.zone}</p></>}
+            <div className="company-schedule-header">
+              <span className="company-schedule-title">{c.schedule}</span>
+              <label className="company-all-day">
+                <span className="company-checkbox-control">
+                  <input
+                    type="checkbox"
+                    checked={allDay}
+                    onChange={(e) => {
+                      setAllDay(e.target.checked);
+                      change(e.target.checked ? { hora: '', hora_fin: '' } : { hora: '09:00', hora_fin: '10:00' });
+                    }}
+                  />
+                  <Check size={13} strokeWidth={3} aria-hidden="true" />
+                </span>
+                {t('Todo el día')}
+              </label>
+            </div>
+
+            <div className="company-schedule-grid">
+              {input.calendar_id ? (
+                <>
+                  <label>
+                    {c.startDate}
+                    <AgendaDateTimeField
+                      type="date"
+                      required
+                      min="1900-01-01"
+                      max="9999-12-31"
+                      value={input.fecha}
+                      label={c.startDate}
+                      locale={locale}
+                      disabled={!canManage || busy}
+                      onChange={(fecha) => {
+                        const patch: Partial<EventInput> = { fecha };
+                        if (!input.fecha_fin || input.fecha_fin < fecha) {
+                          patch.fecha_fin = fecha;
+                        }
+                        change(patch);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    {c.endDate}
+                    <AgendaDateTimeField
+                      type="date"
+                      min={input.fecha}
+                      max="9999-12-30"
+                      value={input.fecha_fin || input.fecha}
+                      label={c.endDate}
+                      locale={locale}
+                      disabled={!canManage || busy}
+                      onChange={(fecha_fin) => change({ fecha_fin })}
+                    />
+                  </label>
+                </>
+              ) : (
+                <label className="company-grid-full">
+                  {t('Fecha')}
+                  <AgendaDateTimeField
+                    type="date"
+                    required
+                    min="1900-01-01"
+                    max="9999-12-31"
+                    value={input.fecha}
+                    label={t('Fecha')}
+                    locale={locale}
+                    disabled={!canManage || busy}
+                    onChange={(fecha) => change({ fecha })}
+                  />
+                </label>
+              )}
+
+              {!allDay && (
+                <>
+                  <label>
+                    {c.startTime}
+                    <AgendaDateTimeField
+                      type="time"
+                      required
+                      value={input.hora || ''}
+                      label={c.startTime}
+                      locale={locale}
+                      disabled={!canManage || busy}
+                      onChange={(hora) => change({ hora })}
+                    />
+                  </label>
+                  <label>
+                    {c.endTime}
+                    <AgendaDateTimeField
+                      type="time"
+                      required
+                      value={input.hora_fin || ''}
+                      label={c.endTime}
+                      locale={locale}
+                      disabled={!canManage || busy}
+                      onChange={(hora_fin) => change({ hora_fin })}
+                    />
+                  </label>
+                </>
+              )}
+            </div>
+
+            {input.calendar_id && <p className="company-field-help">{c.zone}</p>}
           </div>
           {event?.google?.recurring && <p className="company-field-help">{c.occurrence}</p>}
           {!event?.google && <RecurrenceFields input={input} disabled={!canManage || busy} onChange={change} />}
