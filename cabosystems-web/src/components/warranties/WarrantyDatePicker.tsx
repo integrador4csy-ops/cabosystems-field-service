@@ -51,6 +51,7 @@ export function WarrantyDatePicker({
   const panelRef = useRef<HTMLDivElement>(null);
 
   const [open, setOpen] = useState(false);
+  const [openedUpwards, setOpenedUpwards] = useState(false);
 
   // Parse initial selected date or default to today
   const today = useMemo(() => {
@@ -95,20 +96,20 @@ export function WarrantyDatePicker({
       const panel = panelRef.current;
       if (!anchor || !panel) return;
 
-      const width = 290;
-      const height = 330;
+      const width = Math.min(layout.width - 20, Math.max(220, Math.round(anchor.width)));
+      panel.style.width = `${width}px`;
 
-      // Check vertical space
-      const spaceBelow = layout.height - anchor.bottom - 12;
-      const spaceAbove = anchor.top - 12;
-      const upwards = spaceBelow < height && spaceAbove > spaceBelow;
+      const measuredHeight = panel.offsetHeight || 276;
+      const spaceBelow = layout.height - anchor.bottom - 10;
+      const spaceAbove = anchor.top - 10;
+      const upwards = spaceBelow < measuredHeight && spaceAbove > spaceBelow;
+      setOpenedUpwards(upwards);
 
       const left = Math.max(10, Math.min(anchor.left, layout.width - width - 10));
       const top = upwards
-        ? Math.max(10, anchor.top - height - 4)
-        : anchor.bottom + 4;
+        ? Math.max(10, anchor.top - measuredHeight + 1)
+        : Math.min(layout.height - measuredHeight - 10, anchor.bottom - 1);
 
-      panel.style.width = `${width}px`;
       panel.style.left = `${left}px`;
       panel.style.top = `${top}px`;
       panel.style.visibility = 'visible';
@@ -144,7 +145,7 @@ export function WarrantyDatePicker({
       window.removeEventListener('resize', position);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open, disabled]);
+  }, [open, disabled, viewYear, viewMonth]);
 
   const prevMonth = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -238,10 +239,12 @@ export function WarrantyDatePicker({
     <div className={`relative ${className}`}>
       <div
         ref={triggerRef}
-        className={`flex ${compact ? 'h-8 gap-0.5 pl-2 pr-0.5 text-[11.5px]' : 'h-11 gap-1 pl-3 pr-1.5 text-sm'} w-full items-center rounded-lg border bg-white transition-colors ${
+        className={`flex ${compact ? 'h-8 gap-0.5 pl-2 pr-0.5 text-[11.5px]' : 'h-11 gap-1 pl-3 pr-1.5 text-sm'} w-full items-center border bg-white transition-colors ${
           open
-            ? 'border-brand-500 ring-2 ring-brand-500/15'
-            : 'border-slate-200 hover:border-slate-300 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15'
+            ? openedUpwards
+              ? 'rounded-b-lg rounded-t-none border-brand-500 ring-2 ring-brand-500/15'
+              : 'rounded-t-lg rounded-b-none border-brand-500 ring-2 ring-brand-500/15'
+            : 'rounded-lg border-slate-200 hover:border-slate-300 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15'
         } ${disabled ? 'cursor-not-allowed opacity-50 bg-slate-50' : ''}`}
       >
         <button
@@ -303,45 +306,49 @@ export function WarrantyDatePicker({
             role="dialog"
             aria-modal="true"
             aria-label={isEn ? 'Choose date' : 'Seleccionar fecha'}
-            className="fixed z-[1300] rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xl transition-all"
+            className={`fixed z-[1300] border border-brand-500/45 bg-white p-2.5 shadow-lg ${
+              openedUpwards
+                ? 'rounded-t-xl rounded-b-none border-b-0'
+                : 'rounded-b-xl rounded-t-none border-t-0'
+            }`}
             style={{ visibility: 'hidden' }}
           >
             {/* Header: Month, Year, Arrows */}
-            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
-              <span className="text-xs font-semibold text-slate-900 capitalize tracking-tight">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <span className="text-xs font-semibold capitalize tracking-tight text-slate-900">
                 {monthLabel} {viewYear}
               </span>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5">
                 <button
                   type="button"
                   onClick={prevMonth}
                   aria-label={isEn ? 'Previous month' : 'Mes anterior'}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
                 >
-                  <ChevronLeft size={16} />
+                  <ChevronLeft size={15} />
                 </button>
                 <button
                   type="button"
                   onClick={nextMonth}
                   aria-label={isEn ? 'Next month' : 'Mes siguiente'}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
                 >
-                  <ChevronRight size={16} />
+                  <ChevronRight size={15} />
                 </button>
               </div>
             </div>
 
             {/* Weekdays */}
-            <div className="grid grid-cols-7 gap-1 pt-2.5 pb-1 text-center">
+            <div className="grid grid-cols-7 gap-0.5 pt-2 pb-1 text-center">
               {weekdays.map((day) => (
-                <span key={day} className="text-[11px] font-semibold text-slate-400">
+                <span key={day} className="text-[10.5px] font-semibold text-slate-400">
                   {day}
                 </span>
               ))}
             </div>
 
             {/* Days Grid */}
-            <div className="grid grid-cols-7 gap-1 text-center">
+            <div className="grid grid-cols-7 gap-0.5 text-center">
               {calendarCells.map((cell) => {
                 const isSelected = parsedValue?.key === cell.key;
                 const isToday = today.key === cell.key;
@@ -351,11 +358,11 @@ export function WarrantyDatePicker({
                     key={cell.key}
                     type="button"
                     onClick={() => selectDate(cell.key)}
-                    className={`h-8 w-8 mx-auto flex items-center justify-center rounded-lg text-xs transition-colors ${
+                    className={`flex h-7 w-full items-center justify-center rounded-md text-[11.5px] transition-colors ${
                       isSelected
                         ? 'bg-brand-500 font-bold text-white shadow-xs'
                         : isToday
-                        ? 'font-bold text-brand-600 bg-orange-50 border border-brand-300'
+                        ? 'border border-brand-300 bg-orange-50 font-bold text-brand-600'
                         : cell.isCurrentMonth
                         ? 'text-slate-700 hover:bg-orange-50/70 hover:text-orange-950'
                         : 'text-slate-300 hover:bg-slate-50 hover:text-slate-500'
@@ -368,7 +375,7 @@ export function WarrantyDatePicker({
             </div>
 
             {/* Footer actions */}
-            <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
+            <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2">
               <button
                 type="button"
                 onClick={chooseToday}
