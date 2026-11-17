@@ -354,9 +354,32 @@ export function WarrantyManagementView() {
     </div>
 
     {updateOpen && selected && canUpdate ? <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-slate-950/40 p-4" onMouseDown={event => { if (event.target === event.currentTarget && !saving) setUpdateOpen(false); }}><form onSubmit={submitUpdate} role="dialog" aria-modal="true" aria-labelledby="update-warranty-title" className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl"><div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4"><div><h3 id="update-warranty-title" className="text-lg font-semibold text-slate-900">{copy.followUp}</h3><p className="mt-0.5 text-xs text-slate-500">{warrantyFolio(selected.case_number)} · {selected.equipment}</p></div><button type="button" disabled={saving} onClick={() => setUpdateOpen(false)} aria-label={copy.cancel} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100"><X size={19} /></button></div><div className="grid gap-4 p-5 sm:grid-cols-2">
-      <div><label className="mb-1.5 block text-xs font-medium text-slate-600">{copy.stage} <span className="text-brand-500">*</span></label><AppSelect aria-label={copy.stage} value={updateForm.status} onChange={event => setUpdateForm(current => ({ ...current, status: event.target.value as WarrantyStatus }))} style={{ height: 44, minHeight: 44, fontSize: 14 }}>{allowedWarrantyStatuses(selected.status).map(status => <option key={status} value={status}>{statusLabel(copy, status)}</option>)}</AppSelect></div>
+      <div className="sm:col-span-2">
+        <span className="mb-1.5 block text-xs font-medium text-slate-600">{copy.stage} <span className="text-brand-500">*</span></span>
+        <div role="radiogroup" aria-label={copy.stage} className="flex w-full items-center gap-[3px] rounded-[10px] border border-slate-200 bg-slate-100 p-[3px]">
+          {allowedWarrantyStatuses(selected.status).map(status => {
+            const active = updateForm.status === status;
+            return (
+              <button
+                key={status}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => setUpdateForm(current => ({ ...current, status }))}
+                className={`flex h-[38px] flex-1 items-center justify-center whitespace-nowrap rounded-[7px] px-3 text-sm transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${
+                  active
+                    ? 'bg-brand-500 font-semibold text-white shadow-xs'
+                    : 'font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                }`}
+              >
+                {statusLabel(copy, status)}
+              </button>
+            );
+          })}
+        </div>
+      </div>
       <div><label className="mb-1.5 block text-xs font-medium text-slate-600">{copy.managementRoute} <span className="text-brand-500">*</span></label><ManagementRouteListbox value={updateForm.area} onChange={area => setUpdateForm(current => ({ ...current, area }))} copy={copy} /></div>
-      <StartDateField className="sm:col-span-2" value={updateForm.warranty_until} onChange={val => setUpdateForm(current => ({ ...current, warranty_until: val }))} locale={locale} todayKey={todayKey} copy={copy} />
+      <StartDateField value={updateForm.warranty_until} onChange={val => setUpdateForm(current => ({ ...current, warranty_until: val }))} locale={locale} todayKey={todayKey} copy={copy} />
       <div className="sm:col-span-2"><label className="mb-1.5 block text-xs font-medium text-slate-600">{copy.note} <span className="text-brand-500">*</span></label><textarea required rows={4} value={updateForm.last_note} onChange={event => setUpdateForm(current => ({ ...current, last_note: event.target.value }))} placeholder={copy.notePlaceholder} className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2.5 text-sm leading-5 outline-none focus:border-brand-500" /></div>
       {formError ? <p role="alert" className="text-xs text-orange-700 sm:col-span-2">{formError}</p> : null}
     </div><div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4"><button type="button" disabled={saving} onClick={() => setUpdateOpen(false)} className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50">{copy.cancel}</button><button disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-500 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50"><CheckCircle2 size={16} />{saving ? copy.saving : copy.save}</button></div></form></div> : null}
