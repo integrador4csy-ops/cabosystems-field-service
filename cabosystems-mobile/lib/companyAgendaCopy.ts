@@ -20,6 +20,7 @@ const es = {
   saveFailed: 'No se pudo guardar. Comprueba tu conexión y tus permisos e intenta de nuevo.', deleteFailed: 'No se pudo eliminar. Intenta de nuevo.',
   selectDay: 'Ver eventos de', count: 'registros',
   syncCalendar: 'Sincronizar calendario', syncGoogle: 'Sync', connectGoogle: 'Conectar Google Calendar', reauthorizeGoogle: 'Reautorizar cuenta Google',
+  attendees: 'Invitados', addGuest: 'Agregar personas o correos...', noGuests: 'Sin invitados',
 };
 export type CompanyAgendaCopy = typeof es;
 const en: CompanyAgendaCopy = {
@@ -44,5 +45,6 @@ const en: CompanyAgendaCopy = {
   saveFailed: 'Could not save. Check your connection and permissions and try again.', deleteFailed: 'Could not delete. Try again.',
   selectDay: 'View events for', count: 'entries',
   syncCalendar: 'Sync calendar', syncGoogle: 'Sync', connectGoogle: 'Connect Google Calendar', reauthorizeGoogle: 'Reauthorize Google account',
+  attendees: 'Guests', addGuest: 'Add people or emails...', noGuests: 'No guests',
 };
 export const COMPANY_AGENDA_COPY = { es, en };

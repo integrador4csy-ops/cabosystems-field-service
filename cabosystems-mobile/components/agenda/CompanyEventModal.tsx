@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { randomUUID } from 'expo-crypto';
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, type ScrollViewInstance } from 'react-native';
-import { CalendarDays, Clock3, MapPin, Repeat2, X } from 'lucide-react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, type ScrollViewInstance } from 'react-native';
+import { CalendarDays, Clock3, MapPin, Repeat2, UserPlus, Users, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AgendaPalette as P } from '@/constants/Theme';
@@ -10,8 +10,8 @@ import { eventSchedule } from '@/lib/companyAgendaPresentation';
 import { isoWeekday } from '@/lib/companyAgendaRecurrence';
 import { validCompanyEvent } from '@/lib/companyAgenda';
 import type { CompanyAgendaCopy } from '@/lib/companyAgendaCopy';
-import type { AgendaGoogleCalendar, CompanyEvent, EventInput, RecurrenceFrequency } from '@/types/companyAgenda';
-import { getGoogleCalendars } from '@/lib/companyAgendaApi';
+import type { AgendaGoogleCalendar, CompanyEvent, EventAttendee, EventInput, RecurrenceFrequency } from '@/types/companyAgenda';
+import { getAgendaCollaborators, getGoogleCalendars, type AgendaCollaborator } from '@/lib/companyAgendaApi';
 import { AgendaDatePicker } from './AgendaDatePicker';
 import { AgendaTimePicker } from './AgendaTimePicker';
 import { CompanyChoice } from './CompanyChoice';
@@ -39,7 +39,15 @@ export function CompanyEventModal({ event, day, canManage: allowed, canManageCom
   const [calendars, setCalendars] = useState<AgendaGoogleCalendar[]>(() => (availableCalendars || []).filter(item => item.editable !== false));
   const [calendarError, setCalendarError] = useState(false);
   const [allDay, setAllDay] = useState(event ? !event.hora : false);
+  const [collaborators, setCollaborators] = useState<AgendaCollaborator[]>([]);
+  const [guestQuery, setGuestQuery] = useState('');
+  const [guestDropdownOpen, setGuestDropdownOpen] = useState(false);
   const initialCalendarId = event?.google?.calendarId || (!canManageCompany ? ((availableCalendars || []).find(item => item.editable !== false)?.id || '') : '');
+  useEffect(() => {
+    let active = true;
+    void getAgendaCollaborators().then(list => { if (active) setCollaborators(list); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
   useEffect(() => {
     if (event) return;
     let active = true;
@@ -54,11 +62,54 @@ export function CompanyEventModal({ event, day, canManage: allowed, canManageCom
     }).catch(() => { if (active) setCalendarError(true); });
     return () => { active = false; };
   }, [event, canManageCompany]);
-  const [input, setInput] = useState<EventInput>(() => ({ titulo: event?.google?.availabilityOnly ? (locale.startsWith('en') ? 'Busy' : 'Ocupado') : event?.titulo || '', descripcion: event?.descripcion || '', tipo: 'evento', fecha: event?.fecha || day, hora: event ? event.hora?.slice(0, 5) || '' : '09:00', ubicacion: event?.ubicacion || '', repeticion: event?.repeticion || 'ninguna', intervalo: event?.intervalo || 1, dias_semana: event?.dias_semana || [], repetir_hasta: event?.repetir_hasta || null, calendar_id: initialCalendarId, google_etag: event?.google?.etag, request_id: randomUUID().replace(/-/g, ''), fecha_fin: event?.google?.endDate || '', hora_fin: event ? (event.google?.endTime || event.hora_fin)?.slice(0, 5) || '' : '10:00' }));
+  const [input, setInput] = useState<EventInput>(() => ({
+    titulo: event?.google?.availabilityOnly ? (locale.startsWith('en') ? 'Busy' : 'Ocupado') : event?.titulo || '',
+    descripcion: event?.descripcion || '',
+    tipo: 'evento',
+    fecha: event?.fecha || day,
+    hora: event ? event.hora?.slice(0, 5) || '' : '09:00',
+    ubicacion: event?.ubicacion || '',
+    repeticion: event?.repeticion || 'ninguna',
+    intervalo: event?.intervalo || 1,
+    dias_semana: event?.dias_semana || [],
+    repetir_hasta: event?.repetir_hasta || null,
+    calendar_id: initialCalendarId,
+    google_etag: event?.google?.etag,
+    request_id: randomUUID().replace(/-/g, ''),
+    fecha_fin: event?.google?.endDate || '',
+    hora_fin: event ? (event.google?.endTime || event.hora_fin)?.slice(0, 5) || '' : '10:00',
+    attendees: event?.attendees || event?.google?.attendees || [],
+  }));
   const [mode, setMode] = useState<string>(() => event && (event.intervalo > 1 || event.repeticion === 'diaria') ? 'custom' : event?.repeticion || 'ninguna');
   const [busy, setBusy] = useState(false); const [deleting, setDeleting] = useState(false); const [error, setError] = useState('');
   const disabled = !canManage || busy;
   const change = (patch: Partial<EventInput>) => { setInput(previous => ({ ...previous, ...patch })); setError(''); };
+  const addGuest = (attendee: EventAttendee) => {
+    const email = attendee.email.trim().toLowerCase();
+    if (!email || (input.attendees || []).some(a => a.email.toLowerCase() === email)) return;
+    change({ attendees: [...(input.attendees || []), { ...attendee, email }] });
+    setGuestQuery('');
+    setGuestDropdownOpen(false);
+  };
+  const removeGuest = (email: string) => {
+    change({ attendees: (input.attendees || []).filter(a => a.email.toLowerCase() !== email.toLowerCase()) });
+  };
+  const matchingGuests = useMemo(() => {
+    const q = guestQuery.trim().toLowerCase();
+    if (!q) return [];
+    return collaborators.filter(collab => {
+      const already = (input.attendees || []).some(a => a.email.toLowerCase() === collab.email.toLowerCase());
+      if (already) return false;
+      return (collab.nombre && collab.nombre.toLowerCase().includes(q)) || collab.email.toLowerCase().includes(q);
+    }).slice(0, 5);
+  }, [collaborators, guestQuery, input.attendees]);
+  const customEmailMatch = useMemo(() => {
+    const q = guestQuery.trim().toLowerCase();
+    if (!q || !q.includes('@') || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(q)) return null;
+    const already = (input.attendees || []).some(a => a.email.toLowerCase() === q);
+    if (already) return null;
+    return q;
+  }, [guestQuery, input.attendees]);
   const changeRepeat = (value: string) => {
     setMode(value);
     const frequency = (value === 'custom' ? 'semanal' : value) as RecurrenceFrequency;
@@ -101,11 +152,125 @@ export function CompanyEventModal({ event, day, canManage: allowed, canManageCom
               {input.ubicacion ? detailRow(MapPin, locale.startsWith('en') ? 'Location' : 'Ubicación', input.ubicacion) : null}
               {event.google?.recurring || event.repeticion !== 'ninguna' ? detailRow(Repeat2, c.repeat, repeatLabel, repeatHint || undefined) : null}
             </View>
+            {input.attendees && input.attendees.length > 0 ? (
+              <View style={s.attendeesReadBlock}>
+                <Text style={s.label}>{c.attendees} ({input.attendees.length})</Text>
+                <View style={s.chipsWrap}>
+                  {input.attendees.map(a => (
+                    <View key={a.email} style={s.chip}>
+                      {a.avatar_url ? (
+                        <Image source={{ uri: a.avatar_url }} style={s.chipAvatar} />
+                      ) : (
+                        <View style={s.chipAvatarFallback}>
+                          <Text style={s.chipAvatarText}>{(a.displayName || a.email).slice(0, 2).toUpperCase()}</Text>
+                        </View>
+                      )}
+                      <Text style={s.chipText}>{a.displayName || a.email}</Text>
+                      {a.responseStatus && a.responseStatus !== 'needsAction' ? (
+                        <Text style={s.chipStatus}>
+                          {a.responseStatus === 'accepted' ? '✓' : a.responseStatus === 'declined' ? '✕' : '?'}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
             {input.descripcion ? <View style={s.descriptionBlock}><Text style={s.label}>{c.description}</Text><Text selectable style={s.descriptionText}>{input.descripcion}</Text></View> : null}
           </> : <>
           {textField(c.titleLabel, input.titulo, titulo => change({ titulo }), 160)}
           {textField(c.location, input.ubicacion || '', ubicacion => change({ ubicacion }), 240)}
           {textField(c.description, input.descripcion || '', descripcion => change({ descripcion }), 5000, true)}
+          <View style={s.field}>
+            <Text style={s.label}>{c.attendees}</Text>
+            <View style={s.guestInputContainer}>
+              <Users size={16} color={P.slate} style={s.guestInputIcon} />
+              <TextInput
+                accessibilityLabel={c.attendees}
+                editable={!busy}
+                value={guestQuery}
+                onChangeText={text => { setGuestQuery(text); setGuestDropdownOpen(true); }}
+                onFocus={() => { if (guestQuery.trim()) setGuestDropdownOpen(true); }}
+                placeholder={c.addGuest}
+                placeholderTextColor={P.muted}
+                selectionColor={P.accent}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoCorrect={false}
+                returnKeyType="done"
+                onSubmitEditing={() => {
+                  if (matchingGuests.length > 0) {
+                    addGuest({ email: matchingGuests[0].email, displayName: matchingGuests[0].nombre, avatar_url: matchingGuests[0].avatar_url || undefined });
+                  } else if (customEmailMatch) {
+                    addGuest({ email: customEmailMatch });
+                  }
+                }}
+                style={[s.input, s.guestInput]}
+              />
+            </View>
+            {guestDropdownOpen && (matchingGuests.length > 0 || customEmailMatch) ? (
+              <View style={s.guestDropdown}>
+                {matchingGuests.map(collab => (
+                  <Pressable
+                    key={collab.id}
+                    style={({ pressed }) => [s.dropdownOption, pressed && s.dropdownOptionPressed]}
+                    onPress={() => addGuest({ email: collab.email, displayName: collab.nombre, avatar_url: collab.avatar_url || undefined })}
+                  >
+                    {collab.avatar_url ? (
+                      <Image source={{ uri: collab.avatar_url }} style={s.avatar} />
+                    ) : (
+                      <View style={s.avatarFallback}>
+                        <Text style={s.avatarInitial}>{(collab.nombre || collab.email).slice(0, 2).toUpperCase()}</Text>
+                      </View>
+                    )}
+                    <View style={s.optionInfo}>
+                      <Text style={s.optionName}>{collab.nombre}</Text>
+                      <Text style={s.optionEmail}>{collab.email}</Text>
+                    </View>
+                  </Pressable>
+                ))}
+                {customEmailMatch && !matchingGuests.some(m => m.email.toLowerCase() === customEmailMatch) ? (
+                  <Pressable
+                    style={({ pressed }) => [s.dropdownOption, pressed && s.dropdownOptionPressed]}
+                    onPress={() => addGuest({ email: customEmailMatch })}
+                  >
+                    <View style={s.avatarFallback}>
+                      <UserPlus size={16} color={P.accent} />
+                    </View>
+                    <View style={s.optionInfo}>
+                      <Text style={s.optionName}>{customEmailMatch}</Text>
+                      <Text style={s.optionEmail}>{c.addGuest}</Text>
+                    </View>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
+            {input.attendees && input.attendees.length > 0 ? (
+              <View style={s.chipsWrap}>
+                {input.attendees.map(a => (
+                  <View key={a.email} style={s.chip}>
+                    {a.avatar_url ? (
+                      <Image source={{ uri: a.avatar_url }} style={s.chipAvatar} />
+                    ) : (
+                      <View style={s.chipAvatarFallback}>
+                        <Text style={s.chipAvatarText}>{(a.displayName || a.email).slice(0, 2).toUpperCase()}</Text>
+                      </View>
+                    )}
+                    <Text style={s.chipText} numberOfLines={1}>{a.displayName || a.email}</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${a.displayName || a.email}`}
+                      disabled={busy}
+                      onPress={() => removeGuest(a.email)}
+                      style={s.chipRemove}
+                    >
+                      <X size={13} color={P.slate} />
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </View>
           {event ? <Text style={s.help}>{c.calendar}: {event.google?.calendarName || c.localCalendar}</Text> : <View style={s.field}>{disabled ? <Text style={s.readonly}>{calendars.find(calendar => calendar.id === input.calendar_id)?.name || (canManageCompany ? c.localCalendar : '')}</Text> : <TaskFilterSelect anchored label={c.calendar} value={input.calendar_id || ''} options={[...(canManageCompany ? [{ value: '', label: c.localCalendar }] : []), ...calendars.map(calendar => ({ value: calendar.id, label: calendar.name }))]} onChange={calendar_id => change({ calendar_id })} />}</View>}
           {calendarError ? <Text style={s.help}>{c.calendarFailed}</Text> : null}
           <View style={s.scheduleSection}>
@@ -162,6 +327,27 @@ const s = StyleSheet.create({
   detailValue: { color: P.ink, fontFamily: 'Outfit_500Medium', fontSize: 15, lineHeight: 22 },
   descriptionBlock: { gap: 8, paddingTop: 4 },
   descriptionText: { color: P.slate, fontFamily: 'Outfit_400Regular', fontSize: 15, lineHeight: 24 },
+  attendeesReadBlock: { gap: 8, marginTop: 4 },
+  guestInputContainer: { position: 'relative', justifyContent: 'center' },
+  guestInputIcon: { position: 'absolute', left: 12, zIndex: 1 },
+  guestInput: { paddingLeft: 38 },
+  guestDropdown: { backgroundColor: P.white, borderWidth: 1, borderColor: P.line, borderRadius: 8, marginTop: -4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 4, zIndex: 10 },
+  dropdownOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: P.line },
+  dropdownOptionPressed: { backgroundColor: P.wash },
+  avatar: { width: 32, height: 32, borderRadius: 16 },
+  avatarFallback: { width: 32, height: 32, borderRadius: 16, backgroundColor: P.wash, alignItems: 'center', justifyContent: 'center' },
+  avatarInitial: { fontSize: 12, fontFamily: 'Outfit_600SemiBold', color: P.accent },
+  optionInfo: { flex: 1, minWidth: 0 },
+  optionName: { fontSize: 14, fontFamily: 'Outfit_500Medium', color: P.ink },
+  optionEmail: { fontSize: 12, fontFamily: 'Outfit_400Regular', color: P.slate },
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: P.wash, paddingVertical: 4, paddingLeft: 6, paddingRight: 8, borderRadius: 16, borderWidth: 1, borderColor: P.line, maxWidth: '100%' },
+  chipAvatar: { width: 22, height: 22, borderRadius: 11 },
+  chipAvatarFallback: { width: 22, height: 22, borderRadius: 11, backgroundColor: P.white, alignItems: 'center', justifyContent: 'center' },
+  chipAvatarText: { fontSize: 10, fontFamily: 'Outfit_600SemiBold', color: P.slate },
+  chipText: { fontSize: 13, fontFamily: 'Outfit_400Regular', color: P.ink, flexShrink: 1 },
+  chipRemove: { padding: 2, alignItems: 'center', justifyContent: 'center' },
+  chipStatus: { fontSize: 11, fontFamily: 'Outfit_600SemiBold', color: P.accent, marginLeft: 2 },
   closePrimary: { flex: 1, backgroundColor: P.accent, borderColor: P.accent, minHeight: 48 },
   checkboxRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   page: { flex: 1, backgroundColor: P.white, alignItems: 'center' }, sheet: { width: '100%', maxWidth: 600, flex: 1, backgroundColor: P.white }, header: { minHeight: 64, paddingLeft: 24, paddingRight: 12, gap: 10, flexDirection: 'row', alignItems: 'center' }, title: { flex: 1, fontFamily: 'Outfit_600SemiBold', color: P.ink, fontSize: 20 }, icon: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }, content: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 32, gap: 24 }, field: { gap: 8 }, label: { fontFamily: 'Outfit_500Medium', color: P.slate, fontSize: 13 }, input: { backgroundColor: P.white, minHeight: 48, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: P.line, fontFamily: 'Outfit_400Regular', color: P.ink, fontSize: 15 }, description: { minHeight: 80 }, readonly: { fontFamily: 'Outfit_400Regular', color: P.ink, fontSize: 15, lineHeight: 23 }, recurrence: { paddingVertical: 4, gap: 16 }, weekdays: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 }, weekday: { minWidth: 44, minHeight: 44, borderRadius: 8, borderWidth: 1, borderColor: P.line, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }, selectedDay: { borderColor: P.accent, backgroundColor: P.wash }, dayText: { color: P.slate, fontFamily: 'Outfit_400Regular', fontSize: 13, textTransform: 'capitalize' }, selectedDayText: { color: P.ink, fontFamily: 'Outfit_600SemiBold' }, help: { color: P.slate, fontFamily: 'Outfit_400Regular', fontSize: 13, lineHeight: 20 }, error: { padding: 12, borderWidth: 1, borderColor: P.accent, borderRadius: 8, fontFamily: 'Outfit_400Regular', color: P.ink, fontSize: 14 }, confirmation: { gap: 12, paddingVertical: 12 }, footer: { backgroundColor: P.white, flexDirection: 'row', gap: 8, alignItems: 'center', paddingHorizontal: 24, paddingTop: 12, paddingBottom: 12 }, spacer: { flex: 0 }, button: { minHeight: 44, paddingHorizontal: 14, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 1, borderColor: P.line }, buttonText: { fontFamily: 'Outfit_500Medium', fontSize: 14, color: P.ink }, primary: { flex: 1, minHeight: 50, backgroundColor: P.accent, borderColor: P.accent }, primaryText: { fontFamily: 'Outfit_600SemiBold', color: P.white, fontSize: 14 }, deleteButton: { backgroundColor: P.ink },

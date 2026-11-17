@@ -8,6 +8,24 @@ export interface CompanyBirthdayProfile {
   fecha_nacimiento: string | null;
 }
 
+export interface AgendaCollaborator {
+  id: string;
+  nombre: string;
+  email: string;
+  avatar_url?: string | null;
+  rol?: string | null;
+}
+
+export async function getAgendaCollaborators(): Promise<AgendaCollaborator[]> {
+  const { data, error } = await supabase.from('profiles')
+    .select('id, nombre, email, avatar_url, rol')
+    .eq('activo', true)
+    .not('email', 'is', null)
+    .order('nombre');
+  if (error) throw error;
+  return (data || []).filter(p => p.email && p.email.trim()) as AgendaCollaborator[];
+}
+
 async function googleRequest<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke('google-calendar-events', { body });
   if (error) {
@@ -54,7 +72,7 @@ export async function saveCompanyEvent(id: string | undefined, input: EventInput
   input = { ...input, tipo: 'evento' };
   if (!validRecurrence(input)) throw new Error('Invalid recurrence');
   if (id?.startsWith('gcal:') || !id && input.calendar_id) return (await googleRequest<{ event: CompanyEvent }>({ action: 'save', id, calendarId: input.calendar_id, etag: input.google_etag, requestId: input.request_id, input })).event;
-  const { calendar_id, google_etag: _etag, request_id: _request, fecha_fin: _endDate, ...local } = input;
+  const { calendar_id, google_etag: _etag, request_id: _request, fecha_fin: _endDate, attendees: _attendees, ...local } = input;
   if (calendar_id) throw new Error('No se puede mover un evento local desde este formulario.');
   const payload = { ...local, hora_fin: local.hora ? local.hora_fin || null : null };
   const query = id ? supabase.from('agenda_eventos').update(payload).eq('id', id) : supabase.from('agenda_eventos').insert(payload);

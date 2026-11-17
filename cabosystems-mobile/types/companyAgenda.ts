@@ -8,6 +8,13 @@ export interface EventRecurrence {
   repetir_hasta: string | null;
 }
 
+export interface EventAttendee {
+  email: string;
+  displayName?: string;
+  responseStatus?: string;
+  avatar_url?: string;
+}
+
 export interface CompanyEvent extends EventRecurrence {
   id: string;
   titulo: string;
@@ -19,10 +26,11 @@ export interface CompanyEvent extends EventRecurrence {
   ubicacion: string | null;
   created_at: string;
   occurrence_date?: string;
-  google?: { calendarId: string; calendarName: string; calendarColor?: string; etag: string; recurring: boolean; editable: boolean; availabilityOnly?: boolean; endDate: string; endTime: string | null; lastDay: string; timeZone: string };
+  attendees?: EventAttendee[];
+  google?: { calendarId: string; calendarName: string; calendarColor?: string; etag: string; recurring: boolean; editable: boolean; availabilityOnly?: boolean; endDate: string; endTime: string | null; lastDay: string; timeZone: string; attendees?: EventAttendee[] };
 }
 
 export type EventInput = Omit<CompanyEvent, 'id' | 'created_at' | 'occurrence_date' | 'google'> & {
-  calendar_id?: string; google_etag?: string; request_id?: string; fecha_fin?: string; hora_fin?: string | null;
+  calendar_id?: string; google_etag?: string; request_id?: string; fecha_fin?: string; hora_fin?: string | null; attendees?: EventAttendee[];
 };
 export interface AgendaGoogleCalendar { id: string; name: string; timeZone: string; backgroundColor?: string; editable?: boolean }

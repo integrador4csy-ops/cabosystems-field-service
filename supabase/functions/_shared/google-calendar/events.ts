@@ -259,7 +259,8 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
         let patch;
         try { patch = eventBody(input, current); } catch (error) { throw new CalendarError((error as Error).message); }
         await service.verifyEventSession(actor, connection.revision);
-        event = await google(`${path}?sendUpdates=none`, token, { method: 'PATCH', headers: { 'If-Match': body.etag }, body: JSON.stringify(patch) }) as unknown as GoogleEvent;
+        const sendUpdates = (patch.attendees as unknown[])?.length ? 'all' : 'none';
+        event = await google(`${path}?sendUpdates=${sendUpdates}`, token, { method: 'PATCH', headers: { 'If-Match': body.etag }, body: JSON.stringify(patch) }) as unknown as GoogleEvent;
       } else {
         if (typeof body.requestId !== 'string' || !/^[a-f0-9]{32}$/.test(body.requestId)) throw new CalendarError('Vuelve a abrir el formulario para crear el evento.');
         let payload;
@@ -268,8 +269,9 @@ export function createEventService(service: Service, fetcher: typeof fetch = fet
         const eventId = `c${body.requestId}`;
         (payload.extendedProperties as { private: Record<string, string> }).private.csyRequest = fingerprint;
         await service.verifyEventSession(actor, connection.revision);
+        const sendUpdates = (payload.attendees as unknown[])?.length ? 'all' : 'none';
         try {
-          event = await google(`${calendarPath(calendar.id)}?sendUpdates=none`, token, { method: 'POST', body: JSON.stringify({ ...payload, id: eventId }) }) as unknown as GoogleEvent;
+          event = await google(`${calendarPath(calendar.id)}?sendUpdates=${sendUpdates}`, token, { method: 'POST', body: JSON.stringify({ ...payload, id: eventId }) }) as unknown as GoogleEvent;
         } catch (error) {
           if (!(error instanceof GoogleError) || error.status !== 409) throw error;
           const original = await google(`${calendarPath(calendar.id)}/${eventId}`, token) as unknown as GoogleEvent;

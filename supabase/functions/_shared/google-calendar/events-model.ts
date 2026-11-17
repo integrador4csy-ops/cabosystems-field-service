@@ -1,17 +1,30 @@
 import type { Calendar } from './core.ts';
 
 export const COMPANY_ZONE = 'America/Mazatlan';
+export interface EventAttendee {
+  email: string;
+  displayName?: string;
+  responseStatus?: string;
+}
 export interface EventInput {
   titulo: string; descripcion: string | null; ubicacion: string | null; tipo: 'evento' | 'recordatorio';
   fecha: string; hora: string | null; repeticion: 'ninguna' | 'diaria' | 'semanal' | 'mensual';
   intervalo: number; dias_semana: number[]; repetir_hasta: string | null;
   fecha_fin?: string; hora_fin?: string | null;
+  attendees?: EventAttendee[];
+}
+export interface GoogleAttendee {
+  email: string;
+  displayName?: string;
+  responseStatus?: string;
+  self?: boolean;
 }
 export interface GoogleEvent {
   id: string; etag: string; status?: string; summary?: string; description?: string; location?: string;
   created?: string; updated?: string; eventType?: string; locked?: boolean; recurringEventId?: string; recurrence?: string[];
   start?: { date?: string; dateTime?: string; timeZone?: string };
   end?: { date?: string; dateTime?: string; timeZone?: string };
+  attendees?: GoogleAttendee[];
   extendedProperties?: { private?: Record<string, string>; shared?: Record<string, string> };
 }
 export function validDate(value: unknown): value is string {
@@ -53,12 +66,14 @@ export function normalizeGoogleEvent(event: GoogleEvent, calendar: Calendar) {
   const start = allDay ? { date: event.start!.date!, time: null } : parts(Date.parse(event.start!.dateTime!));
   const end = allDay ? { date: shiftDay(event.end!.date!, -1), time: null } : parts(Date.parse(event.end!.dateTime!));
   const lastDay = !allDay && end.time === '00:00:00' ? shiftDay(end.date, -1) : end.date;
+  const attendees = event.attendees?.map(a => ({ email: a.email, displayName: a.displayName, responseStatus: a.responseStatus }));
   return {
     id: eventIdentity(calendar.id, event.id), titulo: event.summary || '(Sin título)', descripcion: event.description || null,
     ubicacion: event.location || null, tipo: 'evento' as const,
     fecha: start.date, hora: start.time, created_at: event.created || '',
     repeticion: 'ninguna' as const, intervalo: 1, dias_semana: [] as number[], repetir_hasta: null,
-    google: { calendarId: calendar.id, calendarName: calendar.name, calendarColor: calendar.backgroundColor, etag: event.etag, recurring: Boolean(event.recurringEventId), availabilityOnly: calendar.accessRole === 'freeBusyReader', editable: ['owner', 'writer'].includes(calendar.accessRole) && (!event.eventType || event.eventType === 'default') && !event.locked, endDate: end.date, endTime: end.time, lastDay, timeZone: COMPANY_ZONE },
+    attendees,
+    google: { calendarId: calendar.id, calendarName: calendar.name, calendarColor: calendar.backgroundColor, etag: event.etag, recurring: Boolean(event.recurringEventId), availabilityOnly: calendar.accessRole === 'freeBusyReader', editable: ['owner', 'writer'].includes(calendar.accessRole) && (!event.eventType || event.eventType === 'default') && !event.locked, endDate: end.date, endTime: end.time, lastDay, timeZone: COMPANY_ZONE, attendees },
   };
 }
 export function googleOccurrences(event: GoogleEvent, calendar: Calendar, from: string, to: string) {
@@ -93,7 +108,8 @@ export function validEventInput(input: unknown): input is EventInput {
     && e.dias_semana.every((day) => Number.isInteger(day) && day >= 1 && day <= 7) && new Set(e.dias_semana).size === e.dias_semana.length
     && (e.repeticion !== 'semanal' || e.dias_semana.length > 0) && (e.repeticion === 'semanal' || e.dias_semana.length === 0)
     && (!e.repetir_hasta || validDate(e.repetir_hasta) && e.repetir_hasta >= e.fecha)
-    && (e.repeticion !== 'ninguna' || e.intervalo === 1 && !e.repetir_hasta);
+    && (e.repeticion !== 'ninguna' || e.intervalo === 1 && !e.repetir_hasta)
+    && (!e.attendees || Array.isArray(e.attendees) && e.attendees.every(a => a && typeof a === 'object' && typeof a.email === 'string' && a.email.includes('@')));
 }
 export function eventBody(input: EventInput, existing?: GoogleEvent): Record<string, unknown> {
   const timed = Boolean(input.hora);
@@ -112,6 +128,13 @@ export function eventBody(input: EventInput, existing?: GoogleEvent): Record<str
     summary: input.titulo.trim(), description: input.descripcion || '', location: input.ubicacion || '', start, end,
     extendedProperties: { ...existing?.extendedProperties, private: { ...existing?.extendedProperties?.private, csyTipo: 'evento' } },
   };
+  if (Array.isArray(input.attendees)) {
+    body.attendees = input.attendees
+      .filter((a): a is EventAttendee => Boolean(a && typeof a.email === 'string' && a.email.trim().length > 0))
+      .map(a => ({ email: a.email.trim().toLowerCase(), ...(a.displayName?.trim() ? { displayName: a.displayName.trim() } : {}) }));
+  } else if (existing?.attendees) {
+    body.attendees = existing.attendees;
+  }
   if (!existing) {
     body.reminders = { useDefault: false };
     const rule = recurrence(input, timed); if (rule) body.recurrence = rule;
