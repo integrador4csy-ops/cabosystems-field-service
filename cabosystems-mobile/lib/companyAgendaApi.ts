@@ -22,15 +22,28 @@ export const KNOWN_CSY_COLLABORATORS: Record<string, string> = {
   'operaciones1csy@gmail.com': 'Alessandra Collins Carrillo',
   'gsandoval@csy.mx': 'Gerardo Sandoval Castro',
   'carlosp@csy.mx': 'Carlos Perez',
-  'carlosjesusfregosozapata@gmail.com': 'Carlos Jesus Fregoso Zapata',
   'instalaciones2.csy@gmail.com': 'Samuel Hernandez',
   'instalaciones1.csy@gmail.com': 'Instalaciones 1',
   'instalaciones3.csy@gmail.com': 'Instalaciones 3',
-  'integrador1@csy.mx': 'Integrador 1',
-  'integrador2@csy.mx': 'Integrador 2',
-  'integrador3@csy.mx': 'Integrador 3',
-  'integrador4csy@gmail.com': 'Integrador 4',
+  'integrador1@csy.mx': 'Juan Salas Ruiz',
+  'integrador2@csy.mx': 'Aaron Belmonte',
+  'integrador3@csy.mx': 'Luis Eduardo Flores',
+  'integrador4csy@gmail.com': 'Carlos Jesus Fregoso Zapata',
 };
+
+function deriveNameFromEmail(email: string): string {
+  return email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+}
+
+function isGenericCollaboratorName(name: string | undefined, email: string): boolean {
+  const cleanName = (name || '').trim();
+  if (!cleanName) return true;
+  const lower = cleanName.toLowerCase();
+  const cleanEmail = email.toLowerCase().trim();
+  if (lower === cleanEmail || lower.includes('@')) return true;
+  if (lower === deriveNameFromEmail(cleanEmail).toLowerCase()) return true;
+  return /^(integrador|instalaciones|operaciones)\s*\d*$/i.test(cleanName);
+}
 
 export const INITIAL_COLLABORATORS: AgendaCollaborator[] = Object.entries(KNOWN_CSY_COLLABORATORS).map(([email, nombre]) => ({
   id: email,
@@ -49,6 +62,7 @@ export async function getAgendaCollaborators(): Promise<AgendaCollaborator[]> {
     ]);
 
     const map = new Map<string, AgendaCollaborator>();
+    const profileMatchedEmails = new Set<string>();
 
     for (const [email, name] of Object.entries(KNOWN_CSY_COLLABORATORS)) {
       const clean = email.toLowerCase().trim();
@@ -69,11 +83,10 @@ export async function getAgendaCollaborators(): Promise<AgendaCollaborator[]> {
         existing.id = inv.id;
         if (inv.rol) existing.rol = inv.rol;
       } else {
-        const derivedName = clean.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
         map.set(clean, {
           id: inv.id,
           email: clean,
-          nombre: derivedName,
+          nombre: deriveNameFromEmail(clean),
           rol: inv.rol || 'colaborador',
           avatar_url: null,
         });
@@ -94,6 +107,7 @@ export async function getAgendaCollaborators(): Promise<AgendaCollaborator[]> {
         matched.avatar_url = p.avatar_url || matched.avatar_url;
         matched.rol = p.rol || matched.rol;
         matched.nombre = p.nombre;
+        profileMatchedEmails.add(matched.email);
       } else {
         const fallbackEmail = `${p.nombre.toLowerCase().replace(/[^a-z0-9]/g, '')}@csy.mx`;
         map.set(fallbackEmail, {
@@ -103,6 +117,7 @@ export async function getAgendaCollaborators(): Promise<AgendaCollaborator[]> {
           rol: p.rol,
           avatar_url: p.avatar_url,
         });
+        profileMatchedEmails.add(fallbackEmail);
       }
     }
 
@@ -111,10 +126,12 @@ export async function getAgendaCollaborators(): Promise<AgendaCollaborator[]> {
         if (!g.email) continue;
         const clean = g.email.toLowerCase().trim();
         if (!clean.includes('@') || clean.endsWith('calendar.google.com')) continue;
+        const googleName = g.displayName?.trim() || '';
+        const hasRealGoogleName = Boolean(googleName && !googleName.includes('@'));
         const existing = map.get(clean);
         if (existing) {
-          if (g.displayName && (!existing.nombre || existing.nombre === existing.email)) {
-            existing.nombre = g.displayName;
+          if (hasRealGoogleName && (!profileMatchedEmails.has(clean) || isGenericCollaboratorName(existing.nombre, clean))) {
+            existing.nombre = googleName;
           }
           if (g.avatarUrl && !existing.avatar_url) {
             existing.avatar_url = g.avatarUrl;
@@ -123,7 +140,7 @@ export async function getAgendaCollaborators(): Promise<AgendaCollaborator[]> {
           map.set(clean, {
             id: clean,
             email: clean,
-            nombre: g.displayName || clean.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+            nombre: hasRealGoogleName ? googleName : deriveNameFromEmail(clean),
             rol: 'invitado',
             avatar_url: g.avatarUrl || null,
           });
