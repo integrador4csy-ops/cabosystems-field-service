@@ -18,6 +18,7 @@ import {
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import * as FileSystem from 'expo-file-system/legacy';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import {
   X,
@@ -604,7 +605,15 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
       const timestamp = Date.now();
       const prefix = isCheckOut ? 'checkout' : 'checkin';
       const storagePath = `${prefix}s/${currentProject.id}_${user.id}_${timestamp}.jpg`;
-      const publicUrl = await uploadEvidencePhoto(await optimizeEvidencePhoto(photoUri), storagePath);
+      const optimizedPhoto = await optimizeEvidencePhoto(photoUri);
+      let publicUrl: string;
+      try {
+        publicUrl = await uploadEvidencePhoto(optimizedPhoto, storagePath);
+      } finally {
+        if (optimizedPhoto && optimizedPhoto !== photoUri && Platform.OS !== 'web') {
+          await FileSystem.deleteAsync(optimizedPhoto, { idempotent: true }).catch(() => {});
+        }
+      }
       const created = await createFieldRecord({
         proyecto_id: currentProject.id,
         tarea_id: null,
@@ -1134,7 +1143,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0D1117',
   },
   cameraPlaceholder: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#0D1117',
     justifyContent: 'center',
     alignItems: 'center',

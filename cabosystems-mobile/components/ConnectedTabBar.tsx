@@ -59,8 +59,7 @@ export function ConnectedTabBarProvider({
       mass: 0.25,
       velocity: 0,
       overshootClamping: true,
-      restDisplacementThreshold: 0.005,
-      restSpeedThreshold: 0.005,
+      energyThreshold: 0.005,
       reduceMotion: ReduceMotion.System,
     });
   }, [index, position]);
@@ -207,7 +206,6 @@ export function ConnectedTabLabel({
 export function ConnectedTabButton(props: React.ComponentProps<typeof Pressable>) {
   return (
     <Pressable
-      delayPressIn={0}
       android_ripple={{
         color: 'rgba(247, 140, 38, 0.20)',
         borderless: false,

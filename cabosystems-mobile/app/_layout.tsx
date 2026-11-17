@@ -161,7 +161,6 @@ function RootLayoutNav() {
         screenOptions={{
           headerShown: false,
           freezeOnBlur: true,
-          detachInactiveScreens: true,
           animation: 'slide_from_right',
           animationDuration: 220,
           gestureEnabled: true,

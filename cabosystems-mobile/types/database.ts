@@ -20,6 +20,7 @@ export type PendienteStatus = 'pendiente' | 'en_proceso' | 'resuelta';
 export interface Profile {
   id: string;
   nombre: string;
+  apellidos?: string | null;
   rol: UserRole;
   activo: boolean;
   avatar_url?: string | null;

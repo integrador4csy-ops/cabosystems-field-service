@@ -633,7 +633,6 @@ export default function UsersScreen() {
         style={styles.scrollView}
         contentContainerStyle={listContentStyle}
         data={teamRows}
-        estimatedItemSize={76}
         keyExtractor={row => row.kind + '-' + row.item.id}
         getItemType={row => row.kind}
         renderItem={renderTeamRow}
