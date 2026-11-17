@@ -236,7 +236,7 @@ export function EventDialog({ event, day, canManage: allowed, canManageCompany: 
                       {avatar ? (
                         <img className="company-attendee-chip-avatar" src={avatar} alt="" />
                       ) : (
-                        <span className="company-attendee-chip-avatar">{name.slice(0, 2).toUpperCase()}</span>
+                        <span className="company-attendee-chip-avatar">{(name || attendee.email).slice(0, 1).toUpperCase()}</span>
                       )}
                       <span className="company-attendee-chip-name" title={attendee.email}>{name}</span>
                       {attendee.responseStatus && attendee.responseStatus !== 'needsAction' && (
