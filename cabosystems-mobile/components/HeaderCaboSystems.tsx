@@ -42,17 +42,10 @@ export const CaboSystemsHeaderLogo = React.memo(function CaboSystemsHeaderLogo({
 }) {
   return (
     <View style={styles.logoContainer}>
-      {/*
-        defaultSource resuelve el recurso del APK de forma síncrona en Android:
-        el logo aparece en el primer frame de cada pestaña. Con expo-image la
-        escenarecién visible mostraba el hueco del logo durante el primer render.
-      */}
       <Image
         source={LOGO_DARK}
-        defaultSource={LOGO_DARK}
         style={[styles.logo, isTablet && styles.logoTablet]}
         resizeMode="contain"
-        fadeDuration={0}
       />
     </View>
   );
@@ -73,6 +66,7 @@ export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
   onSelectAllProjects,
 }: HeaderProps = {}) {
   const { t: tr } = useInterfaceTranslation();
+  const insets = useSafeAreaInsets();
   const context = useProjects();
   const projects = propProjects ?? context.projects;
   const selectedProjectId = propSelectedProjectId ?? context.selectedProjectId;
@@ -98,7 +92,7 @@ export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
 
   return (
     <View style={selectorOnly ? styles.selectorOnlyWrapper : [styles.headerWrapper, seamless && styles.headerSeamless]}>
-      <SafeAreaView edges={selectorOnly ? [] : ['top']} style={selectorOnly ? styles.selectorOnlySafeArea : styles.safeArea}>
+      <View style={[selectorOnly ? styles.selectorOnlySafeArea : styles.safeArea, { paddingTop: selectorOnly ? 0 : insets.top }]}>
         <View style={[styles.container, isTablet && styles.containerTablet, selectorOnly && styles.selectorOnlyContainer]}>
           {/* Logo Minimalista CSY en Modo Claro */}
           {!selectorOnly && <CaboSystemsHeaderLogo isTablet={isTablet} />}
@@ -147,7 +141,7 @@ export const HeaderCaboSystems = React.memo(function HeaderCaboSystems({
             </View>
           )}
         </View>
-      </SafeAreaView>
+      </View>
 
       {/* Bottom Sheet Material 3 Nativo */}
       {showProjectSelector && visible && (
@@ -278,7 +272,7 @@ const styles = StyleSheet.create({
     height: 54,
     justifyContent: 'center',
     alignItems: 'flex-start',
-    transform: [{ translateY: -3 }],
+    marginTop: -3,
   },
   logo: {
     width: 162,

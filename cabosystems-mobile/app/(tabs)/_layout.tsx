@@ -323,10 +323,9 @@ function PreparedTabLayout() {
           name="fab"
           options={
             isAdmin
-              ? { href: null, lazy: true }
+              ? { href: null }
               : {
                   title: t('nav.checkins'),
-                  lazy: true,
                   tabBarButton: props => <FloatingActionButton {...props} />,
                 }
           }

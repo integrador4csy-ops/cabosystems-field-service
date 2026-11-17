@@ -796,7 +796,13 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
                 </View>
               </View>
             ) : (
-              cameraActive && !cameraFullscreen ? <CameraSection onCapture={handleCapturePhoto} flash={flash} onToggleFlash={toggleFlash} onExpand={() => setCameraFullscreen(true)} /> : null
+              cameraActive && !cameraFullscreen ? (
+                <CameraSection onCapture={handleCapturePhoto} flash={flash} onToggleFlash={toggleFlash} onExpand={() => setCameraFullscreen(true)} />
+              ) : (
+                <View style={styles.cameraPlaceholder}>
+                  <ActivityIndicator color={Colors.primary} size="small" />
+                </View>
+              )
             )}
               <Pressable accessibilityRole="button" accessibilityLabel={flash === 'on' ? tr("Apagar flash") : tr("Encender flash")} accessibilityState={{ selected: flash === 'on' }} onPress={toggleFlash} style={[styles.photoToolButton, styles.photoFlashButton]}>
                 {flash === 'on' ? <Zap size={21} color="#FFFFFF" /> : <ZapOff size={21} color="#FFFFFF" />}
