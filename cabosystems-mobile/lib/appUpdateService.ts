@@ -110,17 +110,23 @@ export function useAppUpdateCheck() {
   }, [dismissed]);
 
   useEffect(() => {
-    performCheck();
+    // Diferir la consulta inicial 1.5s para no competir con el arranque visual de la app
+    const initialTimer = setTimeout(() => {
+      void performCheck();
+    }, 1500);
 
     // Re-verificar cuando la app vuelve de segundo plano
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
-        performCheck();
+        void performCheck();
       }
     };
 
     const sub = AppState.addEventListener('change', handleAppStateChange);
-    return () => sub.remove();
+    return () => {
+      clearTimeout(initialTimer);
+      sub.remove();
+    };
   }, [performCheck]);
 
   const dismissModal = () => {

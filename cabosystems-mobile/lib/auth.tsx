@@ -1,9 +1,78 @@
 import { translateCurrent } from './localization';
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
-import { Linking, Alert } from 'react-native';
+import { Linking, Alert, Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import type { Profile } from '@/types/database';
+
+const PROFILE_CACHE_KEY = 'csy_cached_profile_v1';
+
+function getProfileCacheUri(): string | null {
+  const dir = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+  return dir ? `${dir}${PROFILE_CACHE_KEY}.json` : null;
+}
+
+export async function readCachedProfile(userId: string): Promise<Profile | null> {
+  if (!userId) return null;
+  try {
+    let raw: string | null = null;
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') {
+        raw = localStorage.getItem(PROFILE_CACHE_KEY);
+      }
+    } else {
+      const uri = getProfileCacheUri();
+      if (!uri) return null;
+      const info = await FileSystem.getInfoAsync(uri);
+      if (!info.exists) return null;
+      raw = await FileSystem.readAsStringAsync(uri);
+    }
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && parsed.id === userId && parsed.activo !== false) {
+      return parsed as Profile;
+    }
+  } catch {
+    // Ignore corrupt or missing local profile cache
+  }
+  return null;
+}
+
+export async function writeCachedProfile(profile: Profile): Promise<void> {
+  try {
+    const serialized = JSON.stringify(profile);
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(PROFILE_CACHE_KEY, serialized);
+      }
+    } else {
+      const uri = getProfileCacheUri();
+      if (uri) {
+        await FileSystem.writeAsStringAsync(uri, serialized);
+      }
+    }
+  } catch {
+    // Non-critical cache write failure
+  }
+}
+
+export async function clearCachedProfile(): Promise<void> {
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(PROFILE_CACHE_KEY);
+      }
+    } else {
+      const uri = getProfileCacheUri();
+      if (uri) {
+        await FileSystem.deleteAsync(uri, { idempotent: true });
+      }
+    }
+  } catch {
+    // Non-critical cleanup failure
+  }
+}
 
 interface AuthContextType {
   session: Session | null;
@@ -150,8 +219,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const mountedRef = useRef(true);
+  const activeUserIdRef = useRef<string | null>(null);
+  const profileRef = useRef<Profile | null>(null);
+  const inFlightProfileRef = useRef<{ userId: string; promise: Promise<void> } | null>(null);
 
   const clearAuthError = () => setAuthError(null);
+
+  async function hydrateSessionUser(user: User) {
+    activeUserIdRef.current = user.id;
+
+    // Si ya tenemos el perfil de este usuario en memoria, revalidamos en segundo plano
+    if (profileRef.current?.id === user.id) {
+      setLoading(false);
+      void fetchProfile(user, 2);
+      return;
+    }
+
+    // Lectura instantánea desde caché local (~2-5 ms) para evitar bloquear el arranque esperando la red
+    const cached = await readCachedProfile(user.id);
+    if (!mountedRef.current || activeUserIdRef.current !== user.id) return;
+
+    if (cached) {
+      profileRef.current = cached;
+      setProfile(cached);
+      setLoading(false);
+      // Revalidar perfil, rol y estatus activo en segundo plano
+      void fetchProfile(user, 2);
+      return;
+    }
+
+    // Primer inicio de sesión sin caché local: esperar perfil desde red
+    await fetchProfile(user, 3);
+  }
 
   useEffect(() => {
     mountedRef.current = true;
@@ -166,17 +265,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mountedRef.current) return;
       setSession(session);
-      if (session?.user) fetchProfile(session.user);
-      else setLoading(false);
+      if (session?.user) {
+        void hydrateSessionUser(session.user);
+      } else {
+        activeUserIdRef.current = null;
+        profileRef.current = null;
+        setLoading(false);
+      }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mountedRef.current) return;
       setSession(session);
-      if (session?.user) fetchProfile(session.user);
-      else {
+      if (session?.user) {
+        void hydrateSessionUser(session.user);
+      } else {
+        activeUserIdRef.current = null;
+        profileRef.current = null;
         setProfile(null);
         setLoading(false);
+        if (event === 'SIGNED_OUT') {
+          void clearCachedProfile();
+        }
       }
     });
 
@@ -206,12 +316,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (payload.new && mountedRef.current) {
             const updated = payload.new as Profile;
             if (updated.activo === false) {
+              activeUserIdRef.current = null;
+              profileRef.current = null;
+              void clearCachedProfile();
               supabase.auth.signOut();
               setSession(null);
               setProfile(null);
               setAuthError('Tu cuenta ha sido desactivada o revocada por un administrador de CaboSystems.');
             } else {
+              profileRef.current = updated;
               setProfile(updated);
+              void writeCachedProfile(updated);
             }
           }
         }
@@ -225,44 +340,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function refreshProfile() {
     if (session?.user) {
-      await fetchProfile(session.user, 1);
+      await fetchProfile(session.user, 1, true);
     }
   }
 
-  async function fetchProfile(user: User, retries = 3) {
-    for (let i = 0; i < retries; i++) {
-      if (!mountedRef.current) return;
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+  async function fetchProfile(user: User, retries = 3, force = false) {
+    if (!force && inFlightProfileRef.current?.userId === user.id) {
+      return inFlightProfileRef.current.promise;
+    }
 
-      if (data) {
-        if (!mountedRef.current) return;
+    const run = (async () => {
+      for (let i = 0; i < retries; i++) {
+        if (!mountedRef.current || activeUserIdRef.current !== user.id) return;
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
 
-        // Si el usuario está inactivo o fue expulsado por el administrador
-        if (data.activo === false) {
-          await supabase.auth.signOut();
-          setSession(null);
-          setProfile(null);
+        if (data) {
+          if (!mountedRef.current || activeUserIdRef.current !== user.id) return;
+
+          // Si el usuario está inactivo o fue expulsado por el administrador
+          if (data.activo === false) {
+            activeUserIdRef.current = null;
+            profileRef.current = null;
+            void clearCachedProfile();
+            await supabase.auth.signOut();
+            setSession(null);
+            setProfile(null);
+            setLoading(false);
+            setAuthError('Tu cuenta ha sido desactivada o revocada por un administrador de CaboSystems.');
+            return;
+          }
+
+          const freshProfile = data as Profile;
+          profileRef.current = freshProfile;
+          setProfile(freshProfile);
           setLoading(false);
-          setAuthError('Tu cuenta ha sido desactivada o revocada por un administrador de CaboSystems.');
+          void writeCachedProfile(freshProfile);
           return;
         }
 
-        setProfile(data as Profile);
-        setLoading(false);
-        return;
+        if (i < retries - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 600));
+        }
       }
 
-      if (i < retries - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 600));
+      if (!mountedRef.current || activeUserIdRef.current !== user.id) return;
+      setLoading(false);
+    })();
+
+    inFlightProfileRef.current = { userId: user.id, promise: run };
+    try {
+      await run;
+    } finally {
+      if (inFlightProfileRef.current?.promise === run) {
+        inFlightProfileRef.current = null;
       }
     }
-
-    if (!mountedRef.current) return;
-    setLoading(false);
   }
 
   // 1. Iniciar sesión con correo y contraseña
@@ -473,6 +609,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // 5. Cerrar sesión
   async function signOut() {
+    activeUserIdRef.current = null;
+    profileRef.current = null;
+    void clearCachedProfile();
     await supabase.auth.signOut();
     setProfile(null);
     setSession(null);

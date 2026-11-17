@@ -94,18 +94,21 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     const current = () => mountedRef.current && ownerRef.current === owner && requestRef.current === request;
     setLoading(true);
     try {
-      const lastSavedId = await loadPersistedSelectedProjectId(owner);
-      if (Platform.OS !== 'web') {
-        const cached = await readFieldProjects(owner).catch(() => []);
-        if (current() && cached.length) {
-          setProjects(cached);
-          setDataOwner(owner);
-          setSelectedProjectIdState((previous) => {
-            if (previous && cached.some((project) => project.id === previous)) return previous;
-            if (lastSavedId && cached.some((project) => project.id === lastSavedId)) return lastSavedId;
-            return cached[0]?.id;
-          });
-        }
+      const [lastSavedId, cached] = await Promise.all([
+        loadPersistedSelectedProjectId(owner),
+        Platform.OS !== 'web' ? readFieldProjects(owner).catch(() => []) : Promise.resolve([]),
+      ]);
+      if (!current()) return;
+      if (Platform.OS !== 'web' && cached.length) {
+        setProjects(cached);
+        setDataOwner(owner);
+        setSelectedProjectIdState((previous) => {
+          if (previous && cached.some((project) => project.id === previous)) return previous;
+          if (lastSavedId && cached.some((project) => project.id === lastSavedId)) return lastSavedId;
+          return cached[0]?.id;
+        });
+      } else if (lastSavedId) {
+        setSelectedProjectIdState((previous) => previous ?? lastSavedId);
       }
       if (!current()) return;
       const data = await getMyProjects();
@@ -131,11 +134,6 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     setDataOwner('');
     setSelectedProjectIdState(undefined);
     if (owner) {
-      void loadPersistedSelectedProjectId(owner).then((savedId) => {
-        if (mountedRef.current && ownerRef.current === owner && savedId) {
-          setSelectedProjectIdState((current) => current ?? savedId);
-        }
-      });
       refreshProjects();
     } else {
       setProjects([]);

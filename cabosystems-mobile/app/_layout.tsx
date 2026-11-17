@@ -1,4 +1,3 @@
-import FontAwesome from '@expo/vector-icons/FontAwesome';
 import {
   useFonts,
   Outfit_400Regular,
@@ -31,7 +30,7 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-function RootLayoutNav() {
+function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
   const { session, profile, loading } = useAuth();
   const agendaOwner = profile?.activo && profile.id === session?.user.id ? profile.id : '';
   useEffect(() => agendaOwner ? startAgendaWindow(agendaOwner, true) : undefined, [agendaOwner]);
@@ -50,20 +49,27 @@ function RootLayoutNav() {
     return () => unsubscribe();
   }, []);
 
-  // Iniciar rastreo continuo adaptativo tipo Life360 cuando el usuario esté conectado
+  // Iniciar rastreo continuo adaptativo tipo Life360 diferido tras el primer renderizado
   useEffect(() => {
-    if (session?.user?.id) {
-      startLiveTracking(session.user.id);
-    } else {
+    const userId = session?.user?.id;
+    if (!userId) {
       stopLiveTracking();
+      return;
     }
+    const timer = setTimeout(() => {
+      startLiveTracking(userId);
+    }, 1500);
+    return () => clearTimeout(timer);
   }, [session?.user?.id]);
 
-  // Registrar Expo Push Token y sincronizarlo con Supabase
+  // Registrar Expo Push Token diferido para no competir con los primeros frames de arranque
   useEffect(() => {
-    if (session?.user?.id) {
-      registerForPushNotificationsAsync(session.user.id);
-    }
+    const userId = session?.user?.id;
+    if (!userId) return;
+    const timer = setTimeout(() => {
+      registerForPushNotificationsAsync(userId);
+    }, 1800);
+    return () => clearTimeout(timer);
   }, [session?.user?.id]);
 
   // Escuchar cuando el usuario toca una notificación push (app en segundo plano / pantalla bloqueada)
@@ -140,8 +146,8 @@ function RootLayoutNav() {
   }, [router]);
 
   useEffect(() => {
-    // Evitar navegación si el árbol de navegación no se ha montado aún o auth está cargando
-    if (!rootNavigationState?.key || loading) return;
+    // Evitar navegación si el árbol de navegación no se ha montado aún, auth está cargando o faltan fuentes
+    if (!rootNavigationState?.key || loading || !fontsLoaded) return;
 
     const inAuthGroup = segments[0] === '(auth)';
     const isResettingPassword = segments[1] === 'reset-password';
@@ -151,9 +157,9 @@ function RootLayoutNav() {
     } else if (session && !isResettingPassword && (inAuthGroup || segments[0] === 'pending')) {
       router.replace('/(tabs)');
     }
-  }, [session, loading, segments, rootNavigationState?.key, router]);
+  }, [session, loading, fontsLoaded, segments, rootNavigationState?.key, router]);
 
-  if (loading) return null;
+  if (loading || !fontsLoaded) return null;
 
   return (
     <>
@@ -199,27 +205,18 @@ export default function RootLayout() {
     Outfit_600SemiBold,
     Outfit_700Bold,
     Outfit_800ExtraBold,
-    // Compatibilidad universal para cualquier referencia previa
-    Montserrat_400Regular: Outfit_400Regular,
-    Montserrat_500Medium: Outfit_500Medium,
-    Montserrat_600SemiBold: Outfit_600SemiBold,
-    Montserrat_700Bold: Outfit_700Bold,
-    ...FontAwesome.font,
   });
 
   useEffect(() => {
     if (error) throw error;
   }, [error]);
 
-  if (!loaded) {
-    return null;
-  }
-
+  // Montar proveedores en paralelo a la carga de fuentes para eliminar la cascada fuentes -> auth
   return (
     <GestureHandlerRootView style={{ flex: 1 }}><LanguageProvider>
       <AuthProvider>
         <ProjectsProvider>
-          <RootLayoutNav />
+          <RootLayoutNav fontsLoaded={loaded} />
         </ProjectsProvider>
       </AuthProvider>
     </LanguageProvider></GestureHandlerRootView>
