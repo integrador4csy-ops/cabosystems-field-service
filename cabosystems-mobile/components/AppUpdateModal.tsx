@@ -1,5 +1,5 @@
 import { useTranslation as useInterfaceTranslation } from '@/lib/i18n';
-import React from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Modal,
   View,
@@ -9,8 +9,11 @@ import {
   Linking,
   ScrollView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { Colors, Typography, BorderRadius, Spacing, Shadow } from '@/constants/Theme';
 import { AppVersionInfo } from '@/lib/appUpdateService';
 
@@ -20,27 +23,158 @@ interface AppUpdateModalProps {
   onClose: () => void;
 }
 
+export function resolveDirectApkUrl(url: string, version: string): string {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (trimmed.toLowerCase().endsWith('.apk')) return trimmed;
+
+  const tagMatch = trimmed.match(/github\.com\/([^/]+)\/([^/]+)\/releases\/tag\/([^/?#]+)/i);
+  if (tagMatch) {
+    const [, owner, repo, tag] = tagMatch;
+    return `https://github.com/${owner}/${repo}/releases/download/${tag}/cabosystems-field-service.apk`;
+  }
+
+  const repoMatch = trimmed.match(/github\.com\/([^/]+)\/([^/]+)\/releases/i);
+  if (repoMatch) {
+    const [, owner, repo] = repoMatch;
+    const tag = version.startsWith('v') ? version : `v${version}`;
+    return `https://github.com/${owner}/${repo}/releases/download/${tag}/cabosystems-field-service.apk`;
+  }
+
+  return trimmed;
+}
+
+type DownloadStatus = 'idle' | 'downloading' | 'completed' | 'error';
+
 export default function AppUpdateModal({
   visible,
   updateInfo,
   onClose,
 }: AppUpdateModalProps) {
   const { t: tr } = useInterfaceTranslation();
+  const [downloadStatus, setDownloadStatus] = useState<DownloadStatus>('idle');
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadBytes, setDownloadBytes] = useState({ written: 0, total: 0 });
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [downloadedFileUri, setDownloadedFileUri] = useState<string | null>(null);
+  const downloadRef = useRef<FileSystem.DownloadResumable | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (!updateInfo?.latest_version) return;
+    const targetFile = `${FileSystem.documentDirectory || FileSystem.cacheDirectory}CaboSystems-v${updateInfo.latest_version}.apk`;
+    FileSystem.getInfoAsync(targetFile)
+      .then((info) => {
+        if (active && info.exists && info.size && info.size > 1024 * 1024) {
+          setDownloadStatus('completed');
+          setDownloadProgress(1);
+          setDownloadedFileUri(targetFile);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+      if (downloadRef.current) {
+        try {
+          void downloadRef.current.cancelAsync();
+        } catch {}
+      }
+    };
+  }, [updateInfo?.latest_version]);
+
+  const installApk = useCallback(async (apkLocalUri: string, fallbackUrl: string) => {
+    if (Platform.OS !== 'android') {
+      await Linking.openURL(fallbackUrl);
+      return;
+    }
+
+    try {
+      const contentUri = await FileSystem.getContentUriAsync(apkLocalUri);
+
+      try {
+        if (IntentLauncher && typeof IntentLauncher.startActivityAsync === 'function') {
+          await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+            data: contentUri,
+            flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+            type: 'application/vnd.android.package-archive',
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn('IntentLauncher failed, trying openURL:', err);
+      }
+
+      await Linking.openURL(contentUri);
+    } catch (e) {
+      console.warn('Could not launch APK installer:', e);
+      await Linking.openURL(fallbackUrl);
+    }
+  }, []);
+
   if (!updateInfo || !visible) return null;
 
   const handleDownload = async () => {
-    if (!updateInfo.apk_url) return;
+    const rawUrl = updateInfo.apk_url;
+    if (!rawUrl) return;
+
+    const directUrl = resolveDirectApkUrl(rawUrl, updateInfo.latest_version);
+
+    if (downloadStatus === 'completed' && downloadedFileUri) {
+      await installApk(downloadedFileUri, directUrl);
+      return;
+    }
+
+    setDownloadStatus('downloading');
+    setDownloadProgress(0);
+    setErrorMessage(null);
+    setDownloadBytes({ written: 0, total: 0 });
+
     try {
-      const supported = await Linking.canOpenURL(updateInfo.apk_url);
-      if (supported) {
-        await Linking.openURL(updateInfo.apk_url);
-      } else {
-        await Linking.openURL(updateInfo.apk_url);
+      const targetFile = `${FileSystem.documentDirectory || FileSystem.cacheDirectory}CaboSystems-v${updateInfo.latest_version}.apk`;
+
+      const downloadResumable = FileSystem.createDownloadResumable(
+        directUrl,
+        targetFile,
+        {},
+        (progressData) => {
+          if (progressData.totalBytesExpectedToWrite > 0) {
+            const p = progressData.totalBytesWritten / progressData.totalBytesExpectedToWrite;
+            setDownloadProgress(Math.min(1, Math.max(0, p)));
+            setDownloadBytes({
+              written: progressData.totalBytesWritten,
+              total: progressData.totalBytesExpectedToWrite,
+            });
+          } else {
+            setDownloadBytes({
+              written: progressData.totalBytesWritten,
+              total: 0,
+            });
+          }
+        }
+      );
+
+      downloadRef.current = downloadResumable;
+      const result = await downloadResumable.downloadAsync();
+
+      if (!result?.uri) {
+        throw new Error(tr("Error al descargar la actualización."));
       }
-    } catch (e) {
-      console.warn('Error al abrir enlace de actualización:', e);
+
+      setDownloadStatus('completed');
+      setDownloadProgress(1);
+      setDownloadedFileUri(result.uri);
+
+      await installApk(result.uri, directUrl);
+    } catch (err: any) {
+      console.warn('Error downloading update:', err);
+      setDownloadStatus('error');
+      setErrorMessage(err?.message || tr("Error al descargar la actualización."));
+    } finally {
+      downloadRef.current = null;
     }
   };
+
+  const directUrl = resolveDirectApkUrl(updateInfo.apk_url, updateInfo.latest_version);
 
   return (
     <Modal
@@ -48,7 +182,7 @@ export default function AppUpdateModal({
       transparent
       animationType="fade"
       onRequestClose={() => {
-        if (!updateInfo.is_forced) {
+        if (!updateInfo.is_forced && downloadStatus !== 'downloading') {
           onClose();
         }
       }}
@@ -64,8 +198,7 @@ export default function AppUpdateModal({
 
           {/* Badge & Title */}
           <View style={styles.badgeContainer}>
-            <Text style={styles.badgeText}>{tr("NUEVA VERSIÓN v")}{updateInfo.latest_version}
-            </Text>
+            <Text style={styles.badgeText}>{tr("NUEVA VERSIÓN v")}{updateInfo.latest_version}</Text>
           </View>
 
           <Text style={styles.title}>{tr("¡Actualización Disponible!")}</Text>
@@ -85,18 +218,91 @@ export default function AppUpdateModal({
             </View>
           )}
 
+          {/* Barra de Progreso de Descarga */}
+          {(downloadStatus === 'downloading' || downloadStatus === 'completed' || downloadStatus === 'error') && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressHeader}>
+                <Text style={styles.progressLabel}>
+                  {downloadStatus === 'completed'
+                    ? tr("Descarga completada")
+                    : downloadStatus === 'error'
+                    ? tr("Error al descargar la actualización.")
+                    : tr("Descargando actualización...")}
+                </Text>
+                <Text
+                  style={[
+                    styles.progressPercent,
+                    downloadStatus === 'completed' && styles.progressPercentCompleted,
+                    downloadStatus === 'error' && styles.progressPercentError,
+                  ]}
+                >
+                  {downloadStatus === 'completed'
+                    ? '100%'
+                    : downloadStatus === 'error'
+                    ? ''
+                    : `${Math.round(downloadProgress * 100)}%`}
+                </Text>
+              </View>
+
+              <View style={styles.progressBarTrack}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${Math.round(downloadProgress * 100)}%` },
+                    downloadStatus === 'completed' && styles.progressBarFillCompleted,
+                    downloadStatus === 'error' && styles.progressBarFillError,
+                  ]}
+                />
+              </View>
+
+              <View style={styles.progressFooter}>
+                <Text style={styles.progressBytes}>
+                  {downloadBytes.total > 0
+                    ? `${(downloadBytes.written / (1024 * 1024)).toFixed(1)} MB ${tr("de")} ${(downloadBytes.total / (1024 * 1024)).toFixed(1)} MB`
+                    : downloadBytes.written > 0
+                    ? `${(downloadBytes.written / (1024 * 1024)).toFixed(1)} MB`
+                    : ''}
+                </Text>
+              </View>
+            </View>
+          )}
+
           {/* Actions */}
           <View style={styles.buttonContainer}>
             <TouchableOpacity
-              style={styles.primaryButton}
+              style={[
+                styles.primaryButton,
+                downloadStatus === 'downloading' && styles.primaryButtonDisabled,
+              ]}
               onPress={handleDownload}
               activeOpacity={0.85}
+              disabled={downloadStatus === 'downloading'}
             >
-              <Ionicons name="download" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.primaryButtonText}>{tr("Descargar e Instalar")}</Text>
+              {downloadStatus === 'downloading' && (
+                <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+              )}
+              <Text style={styles.primaryButtonText}>
+                {downloadStatus === 'downloading'
+                  ? `${tr("Descargando...")} (${Math.round(downloadProgress * 100)}%)`
+                  : downloadStatus === 'completed'
+                  ? tr("Instalar actualización")
+                  : downloadStatus === 'error'
+                  ? tr("Reintentar descarga")
+                  : tr("Descargar e Instalar")}
+              </Text>
             </TouchableOpacity>
 
-            {!updateInfo.is_forced && (
+            {downloadStatus === 'error' && (
+              <TouchableOpacity
+                style={styles.browserFallbackButton}
+                onPress={() => Linking.openURL(directUrl)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.browserFallbackText}>{tr("Descargar desde el navegador")}</Text>
+              </TouchableOpacity>
+            )}
+
+            {!updateInfo.is_forced && downloadStatus !== 'downloading' && (
               <TouchableOpacity
                 style={styles.secondaryButton}
                 onPress={onClose}
@@ -199,6 +405,65 @@ const styles = StyleSheet.create({
     color: 'rgba(52, 62, 72, 0.75)',
     lineHeight: 16,
   },
+  progressContainer: {
+    width: '100%',
+    backgroundColor: '#F8F9FA',
+    borderRadius: BorderRadius.md,
+    padding: 12,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#E4E7EC',
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  progressLabel: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 12,
+    color: Colors.text,
+  },
+  progressPercent: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 12,
+    color: Colors.primary,
+  },
+  progressPercentCompleted: {
+    color: '#10B981',
+  },
+  progressPercentError: {
+    color: '#EF4444',
+  },
+  progressBarTrack: {
+    width: '100%',
+    height: 8,
+    backgroundColor: '#E4E7EC',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: Colors.primary,
+    borderRadius: 4,
+  },
+  progressBarFillCompleted: {
+    backgroundColor: '#10B981',
+  },
+  progressBarFillError: {
+    backgroundColor: '#EF4444',
+  },
+  progressFooter: {
+    marginTop: 4,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  progressBytes: {
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 11,
+    color: Colors.textSecondary,
+  },
   buttonContainer: {
     width: '100%',
     gap: 8,
@@ -212,10 +477,24 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     ...Shadow.primary,
   },
+  primaryButtonDisabled: {
+    opacity: 0.8,
+  },
   primaryButtonText: {
     fontFamily: 'Outfit_700Bold',
     fontSize: 15,
     color: '#FFFFFF',
+  },
+  browserFallbackButton: {
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  browserFallbackText: {
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 12,
+    color: Colors.primary,
+    textDecorationLine: 'underline',
   },
   secondaryButton: {
     paddingVertical: 10,
