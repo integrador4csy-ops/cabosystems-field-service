@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { ensureCompatibleGradle, standaloneGradle, standaloneMain } = require('../plugins/withGradleCompatibility');
+const { ensureCompatibleGradle, ensureProguardRules, standaloneGradle, standaloneMain } = require('../plugins/withGradleCompatibility');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
@@ -54,4 +54,13 @@ test('standalone device builds embed JavaScript and disable the development serv
   const main = standaloneMain('getDefaultReactHost(\n context = applicationContext,\n packageList = packages)');
   assert.ok(main.includes('useDevSupport = BuildConfig.DEBUG && !BuildConfig.CABO_STANDALONE'));
   assert.equal(standaloneMain(main), main);
+});
+
+test('release ProGuard rules preserve Room, WorkManager and Expo reflection targets across prebuilds', () => {
+  const base = '# default rules\n-keep class com.swmansion.reanimated.** { *; }\n';
+  const updated = ensureProguardRules(base);
+  assert.ok(updated.includes('-keep class * extends androidx.room.RoomDatabase { *; }'));
+  assert.ok(updated.includes('-keep class androidx.work.** { *; }'));
+  assert.ok(updated.includes('-keep class expo.modules.** { *; }'));
+  assert.equal(ensureProguardRules(updated), updated);
 });

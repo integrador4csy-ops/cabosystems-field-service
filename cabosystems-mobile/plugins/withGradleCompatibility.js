@@ -39,6 +39,27 @@ function standaloneMain(source) {
   return source.replace('context = applicationContext,', 'context = applicationContext,\n      useDevSupport = BuildConfig.DEBUG && !BuildConfig.CABO_STANDALONE,');
 }
 
+const proguardKeepMarker = '# CaboSystems: R8 full-mode keep rules';
+const proguardKeepRules = `
+${proguardKeepMarker}
+-keep class androidx.room.** { *; }
+-keep class * extends androidx.room.RoomDatabase { *; }
+-keep class * extends androidx.room.RoomDatabase$Callback { *; }
+-keep class androidx.work.** { *; }
+-keep class * extends androidx.work.ListenableWorker { *; }
+-keep class * extends androidx.work.InputMerger { *; }
+-keep class * extends androidx.startup.Initializer { *; }
+-keep class com.swmansion.worklets.** { *; }
+-keep class com.rnmaps.** { *; }
+-keep class com.google.android.gms.maps.** { *; }
+-keep class expo.modules.** { *; }
+`;
+
+function ensureProguardRules(contents) {
+  if (contents.includes(proguardKeepMarker)) return contents;
+  return `${contents.trimEnd()}\n${proguardKeepRules}`;
+}
+
 module.exports = config => {
   config = withMainApplication(config, mod => {
     mod.modResults.contents = standaloneMain(mod.modResults.contents);
@@ -69,9 +90,19 @@ module.exports = config => {
     const previous = await fs.readFile(file, 'utf8');
     const updated = ensureCompatibleGradle(previous);
     if (updated !== previous) await fs.writeFile(file, updated);
+
+    const proguardFile = path.join(mod.modRequest.platformProjectRoot, 'app/proguard-rules.pro');
+    try {
+      const prevProguard = await fs.readFile(proguardFile, 'utf8');
+      const nextProguard = ensureProguardRules(prevProguard);
+      if (nextProguard !== prevProguard) await fs.writeFile(proguardFile, nextProguard);
+    } catch {
+      await fs.writeFile(proguardFile, proguardKeepRules.trimStart());
+    }
     return mod;
   }]);
 };
 module.exports.ensureCompatibleGradle = ensureCompatibleGradle;
+module.exports.ensureProguardRules = ensureProguardRules;
 module.exports.standaloneGradle = standaloneGradle;
 module.exports.standaloneMain = standaloneMain;
