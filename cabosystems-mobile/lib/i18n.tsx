@@ -150,7 +150,7 @@ export const TRANSLATIONS = {
 
     // Footer
     'profile.footerTagline': 'Tecnología e Integración Residencial • Los Cabos, B.C.S.',
-    'profile.version': 'Versión 1.4.0',
+    'profile.version': 'Versión 1.4.1',
   },
   en: {
     // Bottom Tabs Navigation
@@ -294,7 +294,7 @@ export const TRANSLATIONS = {
 
     // Footer
     'profile.footerTagline': 'Residential Integration & Technology • Los Cabos, B.C.S.',
-    'profile.version': 'Version 1.4.0',
+    'profile.version': 'Version 1.4.1',
   },
 } as const;
 
