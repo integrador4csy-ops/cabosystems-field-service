@@ -204,3 +204,295 @@
 }
 
 .pd-saved-notice { padding:10px 20px; font-size:13px; border-bottom:1px solid #e4e7ec; }
+
+/* Google Sheets Style Column Filters */
+.pd-th-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  user-select: none;
+}
+
+.pd-th-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.pd-th-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-slate-400, #98a2b3);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.pd-th-filter-btn:hover {
+  background: var(--color-slate-200, #e4e7ec);
+  color: var(--color-slate-700, #344054);
+}
+
+.pd-th-filter-btn.is-filtered {
+  background: #ecfdf3;
+  border-color: #a6f4c5;
+  color: #027a48;
+}
+
+.pd-th-filter-btn.is-sorted {
+  background: var(--color-brand-50, #fff7ed);
+  border-color: var(--color-brand-200, #fed7aa);
+  color: #ea580c;
+}
+
+/* Sheets Filter Popover Menu */
+.pd-sheets-filter-menu {
+  width: 260px;
+  background: #ffffff;
+  border: 1px solid var(--color-slate-200, #e4e7ec);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.14), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--color-slate-800, #1e293b);
+  overflow: hidden;
+}
+
+.pd-sheets-menu-section {
+  padding: 6px;
+}
+
+.pd-sheets-menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--color-slate-700, #344054);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.12s ease;
+}
+
+.pd-sheets-menu-item:hover {
+  background: var(--color-slate-50, #f9fafb);
+  color: var(--color-slate-900, #101828);
+}
+
+.pd-sheets-menu-item.is-active {
+  background: var(--color-brand-50, #fff7ed);
+  color: #ea580c;
+  font-weight: 600;
+}
+
+.pd-sheets-check-active {
+  margin-left: auto;
+  color: #ea580c;
+}
+
+.pd-sheets-menu-divider {
+  height: 1px;
+  background: var(--color-slate-200, #f1f5f9);
+  margin: 0;
+}
+
+.pd-sheets-filter-section {
+  padding: 10px 12px 8px;
+}
+
+.pd-sheets-section-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-slate-500, #64748b);
+  margin-bottom: 6px;
+}
+
+.pd-sheets-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 11.5px;
+}
+
+.pd-sheets-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #0284c7;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pd-sheets-link-btn:hover {
+  text-decoration: underline;
+  color: #0369a1;
+}
+
+.pd-sheets-dot {
+  color: var(--color-slate-300, #cbd5e1);
+}
+
+.pd-sheets-search-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--color-slate-200, #e2e8f0);
+  border-radius: 6px;
+  padding: 0 8px;
+  background: #f8fafc;
+  height: 30px;
+  margin-bottom: 8px;
+}
+
+.pd-sheets-search-box:focus-within {
+  background: #ffffff;
+  border-color: #f78c26;
+  box-shadow: 0 0 0 2px rgba(247, 140, 38, 0.15);
+}
+
+.pd-sheets-search-box input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  color: var(--color-slate-800, #1e293b);
+  outline: none;
+  min-height: auto;
+  padding: 0;
+}
+
+.pd-sheets-search-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: var(--color-slate-400, #94a3b8);
+  cursor: pointer;
+  padding: 0;
+}
+
+.pd-sheets-values-list {
+  max-height: 160px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0;
+}
+
+.pd-sheets-value-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--color-slate-700, #334155);
+  cursor: pointer;
+  user-select: none;
+}
+
+.pd-sheets-value-row:hover {
+  background: var(--color-slate-50, #f8fafc);
+}
+
+.pd-sheets-value-row input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pd-sheets-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--color-slate-300, #cbd5e1);
+  border-radius: 4px;
+  background: #ffffff;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.pd-sheets-checkbox.is-checked {
+  background: #0284c7;
+  border-color: #0284c7;
+}
+
+.pd-sheets-value-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-sheets-values-empty {
+  padding: 14px 8px;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--color-slate-400, #94a3b8);
+}
+
+.pd-sheets-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f8fafc;
+}
+
+.pd-sheets-btn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 28px;
+  border: 1px solid transparent;
+  transition: all 0.12s ease;
+}
+
+.pd-sheets-btn-cancel {
+  background: #ffffff;
+  border-color: var(--color-slate-200, #e2e8f0);
+  color: var(--color-slate-600, #475569);
+}
+
+.pd-sheets-btn-cancel:hover {
+  background: var(--color-slate-50, #f1f5f9);
+}
+
+.pd-sheets-btn-ok {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.pd-sheets-btn-ok:hover {
+  background: #0369a1;
+}

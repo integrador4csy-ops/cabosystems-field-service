@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Building2, Check, ChevronDown, ChevronRight, ListFilter, LocateFixed, Loader2, MapPin, Plus, RefreshCw, Settings2, Trash2, UserRoundCog, Users, X } from 'lucide-react';
+import { ArrowDownAZ, ArrowLeft, ArrowUpZA, Building2, Check, ChevronDown, ChevronRight, Filter, ListFilter, LocateFixed, Loader2, MapPin, Plus, RefreshCw, Search, Settings2, Trash2, UserRoundCog, Users, X } from 'lucide-react';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { useTranslation } from '../../context/LanguageContext';
 import { getRoleLabel } from '../../lib/uiTranslations';
@@ -332,6 +332,234 @@ function VillaTeam({ villa, data, admin, c, close, saved, deleted, onDirty }: { 
   </aside>;
 }
 
+type DirectoryColumnKey = 'villa' | 'integrador' | 'tecnico' | 'estatus';
+
+function ColumnFilterMenu({
+  columnTitle,
+  allValues,
+  selectedValues,
+  sortOrder,
+  anchorRect,
+  onApplySort,
+  onApplyFilter,
+  onClose,
+  c,
+}: {
+  columnKey: DirectoryColumnKey;
+  columnTitle: string;
+  allValues: string[];
+  selectedValues: Set<string> | null;
+  sortOrder: 'asc' | 'desc' | null;
+  anchorRect: DOMRect;
+  onApplySort: (order: 'asc' | 'desc') => void;
+  onApplyFilter: (selected: Set<string> | null) => void;
+  onClose: () => void;
+  c: ProjectCopy;
+}) {
+  const [draftSelected, setDraftSelected] = useState<Set<string>>(() => {
+    return selectedValues !== null ? new Set(selectedValues) : new Set(allValues);
+  });
+  const [searchValue, setSearchValue] = useState('');
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
+
+  const filteredValues = useMemo(() => {
+    const q = searchValue.toLowerCase().trim();
+    if (!q) return allValues;
+    return allValues.filter((v) => v.toLowerCase().includes(q));
+  }, [allValues, searchValue]);
+
+  const handleSelectAll = () => {
+    setDraftSelected((prev) => {
+      const next = new Set(prev);
+      for (const val of filteredValues) next.add(val);
+      return next;
+    });
+  };
+
+  const handleClear = () => {
+    setDraftSelected((prev) => {
+      const next = new Set(prev);
+      for (const val of filteredValues) next.delete(val);
+      return next;
+    });
+  };
+
+  const handleToggleValue = (val: string) => {
+    setDraftSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(val)) next.delete(val);
+      else next.add(val);
+      return next;
+    });
+  };
+
+  const handleApply = () => {
+    if (draftSelected.size >= allValues.length) {
+      onApplyFilter(null);
+    } else {
+      onApplyFilter(new Set(draftSelected));
+    }
+    onClose();
+  };
+
+  const menuWidth = 260;
+  const left = Math.max(12, Math.min(anchorRect.right - menuWidth, window.innerWidth - menuWidth - 16));
+  const top = anchorRect.bottom + 4;
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      className="pd-sheets-filter-menu"
+      style={{
+        position: 'fixed',
+        top: `${top}px`,
+        left: `${left}px`,
+        zIndex: 9999,
+      }}
+      role="dialog"
+      aria-label={`${c.filterColumn}: ${columnTitle}`}
+    >
+      {/* 1. Sort Options */}
+      <div className="pd-sheets-menu-section">
+        <button
+          type="button"
+          className={`pd-sheets-menu-item ${sortOrder === 'asc' ? 'is-active' : ''}`}
+          onClick={() => {
+            onApplySort('asc');
+            onClose();
+          }}
+        >
+          <ArrowDownAZ size={15} />
+          <span>{c.sortAsc}</span>
+          {sortOrder === 'asc' && <Check size={14} className="pd-sheets-check-active" />}
+        </button>
+        <button
+          type="button"
+          className={`pd-sheets-menu-item ${sortOrder === 'desc' ? 'is-active' : ''}`}
+          onClick={() => {
+            onApplySort('desc');
+            onClose();
+          }}
+        >
+          <ArrowUpZA size={15} />
+          <span>{c.sortDesc}</span>
+          {sortOrder === 'desc' && <Check size={14} className="pd-sheets-check-active" />}
+        </button>
+      </div>
+
+      <div className="pd-sheets-menu-divider" />
+
+      {/* 2. Filter by Values */}
+      <div className="pd-sheets-filter-section">
+        <span className="pd-sheets-section-title">{c.filterByValues}</span>
+
+        <div className="pd-sheets-filter-actions">
+          <button
+            type="button"
+            className="pd-sheets-link-btn"
+            onClick={handleSelectAll}
+          >
+            {c.selectAll}
+          </button>
+          <span className="pd-sheets-dot">·</span>
+          <button
+            type="button"
+            className="pd-sheets-link-btn"
+            onClick={handleClear}
+          >
+            {c.clearValues}
+          </button>
+        </div>
+
+        {/* Search Box */}
+        <div className="pd-sheets-search-box">
+          <Search size={13} className="text-slate-400" />
+          <input
+            type="search"
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            placeholder={c.searchValues}
+            autoFocus
+          />
+          {searchValue && (
+            <button
+              type="button"
+              onClick={() => setSearchValue('')}
+              className="pd-sheets-search-clear"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+
+        {/* Values Checklist */}
+        <div className="pd-sheets-values-list">
+          {filteredValues.length === 0 ? (
+            <div className="pd-sheets-values-empty">{c.emptySearch}</div>
+          ) : (
+            filteredValues.map((val) => {
+              const checked = draftSelected.has(val);
+              return (
+                <label key={val} className="pd-sheets-value-row">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => handleToggleValue(val)}
+                  />
+                  <span className={`pd-sheets-checkbox ${checked ? 'is-checked' : ''}`}>
+                    {checked && <Check size={11} />}
+                  </span>
+                  <span className="pd-sheets-value-text" title={val}>
+                    {val}
+                  </span>
+                </label>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <div className="pd-sheets-menu-divider" />
+
+      {/* 3. Action Buttons */}
+      <div className="pd-sheets-footer">
+        <button
+          type="button"
+          className="pd-sheets-btn pd-sheets-btn-cancel"
+          onClick={onClose}
+        >
+          {c.cancel}
+        </button>
+        <button
+          type="button"
+          className="pd-sheets-btn pd-sheets-btn-ok"
+          onClick={handleApply}
+        >
+          {c.accept}
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export function ProjectDirectoryView() {
   const { adminProfile } = useAdminAuth(); const admin = adminProfile?.rol === 'admin' && adminProfile.activo === true;
   const { language } = useTranslation(); const c = PROJECT_COPY[language];
@@ -345,6 +573,11 @@ export function ProjectDirectoryView() {
   const [deleteTarget, setDeleteTarget] = useState<Development | null>(null); const [deleteError, setDeleteError] = useState('');
   const [statusFilters, setStatusFilters] = useState<ProjectVilla['estatus'][]>([]);
   const [creation, setCreation] = useState<'development' | 'villa' | null>(null); const [access, setAccess] = useState<'global' | 'development' | null>(null);
+  const [sortColumn, setSortColumn] = useState<DirectoryColumnKey | null>(null);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [columnFilters, setColumnFilters] = useState<Partial<Record<DirectoryColumnKey, Set<string>>>>({});
+  const [activeMenuCol, setActiveMenuCol] = useState<DirectoryColumnKey | null>(null);
+  const [menuAnchorRect, setMenuAnchorRect] = useState<DOMRect | null>(null);
   const request = useRef(0); const dirty = useRef(false); const setDirty = useCallback((value: boolean) => { dirty.current = value; }, []);
   const hasLoaded = useRef(Boolean(cached));
   const canLeave = () => { if (!dirty.current) { setNotice(''); return true; } if (!window.confirm(c.unsaved)) return false; dirty.current = false; setNotice(''); setEditorVersion(previous => previous + 1); return true; };
@@ -368,6 +601,12 @@ export function ProjectDirectoryView() {
   }, [load]);
   useEffect(() => { if (directorySearchQuery) setVillaId(''); }, [directorySearchQuery]);
   useEffect(() => () => setDirectorySearchQuery(''), [setDirectorySearchQuery]);
+  useEffect(() => {
+    setColumnFilters({});
+    setSortColumn(null);
+    setActiveMenuCol(null);
+    setMenuAnchorRect(null);
+  }, [developmentId]);
   const development = data.developments.find(d => d.id === developmentId);
   const selectedVilla = data.villas.find(v => v.id === villaId && v.desarrollo_id === development?.id && (!statusFilters.length || statusFilters.includes(v.estatus)));
   const visibleByStatus = useMemo(() => statusFilters.length ? data.villas.filter(v => statusFilters.includes(v.estatus)) : data.villas, [data.villas, statusFilters]);
@@ -383,11 +622,104 @@ export function ProjectDirectoryView() {
       setVillaId('');
     }
   }, [normalizedDirectoryQuery, matchingDevelopmentIds, developmentId, developments]);
-  const villas = matchingVillas.filter(v => v.desarrollo_id === development?.id).sort((a, b) => a.villa.localeCompare(b.villa, language, { numeric: true }));
+
+  const developmentVillas = useMemo(() => {
+    return data.villas.filter(v => v.desarrollo_id === development?.id);
+  }, [data.villas, development?.id]);
+
+  const getColumnValue = useCallback((villa: ProjectVilla, col: DirectoryColumnKey): string => {
+    switch (col) {
+      case 'villa':
+        return villa.villa;
+      case 'integrador':
+        return staffNames.get(villa.integrador_id || '') || c.unassigned;
+      case 'tecnico':
+        return staffNames.get(villa.tecnico_id || '') || c.unassigned;
+      case 'estatus':
+        return projectStatusLabel(c, villa.estatus);
+    }
+  }, [staffNames, c]);
+
+  const columnDistinctValues = useMemo(() => {
+    const result: Record<DirectoryColumnKey, string[]> = {
+      villa: [],
+      integrador: [],
+      tecnico: [],
+      estatus: [],
+    };
+    const keys: DirectoryColumnKey[] = ['villa', 'integrador', 'tecnico', 'estatus'];
+    for (const key of keys) {
+      const set = new Set<string>();
+      for (const v of developmentVillas) {
+        set.add(getColumnValue(v, key));
+      }
+      result[key] = Array.from(set).sort((a, b) => a.localeCompare(b, language, { numeric: true }));
+    }
+    return result;
+  }, [developmentVillas, getColumnValue, language]);
+
+  const villas = useMemo(() => {
+    let list = matchingVillas.filter(v => v.desarrollo_id === development?.id);
+
+    for (const col of ['villa', 'integrador', 'tecnico', 'estatus'] as DirectoryColumnKey[]) {
+      const allowed = columnFilters[col];
+      if (allowed) {
+        list = list.filter(v => allowed.has(getColumnValue(v, col)));
+      }
+    }
+
+    if (sortColumn) {
+      list.sort((a, b) => {
+        const valA = getColumnValue(a, sortColumn);
+        const valB = getColumnValue(b, sortColumn);
+        const cmp = valA.localeCompare(valB, language, { numeric: true });
+        return sortOrder === 'desc' ? -cmp : cmp;
+      });
+    } else {
+      list.sort((a, b) => a.villa.localeCompare(b.villa, language, { numeric: true }));
+    }
+
+    return list;
+  }, [matchingVillas, development?.id, columnFilters, sortColumn, sortOrder, getColumnValue, language]);
+
   const counts = useMemo(() => { const map = new Map<string, number>(); for (const villa of matchingVillas) map.set(villa.desarrollo_id, (map.get(villa.desarrollo_id) || 0) + 1); return map; }, [matchingVillas]);
   const toggleStatusFilter = (status: ProjectVilla['estatus']) => setStatusFilters(current => current.includes(status)
     ? current.length === 1 ? current : current.filter(item => item !== status)
     : PROJECT_STATUSES.filter(item => current.includes(item) || item === status));
+
+  const renderColumnHeader = (colKey: DirectoryColumnKey, title: string) => {
+    const isFiltered = Boolean(columnFilters[colKey]);
+    const isSorted = sortColumn === colKey;
+
+    return (
+      <div className="pd-th-cell">
+        <span className="pd-th-label">{title}</span>
+        <button
+          type="button"
+          className={`pd-th-filter-btn ${isFiltered ? 'is-filtered' : isSorted ? 'is-sorted' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (activeMenuCol === colKey) {
+              setActiveMenuCol(null);
+              setMenuAnchorRect(null);
+            } else {
+              setActiveMenuCol(colKey);
+              setMenuAnchorRect(e.currentTarget.getBoundingClientRect());
+            }
+          }}
+          aria-label={`${c.filterColumn}: ${title}`}
+        >
+          {isFiltered ? (
+            <Filter size={12} />
+          ) : isSorted ? (
+            sortOrder === 'asc' ? <ArrowDownAZ size={12} /> : <ArrowUpZA size={12} />
+          ) : (
+            <ListFilter size={12} />
+          )}
+        </button>
+      </div>
+    );
+  };
   const changed = async () => { resources.queries.invalidate('tasks'); await load(); };
   const created = async (development: string, villa?: string) => { resources.queries.invalidate('tasks'); setDevelopmentId(development); setVillaId(villa || ''); setDirectorySearchQuery(''); await load(); };
   const requestDevelopmentDeletion = () => {
@@ -427,7 +759,14 @@ export function ProjectDirectoryView() {
         {development ? <><header><div><button type="button" className="pd-mobile-back" onClick={() => { if (canLeave()) { setDevelopmentId(''); setVillaId(''); } }}><ArrowLeft size={16} />{c.developments}</button><h2>{development.nombre}</h2><p className="pd-muted">{c.activeVillas} · {counts.get(development.id) || 0}</p></div>{admin && <div className="pd-header-actions"><button type="button" className="pd-icon" aria-label={c.developmentAccess} title={c.developmentAccess} disabled={Boolean(deletingDevelopmentId)} onClick={() => setAccess('development')}><Settings2 size={18} /></button><button type="button" className="pd-icon pd-danger-icon" aria-label={deletingDevelopmentId === development.id ? c.deletingDevelopment : c.deleteDevelopment} title={c.deleteDevelopment} disabled={Boolean(deletingDevelopmentId)} onClick={requestDevelopmentDeletion}>{deletingDevelopmentId === development.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}</button></div>}</header>
           <div className="pd-villa-tools"><details className="pd-status-filter"><summary aria-label={c.filterStatus}><ListFilter size={16} /><span>{statusFilters.length === 0 ? c.allStatuses : statusFilters.length === 1 ? projectStatusLabel(c, statusFilters[0]) : `${statusFilters.length} ${c.statuses}`}</span><ChevronDown size={15} /></summary><div className="pd-status-menu" role="group" aria-label={c.filterStatus}>{PROJECT_STATUSES.map(status => { const checked = statusFilters.includes(status); return <label key={status} className={checked ? 'is-checked' : ''}><input type="checkbox" checked={checked} onChange={() => toggleStatusFilter(status)} /><span className="pd-check" aria-hidden="true">{checked ? <Check size={13} /> : null}</span><span>{projectStatusLabel(c, status)}</span></label>; })}<button type="button" className="pd-status-clear" disabled={!statusFilters.length} onClick={() => setStatusFilters([])}>{c.clearFilter}</button></div></details>{admin && <button className="pd-primary" type="button" onClick={() => { if (canLeave()) setCreation('villa'); }}><Plus size={16} />{c.newVilla}</button>}</div>
           <div className="pd-villa-list">
-            {villas.length > 0 && <div className="pd-villa-list-head" aria-hidden="true"><span>{c.villaName}</span><span>{c.integrator}</span><span>{c.technician}</span><span>{c.projectStatus}</span></div>}
+            {developmentVillas.length > 0 && (
+              <div className="pd-villa-list-head">
+                {renderColumnHeader('villa', c.villaName)}
+                {renderColumnHeader('integrador', c.integrator)}
+                {renderColumnHeader('tecnico', c.technician)}
+                {renderColumnHeader('estatus', c.projectStatus)}
+              </div>
+            )}
             <div className="pd-villa-list-body">
               {villas.map(villa => <button className={`pd-villa ${villa.id === villaId ? 'is-selected' : ''}`} type="button" key={villa.id} aria-pressed={villa.id === villaId} onClick={() => { if (canLeave()) { setVillaId(villa.id); setDirectorySearchQuery(''); } }}>
                 <span className="pd-villa-identity"><strong>{villa.villa}</strong><span className="pd-villa-meta">{villa.numero_proyecto && <span>{villa.numero_proyecto}</span>}{villa.cliente && <span>{villa.cliente}</span>}{!villa.numero_proyecto && !villa.cliente && villa.descripcion && <span>{villa.descripcion}</span>}</span></span>
@@ -438,6 +777,44 @@ export function ProjectDirectoryView() {
               {!villas.length && <div className="pd-empty"><p>{directorySearchQuery ? c.emptySearch : c.emptyVillas}</p><p className="pd-muted pd-help">{c.viewInactive}</p></div>}
             </div>
           </div>
+          {activeMenuCol && menuAnchorRect && (
+            <ColumnFilterMenu
+              columnKey={activeMenuCol}
+              columnTitle={
+                activeMenuCol === 'villa'
+                  ? c.villaName
+                  : activeMenuCol === 'integrador'
+                  ? c.integrator
+                  : activeMenuCol === 'tecnico'
+                  ? c.technician
+                  : c.projectStatus
+              }
+              allValues={columnDistinctValues[activeMenuCol]}
+              selectedValues={columnFilters[activeMenuCol] ?? null}
+              sortOrder={sortColumn === activeMenuCol ? sortOrder : null}
+              anchorRect={menuAnchorRect}
+              onApplySort={(order) => {
+                setSortColumn(activeMenuCol);
+                setSortOrder(order);
+              }}
+              onApplyFilter={(selected) => {
+                setColumnFilters((prev) => {
+                  const next = { ...prev };
+                  if (selected === null) {
+                    delete next[activeMenuCol];
+                  } else {
+                    next[activeMenuCol] = selected;
+                  }
+                  return next;
+                });
+              }}
+              onClose={() => {
+                setActiveMenuCol(null);
+                setMenuAnchorRect(null);
+              }}
+              c={c}
+            />
+          )}
         </> : <div className="pd-empty pd-select-empty"><Building2 size={28} /><p>{c.chooseDevelopment}</p></div>}
       </div>
       {selectedVilla && <VillaTeam key={`${selectedVilla.id}:${selectedVilla.equipo_revision}:${editorVersion}`} villa={selectedVilla} data={data} admin={admin} c={c} close={() => { if (canLeave()) setVillaId(''); }} saved={async () => { await changed(); setNotice(c.saved); }} deleted={async () => { setVillaId(''); await changed(); setNotice(c.villaDeleted); }} onDirty={setDirty} />}

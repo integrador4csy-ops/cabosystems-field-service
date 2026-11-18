@@ -41,6 +41,10 @@ export const PROJECT_COPY = {
     mapInstruction: 'Haz clic en el mapa o arrastra el punto para ajustar el centro.', mapEmpty: 'Haz clic para colocar la villa.',
     mapLoading: 'Cargando mapa...', mapLoadError: 'No se pudo cargar el mapa. Puedes ingresar las coordenadas manualmente.',
     mapAriaLabel: 'Mapa para seleccionar la ubicación de la villa', mapMarkerTitle: 'Centro de la geocerca',
+    sortAsc: 'Ordenar De la A a la Z', sortDesc: 'Ordenar De la Z a la A',
+    filterByValues: 'Filtrar por valores', selectAll: 'Seleccionar todo',
+    clearValues: 'Borrar', searchValues: 'Buscar...', accept: 'Aceptar',
+    filterColumn: 'Filtrar columna',
   },
   en: {
     projects: 'Projects', developments: 'Developments', newDevelopment: 'New development', newVilla: 'New villa / project',
@@ -84,6 +88,10 @@ export const PROJECT_COPY = {
     mapInstruction: 'Click the map or drag the point to adjust the center.', mapEmpty: 'Click to place the villa.',
     mapLoading: 'Loading map...', mapLoadError: 'The map could not be loaded. You can enter the coordinates manually.',
     mapAriaLabel: 'Map to select the villa location', mapMarkerTitle: 'Geofence center',
+    sortAsc: 'Sort A to Z', sortDesc: 'Sort Z to A',
+    filterByValues: 'Filter by values', selectAll: 'Select all',
+    clearValues: 'Clear', searchValues: 'Search...', accept: 'OK',
+    filterColumn: 'Filter column',
   },
 };
 export type ProjectCopy = typeof PROJECT_COPY.es;
