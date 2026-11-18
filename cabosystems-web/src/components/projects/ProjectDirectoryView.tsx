@@ -371,11 +371,20 @@ function ColumnFilterMenu({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
+    const handleScroll = (event: Event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', onClose);
+    window.addEventListener('scroll', handleScroll, true);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', onClose);
+      window.removeEventListener('scroll', handleScroll, true);
     };
   }, [onClose]);
 
@@ -420,32 +429,57 @@ function ColumnFilterMenu({
   };
 
   const menuWidth = 270;
-  let left = anchorRect.left + (anchorRect.width / 2) - 30;
-  if (left + menuWidth > window.innerWidth - 16) {
-    left = window.innerWidth - menuWidth - 16;
-  }
-  if (left < 16) {
-    left = 16;
+  const spaceRight = window.innerWidth - anchorRect.left - 16;
+  const spaceLeft = anchorRect.right - 16;
+
+  let left: number;
+  let alignSide: 'left' | 'right';
+
+  // Google Sheets behavior:
+  // - If space on right is sufficient for menu, anchor top-left of menu to bottom-left of icon (left = anchorRect.left).
+  // - If space on right is insufficient (e.g. rightmost column "Estatus"), anchor top-right of menu to bottom-right of icon (left = anchorRect.right - menuWidth).
+  if (spaceRight >= menuWidth) {
+    left = anchorRect.left;
+    alignSide = 'left';
+  } else if (spaceLeft >= menuWidth) {
+    left = anchorRect.right - menuWidth;
+    alignSide = 'right';
+  } else {
+    if (spaceLeft >= spaceRight) {
+      left = anchorRect.right - menuWidth;
+      alignSide = 'right';
+    } else {
+      left = anchorRect.left;
+      alignSide = 'left';
+    }
   }
 
+  // Safety clamp to ensure 100% viewport containment
+  left = Math.max(16, Math.min(left, window.innerWidth - menuWidth - 16));
+
   const estimatedHeight = 350;
-  let top = anchorRect.bottom + 6;
+  let top = anchorRect.bottom + 4;
+  let openUpwards = false;
   if (top + estimatedHeight > window.innerHeight - 16) {
-    if (anchorRect.top - 6 - estimatedHeight >= 16) {
-      top = anchorRect.top - 6 - estimatedHeight;
+    if (anchorRect.top - 4 - estimatedHeight >= 16) {
+      top = anchorRect.top - 4 - estimatedHeight;
+      openUpwards = true;
     } else {
       top = Math.max(16, window.innerHeight - estimatedHeight - 16);
     }
   }
 
+  const transformOrigin = `${openUpwards ? 'bottom' : 'top'} ${alignSide}`;
+
   return createPortal(
     <div
       ref={menuRef}
-      className="pd-sheets-filter-menu"
+      className={`pd-sheets-filter-menu align-${alignSide}`}
       style={{
         position: 'fixed',
         top: `${top}px`,
         left: `${left}px`,
+        transformOrigin,
         zIndex: 9999,
       }}
       role="dialog"
