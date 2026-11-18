@@ -419,9 +419,24 @@ function ColumnFilterMenu({
     onClose();
   };
 
-  const menuWidth = 260;
-  const left = Math.max(12, Math.min(anchorRect.right - menuWidth, window.innerWidth - menuWidth - 16));
-  const top = anchorRect.bottom + 4;
+  const menuWidth = 270;
+  let left = anchorRect.left + (anchorRect.width / 2) - 30;
+  if (left + menuWidth > window.innerWidth - 16) {
+    left = window.innerWidth - menuWidth - 16;
+  }
+  if (left < 16) {
+    left = 16;
+  }
+
+  const estimatedHeight = 350;
+  let top = anchorRect.bottom + 6;
+  if (top + estimatedHeight > window.innerHeight - 16) {
+    if (anchorRect.top - 6 - estimatedHeight >= 16) {
+      top = anchorRect.top - 6 - estimatedHeight;
+    } else {
+      top = Math.max(16, window.innerHeight - estimatedHeight - 16);
+    }
+  }
 
   return createPortal(
     <div
@@ -690,13 +705,14 @@ export function ProjectDirectoryView() {
   const renderColumnHeader = (colKey: DirectoryColumnKey, title: string) => {
     const isFiltered = Boolean(columnFilters[colKey]);
     const isSorted = sortColumn === colKey;
+    const isOpen = activeMenuCol === colKey;
 
     return (
       <div className="pd-th-cell">
         <span className="pd-th-label">{title}</span>
         <button
           type="button"
-          className={`pd-th-filter-btn ${isFiltered ? 'is-filtered' : isSorted ? 'is-sorted' : ''}`}
+          className={`pd-th-filter-btn ${isOpen ? 'is-open' : isFiltered ? 'is-filtered' : isSorted ? 'is-sorted' : ''}`}
           onClick={(e) => {
             e.stopPropagation();
             if (activeMenuCol === colKey) {
