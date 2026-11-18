@@ -421,6 +421,9 @@ function DashboardContent() {
           onlineCount={onlineCount}
           movingCount={movingCount}
           offlineCount={offlineCount}
+          workers={workers}
+          selectedWorkerId={selectedWorkerId}
+          onSelectWorker={handleSelectWorker}
           historyWorkers={workers}
           historyWorkerId={historyWorkerId}
           onHistoryWorkerChange={handleSelectWorker}

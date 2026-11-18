@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { SearchIcon, CloseIcon } from '../../icons';
 import { CalendarDays, Car, ChevronLeft, ChevronRight, Menu, MapPin, Plus, RefreshCw } from 'lucide-react';
 import { useTranslation } from '../../context/LanguageContext';
@@ -6,6 +6,7 @@ import { useSidebar } from '../../context/SidebarContext';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import type { LiveWorker } from '../../types/fleet';
 import { dateKey, shiftDate } from '../../lib/taskDates';
+import { formatShortName } from '../../lib/agendaPresentation';
 import { AppSelect } from '../ui/AppSelect';
 import { NotificationCenter } from './NotificationCenter';
 import { AgendaDateTimeField } from '../agenda/AgendaDateTimeField';
@@ -17,6 +18,9 @@ interface AppHeaderProps {
   onlineCount: number;
   movingCount: number;
   offlineCount: number;
+  workers?: LiveWorker[];
+  selectedWorkerId?: string | null;
+  onSelectWorker?: (workerId: string) => void;
   historyWorkers?: LiveWorker[];
   historyWorkerId?: string;
   onHistoryWorkerChange?: (workerId: string) => void;
@@ -38,6 +42,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onlineCount,
   movingCount,
   offlineCount,
+  workers = [],
+  selectedWorkerId = null,
+  onSelectWorker,
   historyWorkers = [],
   historyWorkerId = '',
   onHistoryWorkerChange,
@@ -85,6 +92,18 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const title = isChecks ? t('Historial de checks') : isHistory ? t('sidebar.history') : isTracking ? t('sidebar.radar') : teamTitles[activeItem] || (activeItem === 'garantias' ? (locale.startsWith('es') ? 'Garantías' : 'Warranties') : activeItem === 'chat' ? t('sidebar.chat') : activeItem === 'agenda' ? t('sidebar.agenda') : activeItem === 'proyectos' ? t('sidebar.projects') : isHistory ? t('sidebar.history') : t('sidebar.radar'));
   const today = dateKey(new Date());
   const yesterday = shiftDate(today, -1);
+
+  const sortedWorkers = useMemo(() => {
+    return [...workers].sort((a, b) => {
+      const aMoving = !a.isOffline && (a.location?.velocidad || 0) > 12;
+      const bMoving = !b.isOffline && (b.location?.velocidad || 0) > 12;
+      if (aMoving !== bMoving) return aMoving ? -1 : 1;
+      if (a.isOffline !== b.isOffline) return a.isOffline ? 1 : -1;
+      const nameA = a.profile?.nombre || a.profile?.full_name || '';
+      const nameB = b.profile?.nombre || b.profile?.full_name || '';
+      return nameA.localeCompare(nameB);
+    });
+  }, [workers]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -219,25 +238,85 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         {isWarranty && <button type="button" onClick={requestCreateWarranty} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{t('Nueva garantía')}</button>}
         {isTeam && <button type="button" onClick={requestCreateTeamInvite} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{t('Nueva invitación')}</button>}
         {isRadar && (
-          <div className="flex h-9 items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 shadow-2xs">
-            <div className="flex items-center gap-1.5 text-emerald-700 font-medium" title={t('header.onlineTitle')}>
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              <span className="font-semibold">{onlineCount}</span>
-              <span className="hidden sm:inline">{t('header.online')}</span>
+          sortedWorkers.length > 0 ? (
+            <div
+              className="flex items-center gap-1.5 overflow-x-auto max-w-[320px] sm:max-w-[440px] lg:max-w-[560px] 2xl:max-w-[720px] py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {sortedWorkers.map((worker) => {
+                const isSelected = selectedWorkerId === worker.profile.id;
+                const isOffline = worker.isOffline;
+                const isMoving = !isOffline && (worker.location?.velocidad || 0) > 12;
+                const fullName = worker.profile.nombre || worker.profile.full_name || worker.profile.email || t('Técnico');
+                const displayName = formatShortName(fullName) || fullName;
+                const initial = (fullName.charAt(0) || 'T').toUpperCase();
+                const statusLabel = isMoving ? t('header.inRoute') : isOffline ? t('header.offline') : t('header.online');
+
+                return (
+                  <button
+                    key={worker.profile.id}
+                    type="button"
+                    onClick={() => onSelectWorker?.(isSelected ? '' : worker.profile.id)}
+                    className={`group inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border pl-1 pr-2.5 text-xs font-medium transition-all select-none ${
+                      isSelected
+                        ? 'border-brand-500 bg-brand-50 text-brand-900 shadow-2xs ring-2 ring-brand-500/25'
+                        : isOffline
+                        ? 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                        : isMoving
+                        ? 'border-amber-200 bg-amber-50/70 text-amber-900 hover:bg-amber-100/70'
+                        : 'border-emerald-200 bg-emerald-50/70 text-emerald-900 hover:bg-emerald-100/70'
+                    }`}
+                    title={`${fullName} · ${statusLabel}`}
+                    aria-pressed={isSelected}
+                  >
+                    <span className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-700 overflow-hidden">
+                      {worker.profile.avatar_url ? (
+                        <img src={worker.profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span>{initial}</span>
+                      )}
+                      <span
+                        className={`absolute bottom-0 right-0 h-1.5 w-1.5 rounded-full ring-1 ring-white ${
+                          isOffline ? 'bg-slate-400' : isMoving ? 'bg-amber-500' : 'bg-emerald-500'
+                        }`}
+                      />
+                    </span>
+                    <span className="truncate max-w-[90px] sm:max-w-[120px] font-semibold">{displayName}</span>
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                        isOffline
+                          ? 'bg-slate-100 text-slate-500'
+                          : isMoving
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}
+                    >
+                      {statusLabel}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-            {movingCount > 0 && (
-              <div className="flex items-center gap-1.5 text-orange-700 font-medium" title={t('header.inRouteTitle')}>
-                <Car size={14} />
-                <span className="font-semibold">{movingCount}</span>
-                <span className="hidden xl:inline">{t('header.inRoute')}</span>
+          ) : (
+            <div className="flex h-9 items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-emerald-700 font-medium" title={t('header.onlineTitle')}>
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="font-semibold">{onlineCount}</span>
+                <span className="hidden sm:inline">{t('header.online')}</span>
               </div>
-            )}
-            <div className="flex items-center gap-1.5 text-slate-500 font-medium" title={t('header.offlineTitle')}>
-              <span className="h-2 w-2 rounded-full bg-slate-400" />
-              <span className="font-semibold">{offlineCount}</span>
-              <span className="hidden sm:inline">{t('header.offline')}</span>
+              {movingCount > 0 && (
+                <div className="flex items-center gap-1.5 text-orange-700 font-medium" title={t('header.inRouteTitle')}>
+                  <Car size={14} />
+                  <span className="font-semibold">{movingCount}</span>
+                  <span className="hidden xl:inline">{t('header.inRoute')}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5 text-slate-500 font-medium" title={t('header.offlineTitle')}>
+                <span className="h-2 w-2 rounded-full bg-slate-400" />
+                <span className="font-semibold">{offlineCount}</span>
+                <span className="hidden sm:inline">{t('header.offline')}</span>
+              </div>
             </div>
-          </div>
+          )
         )}
         <NotificationCenter />
       </div>
