@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { SearchIcon, CloseIcon } from '../../icons';
-import { CalendarDays, Car, ChevronDown, ChevronLeft, ChevronRight, Menu, MapPin, Plus, RefreshCw, X } from 'lucide-react';
+import { Battery, BatteryCharging, CalendarDays, Car, ChevronDown, ChevronLeft, ChevronRight, Menu, MapPin, Plus, RefreshCw, X } from 'lucide-react';
 import { useTranslation } from '../../context/LanguageContext';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAdminAuth } from '../../context/AdminAuthContext';
@@ -447,8 +447,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                               {typeof battery === 'number' && battery >= 0 && (
                                 <>
                                   <span className="text-slate-300">·</span>
-                                  <span className="flex items-center gap-0.5">
-                                    🔋 {Math.round(battery)}%
+                                  <span className="flex items-center gap-1 font-medium">
+                                    {worker.location?.esta_cargando ? (
+                                      <BatteryCharging size={12} className="text-amber-500" />
+                                    ) : battery < 20 ? (
+                                      <Battery size={12} className="text-rose-500" />
+                                    ) : (
+                                      <Battery size={12} className="text-slate-400" />
+                                    )}
+                                    <span>{Math.round(battery)}%</span>
                                   </span>
                                 </>
                               )}
