@@ -1,12 +1,11 @@
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { SearchIcon, CloseIcon } from '../../icons';
-import { CalendarDays, Car, ChevronLeft, ChevronRight, Menu, MapPin, Plus, RefreshCw } from 'lucide-react';
+import { CalendarDays, Car, ChevronDown, ChevronLeft, ChevronRight, Menu, MapPin, Plus, RefreshCw, X } from 'lucide-react';
 import { useTranslation } from '../../context/LanguageContext';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import type { LiveWorker } from '../../types/fleet';
 import { dateKey, shiftDate } from '../../lib/taskDates';
-import { formatShortName } from '../../lib/agendaPresentation';
 import { AppSelect } from '../ui/AppSelect';
 import { NotificationCenter } from './NotificationCenter';
 import { AgendaDateTimeField } from '../agenda/AgendaDateTimeField';
@@ -93,6 +92,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const today = dateKey(new Date());
   const yesterday = shiftDate(today, -1);
 
+  const [teamMenuOpen, setTeamMenuOpen] = useState(false);
+  const [teamSearchText, setTeamSearchText] = useState('');
+  const teamMenuContainerRef = useRef<HTMLDivElement>(null);
+
   const sortedWorkers = useMemo(() => {
     return [...workers].sort((a, b) => {
       const aMoving = !a.isOffline && (a.location?.velocidad || 0) > 12;
@@ -104,6 +107,34 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       return nameA.localeCompare(nameB);
     });
   }, [workers]);
+
+  const displayWorkers = useMemo(() => {
+    const q = teamSearchText.toLowerCase().trim();
+    if (!q) return sortedWorkers;
+    return sortedWorkers.filter((w) => {
+      const name = (w.profile?.nombre || w.profile?.full_name || '').toLowerCase();
+      const email = (w.profile?.email || '').toLowerCase();
+      return name.includes(q) || email.includes(q);
+    });
+  }, [sortedWorkers, teamSearchText]);
+
+  useEffect(() => {
+    if (!teamMenuOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!teamMenuContainerRef.current?.contains(event.target as Node)) {
+        setTeamMenuOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setTeamMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [teamMenuOpen]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -238,74 +269,29 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         {isWarranty && <button type="button" onClick={requestCreateWarranty} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{t('Nueva garantía')}</button>}
         {isTeam && <button type="button" onClick={requestCreateTeamInvite} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand-500 px-3 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={16} aria-hidden="true" />{t('Nueva invitación')}</button>}
         {isRadar && (
-          sortedWorkers.length > 0 ? (
-            <div
-              className="flex items-center gap-1.5 overflow-x-auto max-w-[320px] sm:max-w-[440px] lg:max-w-[560px] 2xl:max-w-[720px] py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          <div ref={teamMenuContainerRef} className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setTeamMenuOpen((prev) => !prev)}
+              aria-expanded={teamMenuOpen}
+              className={`flex h-9 items-center gap-2.5 rounded-lg border px-3 text-xs font-medium shadow-2xs transition-all ${
+                teamMenuOpen
+                  ? 'border-brand-500 bg-brand-50/70 text-slate-800 ring-2 ring-brand-500/20'
+                  : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+              }`}
+              title={t('header.teamListTitle')}
             >
-              {sortedWorkers.map((worker) => {
-                const isSelected = selectedWorkerId === worker.profile.id;
-                const isOffline = worker.isOffline;
-                const isMoving = !isOffline && (worker.location?.velocidad || 0) > 12;
-                const fullName = worker.profile.nombre || worker.profile.full_name || worker.profile.email || t('Técnico');
-                const displayName = formatShortName(fullName) || fullName;
-                const initial = (fullName.charAt(0) || 'T').toUpperCase();
-                const statusLabel = isMoving ? t('header.inRoute') : isOffline ? t('header.offline') : t('header.online');
-
-                return (
-                  <button
-                    key={worker.profile.id}
-                    type="button"
-                    onClick={() => onSelectWorker?.(isSelected ? '' : worker.profile.id)}
-                    className={`group inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border pl-1 pr-2.5 text-xs font-medium transition-all select-none ${
-                      isSelected
-                        ? 'border-brand-500 bg-brand-50 text-brand-900 shadow-2xs ring-2 ring-brand-500/25'
-                        : isOffline
-                        ? 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-                        : isMoving
-                        ? 'border-amber-200 bg-amber-50/70 text-amber-900 hover:bg-amber-100/70'
-                        : 'border-emerald-200 bg-emerald-50/70 text-emerald-900 hover:bg-emerald-100/70'
-                    }`}
-                    title={`${fullName} · ${statusLabel}`}
-                    aria-pressed={isSelected}
-                  >
-                    <span className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-700 overflow-hidden">
-                      {worker.profile.avatar_url ? (
-                        <img src={worker.profile.avatar_url} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <span>{initial}</span>
-                      )}
-                      <span
-                        className={`absolute bottom-0 right-0 h-1.5 w-1.5 rounded-full ring-1 ring-white ${
-                          isOffline ? 'bg-slate-400' : isMoving ? 'bg-amber-500' : 'bg-emerald-500'
-                        }`}
-                      />
-                    </span>
-                    <span className="truncate max-w-[90px] sm:max-w-[120px] font-semibold">{displayName}</span>
-                    <span
-                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-                        isOffline
-                          ? 'bg-slate-100 text-slate-500'
-                          : isMoving
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-emerald-100 text-emerald-800'
-                      }`}
-                    >
-                      {statusLabel}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex h-9 items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 shadow-2xs">
               <div className="flex items-center gap-1.5 text-emerald-700 font-medium" title={t('header.onlineTitle')}>
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="relative flex h-2 w-2">
+                  {onlineCount > 0 && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />}
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                </span>
                 <span className="font-semibold">{onlineCount}</span>
                 <span className="hidden sm:inline">{t('header.online')}</span>
               </div>
               {movingCount > 0 && (
                 <div className="flex items-center gap-1.5 text-orange-700 font-medium" title={t('header.inRouteTitle')}>
-                  <Car size={14} />
+                  <Car size={13} />
                   <span className="font-semibold">{movingCount}</span>
                   <span className="hidden xl:inline">{t('header.inRoute')}</span>
                 </div>
@@ -315,8 +301,167 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 <span className="font-semibold">{offlineCount}</span>
                 <span className="hidden sm:inline">{t('header.offline')}</span>
               </div>
-            </div>
-          )
+              <ChevronDown
+                size={14}
+                className={`text-slate-400 transition-transform duration-200 ${teamMenuOpen ? 'rotate-180 text-brand-600' : ''}`}
+              />
+            </button>
+
+            {teamMenuOpen && (
+              <div
+                className="absolute right-0 top-11 z-[120] flex max-h-[min(540px,calc(100vh-88px))] w-[min(380px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+                role="dialog"
+                aria-label={t('header.teamList')}
+              >
+                {/* Header of popover */}
+                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 py-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-semibold text-slate-900">{t('header.teamList')}</h2>
+                      <span className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[11px] font-bold text-slate-700">
+                        {sortedWorkers.length}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 text-xs">
+                      <span className="inline-flex items-center gap-1 font-medium text-emerald-700">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        {onlineCount} {t('header.online')}
+                      </span>
+                      {movingCount > 0 && (
+                        <>
+                          <span className="text-slate-300">·</span>
+                          <span className="inline-flex items-center gap-1 font-medium text-amber-700">
+                            <Car size={12} />
+                            {movingCount} {t('header.inRoute')}
+                          </span>
+                        </>
+                      )}
+                      <span className="text-slate-300">·</span>
+                      <span className="inline-flex items-center gap-1 font-medium text-slate-500">
+                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                        {offlineCount} {t('header.offline')}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTeamMenuOpen(false)}
+                    aria-label={t('Cerrar')}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Search if there are more than 4 workers */}
+                {sortedWorkers.length > 4 && (
+                  <div className="border-b border-slate-100 p-2 bg-white">
+                    <div className="relative">
+                      <SearchIcon size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      <input
+                        type="search"
+                        value={teamSearchText}
+                        onChange={(e) => setTeamSearchText(e.target.value)}
+                        placeholder={t('Buscar colaboradores')}
+                        className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* List of workers */}
+                <div className="overflow-y-auto p-2 divide-y divide-slate-100/80">
+                  {displayWorkers.length === 0 ? (
+                    <div className="py-6 text-center text-xs text-slate-500">
+                      {t('No se encontraron colaboradores con esa búsqueda')}
+                    </div>
+                  ) : (
+                    displayWorkers.map((worker) => {
+                      const isSelected = selectedWorkerId === worker.profile.id;
+                      const isOffline = worker.isOffline;
+                      const speed = worker.location?.velocidad || 0;
+                      const isMoving = !isOffline && speed > 12;
+                      const fullName = worker.profile.nombre || worker.profile.full_name || worker.profile.email || t('Técnico');
+                      const initial = (fullName.charAt(0) || 'T').toUpperCase();
+                      const battery = worker.location?.bateria;
+
+                      return (
+                        <button
+                          key={worker.profile.id}
+                          type="button"
+                          onClick={() => {
+                            onSelectWorker?.(isSelected ? '' : worker.profile.id);
+                            setTeamMenuOpen(false);
+                          }}
+                          className={`group flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-colors ${
+                            isSelected
+                              ? 'bg-brand-50 text-brand-950 ring-1 ring-brand-500/30'
+                              : 'hover:bg-slate-50 text-slate-800'
+                          }`}
+                        >
+                          {/* Avatar with live status indicator */}
+                          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700 overflow-hidden ring-1 ring-slate-200">
+                            {worker.profile.avatar_url ? (
+                              <img src={worker.profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              <span>{initial}</span>
+                            )}
+                            <span
+                              className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-white ${
+                                isOffline ? 'bg-slate-400' : isMoving ? 'bg-amber-500' : 'bg-emerald-500'
+                              }`}
+                            />
+                          </div>
+
+                          {/* Info */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="truncate text-xs font-semibold text-slate-900 group-hover:text-brand-600 transition-colors">
+                                {fullName}
+                              </span>
+                              <span
+                                className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                                  isOffline
+                                    ? 'bg-slate-100 text-slate-600'
+                                    : isMoving
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-emerald-100 text-emerald-800'
+                                }`}
+                              >
+                                {isMoving ? t('header.inRoute') : isOffline ? t('header.offline') : t('header.online')}
+                              </span>
+                            </div>
+
+                            <div className="mt-0.5 flex items-center gap-2 text-[11px] text-slate-500">
+                              {isMoving ? (
+                                <span className="flex items-center gap-1 text-amber-700 font-medium">
+                                  <Car size={11} />
+                                  {Math.round(speed)} km/h
+                                </span>
+                              ) : isOffline ? (
+                                <span>{worker.relativeTime || t('header.offline')}</span>
+                              ) : (
+                                <span className="text-emerald-700 font-medium">● GPS activo</span>
+                              )}
+
+                              {typeof battery === 'number' && battery >= 0 && (
+                                <>
+                                  <span className="text-slate-300">·</span>
+                                  <span className="flex items-center gap-0.5">
+                                    🔋 {Math.round(battery)}%
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         )}
         <NotificationCenter />
       </div>

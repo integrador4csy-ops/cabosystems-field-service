@@ -44,6 +44,8 @@ export const WEB_TRANSLATIONS = {
     'header.onlineTitle': 'Técnicos conectados con señal activa',
     'header.inRouteTitle': 'Técnicos en movimiento/ruta (>12 km/h)',
     'header.offlineTitle': 'Técnicos sin señal reciente (>15 min)',
+    'header.teamList': 'Estado del equipo',
+    'header.teamListTitle': 'Ver lista de técnicos en línea y offline',
 
     // Modal Editar Perfil / Ajustes
     'modal.profileTitle': 'Editar Perfil y Ajustes',
@@ -111,6 +113,8 @@ export const WEB_TRANSLATIONS = {
     'header.onlineTitle': 'Technicians connected with active signal',
     'header.inRouteTitle': 'Technicians in transit/route (>12 km/h)',
     'header.offlineTitle': 'Technicians with no recent signal (>15 min)',
+    'header.teamList': 'Team status',
+    'header.teamListTitle': 'View online and offline technicians',
 
     // Modal Editar Perfil / Ajustes
     'modal.profileTitle': 'Edit Profile & Settings',
