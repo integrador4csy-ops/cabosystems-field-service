@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, LogIn, LogOut, RefreshCw, Users, X } from 'lucide-react-native';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, LogIn, LogOut, MapPin, RefreshCw, Users, X } from 'lucide-react-native';
 import { HeaderCaboSystems, useHeaderHeight } from '@/components/HeaderCaboSystems';
 import { BOTTOM_BAR_HEIGHT, BOTTOM_BAR_MIN_INSET } from '@/constants/NavigationLayout';
 import { useAuth } from '@/lib/auth';
@@ -35,6 +35,7 @@ const CheckCard = React.memo(function CheckCard({
 }) {
   const isOut = item.check_type === 'check_out';
   const time = new Date(item.checked_at).toLocaleTimeString(en ? 'en-US' : 'es-MX', { hour: '2-digit', minute: '2-digit' });
+  const hasCoords = typeof item.latitude === 'number' && typeof item.longitude === 'number' && (item.latitude !== 0 || item.longitude !== 0);
   return (
     <View style={styles.checkCard}>
       <Pressable accessibilityRole="imagebutton" onPress={() => onPhoto(item)} style={styles.photoButton}>
@@ -49,6 +50,17 @@ const CheckCard = React.memo(function CheckCard({
             <Text style={styles.checkType}>{isOut ? 'Check-out' : 'Check-in'}</Text>
             <Text style={styles.checkTime}>{time}</Text>
           </View>
+          {hasCoords ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={en ? 'View on map' : 'Ver en mapa'}
+              onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${item.latitude},${item.longitude}`)}
+              style={styles.mapPinButton}
+              hitSlop={8}
+            >
+              <MapPin size={16} color="#f78c26" />
+            </Pressable>
+          ) : null}
         </View>
         <Text style={styles.villa} numberOfLines={1}>{item.villa}</Text>
         <Text style={styles.development} numberOfLines={1}>{item.development}</Text>
@@ -421,9 +433,22 @@ export function ChecksHistoryContent({
           </Pressable>
           {photoItem ? <Image source={{ uri: photoItem.photo_url }} style={styles.fullPhoto} contentFit="contain" /> : null}
           {photoItem ? (
-            <Text style={styles.photoCaption}>
-              {photoItem.technician_name} · {photoItem.villa} · {new Date(photoItem.checked_at).toLocaleString(en ? 'en-US' : 'es-MX')}
-            </Text>
+            <View style={styles.photoFooter}>
+              <Text style={styles.photoCaption}>
+                {photoItem.technician_name} · {photoItem.villa} · {new Date(photoItem.checked_at).toLocaleString(en ? 'en-US' : 'es-MX')}
+              </Text>
+              {photoItem.latitude && photoItem.longitude ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={en ? 'View on map' : 'Ver en mapa'}
+                  onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${photoItem.latitude},${photoItem.longitude}`)}
+                  style={styles.photoMapBtn}
+                >
+                  <MapPin size={15} color="#FFFFFF" />
+                  <Text style={styles.photoMapText}>{en ? 'View on map' : 'Ver en mapa'}</Text>
+                </Pressable>
+              ) : null}
+            </View>
           ) : null}
         </View>
       </Modal>
@@ -850,5 +875,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginTop: 12,
+  },
+  photoFooter: {
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
+  },
+  photoMapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#f78c26',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 6,
+  },
+  photoMapText: {
+    color: '#FFFFFF',
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 13,
+  },
+  mapPinButton: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: '#FFF7ED',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

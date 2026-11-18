@@ -51,7 +51,7 @@ import {
   getTaskById,
   registerMissingVillaGeofence,
 } from '@/lib/api';
-import { getLatestOfflineFieldRecord as getLatestFieldRecord, queueFieldRecord } from '@/lib/fieldSync';
+import { getLatestOfflineFieldRecord as getLatestFieldRecord, isFieldRecordFromToday, queueFieldRecord } from '@/lib/fieldSync';
 import { optimizeEvidencePhoto } from '@/lib/evidencePhoto';
 import type { Project } from '@/types/database';
 import { HeaderCaboSystems, useHeaderHeight } from '@/components/HeaderCaboSystems';
@@ -444,11 +444,6 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
         // 1. Detectar si la siguiente acción es salida o llegada
         if (type) {
           setIsCheckOut(type === 'check_out');
-        } else {
-          const latest = await getLatestFieldRecord(user.id);
-          if (mounted && latest) {
-            setIsCheckOut(latest.tipo === 'check_in');
-          }
         }
 
         // 2. Identificar automáticamente el Desarrollo y Villa correspondiente
@@ -485,6 +480,21 @@ export default function CheckinScreen({ embedded = false }: { embedded?: boolean
           setCurrentProject(resolved);
           if (resolved) {
             setSelectedProject(resolved);
+          }
+        }
+
+        // 3. Validar estado de check-in / check-out: si llegó otro día se reinicia a check-in
+        if (!type || type === 'check_out') {
+          const latest = await getLatestFieldRecord(user.id);
+          if (mounted && latest) {
+            const isToday = typeof isFieldRecordFromToday === 'function' ? isFieldRecordFromToday(latest.fecha_hora) : true;
+            if (!isToday || latest.tipo !== 'check_in') {
+              setIsCheckOut(false);
+            } else if (!type) {
+              setIsCheckOut(true);
+            }
+          } else if (mounted && !type) {
+            setIsCheckOut(false);
           }
         }
       } catch (err) {

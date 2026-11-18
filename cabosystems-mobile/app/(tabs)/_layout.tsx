@@ -23,7 +23,7 @@ import { Colors, Animation } from '@/constants/Theme';
 import { BOTTOM_BAR_HEIGHT, BOTTOM_BAR_MIN_INSET } from '@/constants/NavigationLayout';
 import { useAuth } from '@/lib/auth';
 import { useProjects } from '@/lib/projects';
-import { getLatestOfflineFieldRecord as getLatestFieldRecord, subscribeFieldSync } from '@/lib/fieldSync';
+import { getLatestOfflineFieldRecord as getLatestFieldRecord, isFieldRecordFromToday, subscribeFieldSync } from '@/lib/fieldSync';
 import { startForegroundPolling } from '@/lib/foregroundPolling';
 import { useTranslation } from '@/lib/i18n';
 import { afterTabPaint, prepareTabs } from '@/lib/tabPreparation';
@@ -110,7 +110,8 @@ function FloatingActionButton(props: any) {
       if (!user?.id) return;
       const latest = await getLatestFieldRecord(user.id);
       if (mounted) {
-        setIsCheckedIn(latest?.tipo === 'check_in');
+        const isToday = latest ? isFieldRecordFromToday(latest.fecha_hora) : false;
+        setIsCheckedIn(latest?.tipo === 'check_in' && isToday);
       }
     }
     const stopPolling = startForegroundPolling(checkStatus, 10000);

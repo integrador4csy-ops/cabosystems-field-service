@@ -108,6 +108,34 @@ export async function queueFieldRecord(input: Omit<PendingFieldRecord, 'id' | 'c
   return id;
 }
 export async function retryFieldSync(owner: string) { await retryPendingFieldRecords(owner); notify(); wake?.(); }
+
+/**
+ * Formats a timestamp into YYYY-MM-DD in the Los Cabos (America/Mazatlan) timezone.
+ */
+export function getLocalMazatlanDateKey(dateInput?: string | number | Date | null): string {
+  try {
+    if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
+      const d = dateInput ? new Date(dateInput) : new Date();
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Mazatlan',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(d);
+    }
+  } catch {}
+  const d = dateInput ? new Date(dateInput) : new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Returns true if the record was captured today in the Los Cabos timezone.
+ */
+export function isFieldRecordFromToday(fechaHora?: string | null): boolean {
+  if (!fechaHora) return false;
+  return getLocalMazatlanDateKey(fechaHora) === getLocalMazatlanDateKey();
+}
+
 export async function getLatestOfflineFieldRecord(owner: string): Promise<FieldRecord | null> {
   let local = Platform.OS === 'web' ? null : await latestLocalFieldRecord(owner).catch(() => null);
   const asRecord = (saved: PendingFieldRecord): FieldRecord => ({ id: saved.id, proyecto_id: saved.projectId, tarea_id: null, tecnico_id: owner, tipo: saved.tipo, latitud: saved.latitude, longitud: saved.longitude, foto_url: saved.remotePhotoUrl || saved.photoUri, comentarios: saved.comments, fecha_hora: saved.capturedAt });

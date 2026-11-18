@@ -5,6 +5,7 @@ import { getAdminCheckHistory, type AdminCheckHistoryItem } from '../../lib/chec
 import { dateKey, shiftDate } from '../../lib/taskDates';
 import { AppSelect } from '../ui/AppSelect';
 import { ImageLightboxModal } from '../chat/ImageLightboxModal';
+import { CheckLocationModal, type CheckLocationData } from './CheckLocationModal';
 
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'CS';
@@ -40,6 +41,7 @@ export function CheckHistoryView({
   const [error, setError] = useState('');
   const [collapsedMap, setCollapsedMap] = useState<Record<string, boolean>>({});
   const [evidence, setEvidence] = useState<{ url: string; caption: string } | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<CheckLocationData | null>(null);
 
   const day = propDay ?? internalDay;
   const setDay = onDayChange ?? setInternalDay;
@@ -184,6 +186,7 @@ export function CheckHistoryView({
                     const isIn = entry.check_type === 'check_in';
                     const place = [entry.development, entry.villa].filter(Boolean).join(' · ');
                     const time = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(new Date(entry.checked_at));
+                    const hasLocation = typeof entry.latitude === 'number' && typeof entry.longitude === 'number' && (entry.latitude !== 0 || entry.longitude !== 0);
                     return <div key={entry.id} className="grid gap-3 px-4 py-3 sm:grid-cols-[auto_1fr_auto] sm:items-center hover:bg-slate-50/50 transition-colors">
                       <div className={`flex h-9 w-9 items-center justify-center rounded-full ${isIn ? 'bg-emerald-50 text-emerald-700' : 'bg-brand-50 text-brand-700'}`}>{isIn ? <LogIn size={18} /> : <LogOut size={18} />}</div>
                       <div className="min-w-0">
@@ -191,7 +194,37 @@ export function CheckHistoryView({
                         {place && <p className="mt-1 flex items-center gap-1 truncate text-sm text-slate-600"><MapPin size={14} className="shrink-0 text-slate-400" />{place}</p>}
                         {entry.comments && <p className="mt-1 text-sm text-slate-500">{entry.comments}</p>}
                       </div>
-                      {entry.photo_url && <button type="button" onClick={() => setEvidence({ url: entry.photo_url, caption: `${person.technician_name} · ${isIn ? 'Check-in' : 'Check-out'} · ${time}` })} className="inline-flex h-9 items-center gap-2 justify-self-start rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-700 sm:justify-self-end"><Camera size={15} />{t('Ver evidencia')}</button>}
+                      <div className="flex flex-wrap items-center gap-2 justify-self-start sm:justify-self-end">
+                        {hasLocation && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLocation({
+                              latitude: entry.latitude,
+                              longitude: entry.longitude,
+                              technicianName: person.technician_name,
+                              checkType: entry.check_type,
+                              time,
+                              place,
+                              photoUrl: entry.photo_url || null,
+                              comments: entry.comments || null,
+                            })}
+                            className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-700 transition-colors"
+                          >
+                            <MapPin size={15} />
+                            {t('Ver mapa')}
+                          </button>
+                        )}
+                        {entry.photo_url && (
+                          <button
+                            type="button"
+                            onClick={() => setEvidence({ url: entry.photo_url, caption: `${person.technician_name} · ${isIn ? 'Check-in' : 'Check-out'} · ${time}` })}
+                            className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-700 transition-colors"
+                          >
+                            <Camera size={15} />
+                            {t('Ver evidencia')}
+                          </button>
+                        )}
+                      </div>
                     </div>;
                   })}
                 </div>
@@ -201,6 +234,17 @@ export function CheckHistoryView({
         </div>}
       </div>
       {evidence && <ImageLightboxModal imageUrl={evidence.url} caption={evidence.caption} onClose={() => setEvidence(null)} />}
+      {selectedLocation && (
+        <CheckLocationModal
+          data={selectedLocation}
+          onClose={() => setSelectedLocation(null)}
+          onViewPhoto={(url) => {
+            const cap = `${selectedLocation.technicianName} · ${selectedLocation.checkType === 'check_in' ? 'Check-in' : 'Check-out'} · ${selectedLocation.time}`;
+            setSelectedLocation(null);
+            setEvidence({ url, caption: cap });
+          }}
+        />
+      )}
     </section>
   );
 }
