@@ -1,8 +1,7 @@
-import { useEffect, useRef } from 'react';
-import * as L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import { ExternalLink, LogIn, LogOut, MapPin, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ExternalLink, LogIn, LogOut, X } from 'lucide-react';
 import { useTranslation } from '../../context/LanguageContext';
+import { loadGoogleMaps } from '../../lib/googleMapsLoader';
 
 export interface CheckLocationData {
   latitude: number;
@@ -22,9 +21,11 @@ interface CheckLocationModalProps {
 }
 
 export function CheckLocationModal({ data, onClose, onViewPhoto }: CheckLocationModalProps) {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const [mapLoading, setMapLoading] = useState(true);
+  const [mapError, setMapError] = useState('');
 
   const isIn = data.checkType === 'check_in';
   const googleMapsUrl = `https://www.google.com/maps?q=${data.latitude},${data.longitude}`;
@@ -38,49 +39,91 @@ export function CheckLocationModal({ data, onClose, onViewPhoto }: CheckLocation
   }, [onClose]);
 
   useEffect(() => {
-    if (!mapContainerRef.current) return;
+    let active = true;
     let resizeObserver: ResizeObserver | null = null;
+    let marker: google.maps.marker.AdvancedMarkerElement | google.maps.Marker | null = null;
+    let infoWindow: google.maps.InfoWindow | null = null;
 
-    try {
-      const map = L.map(mapContainerRef.current, {
-        center: [data.latitude, data.longitude],
-        zoom: 16,
-        zoomControl: true,
-        attributionControl: true,
+    setMapLoading(true);
+    setMapError('');
+
+    void loadGoogleMaps(language)
+      .then(() => {
+        if (!active || !mapContainerRef.current) return;
+
+        const map = new google.maps.Map(mapContainerRef.current, {
+          center: { lat: data.latitude, lng: data.longitude },
+          zoom: 17,
+          mapId: import.meta.env.VITE_GOOGLE_MAP_ID || 'DEMO_MAP_ID',
+          mapTypeId: google.maps.MapTypeId.ROADMAP,
+          colorScheme: google.maps.ColorScheme.LIGHT,
+          disableDefaultUI: false,
+          zoomControl: true,
+          mapTypeControl: true,
+          streetViewControl: true,
+          fullscreenControl: false,
+        });
+        mapRef.current = map;
+
+        const pinElement = document.createElement('div');
+        pinElement.style.display = 'flex';
+        pinElement.style.alignItems = 'center';
+        pinElement.style.justifyContent = 'center';
+        pinElement.style.width = '38px';
+        pinElement.style.height = '38px';
+        pinElement.style.borderRadius = '50%';
+        pinElement.style.backgroundColor = isIn ? '#059669' : '#f78c26';
+        pinElement.style.color = '#ffffff';
+        pinElement.style.boxShadow = '0 4px 14px rgba(0,0,0,0.35)';
+        pinElement.style.border = '2.5px solid #ffffff';
+        pinElement.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          ${isIn ? '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>' : '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>'}
+        </svg>`;
+
+        if (google.maps.marker?.AdvancedMarkerElement) {
+          marker = new google.maps.marker.AdvancedMarkerElement({
+            map,
+            position: { lat: data.latitude, lng: data.longitude },
+            title: data.place || data.technicianName,
+            content: pinElement,
+          });
+        } else {
+          marker = new google.maps.Marker({
+            map,
+            position: { lat: data.latitude, lng: data.longitude },
+            title: data.place || data.technicianName,
+          });
+        }
+
+        infoWindow = new google.maps.InfoWindow({
+          content: `<div style="padding:4px 6px;font-family:sans-serif;">
+            <strong style="font-size:13px;color:#1e293b;">${data.place || data.technicianName}</strong>
+            <div style="font-size:12px;color:#64748b;margin-top:2px;">${isIn ? 'Check-in' : 'Check-out'} · ${data.time}</div>
+          </div>`,
+        });
+        infoWindow.open({ map, anchor: marker });
+
+        resizeObserver = new ResizeObserver(() => google.maps.event.trigger(map, 'resize'));
+        resizeObserver.observe(mapContainerRef.current);
+        setMapLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        console.error('Error loading Google Maps in CheckLocationModal:', err);
+        setMapError(t('No se pudo cargar Google Maps. Revisa la clave API y sus restricciones.'));
+        setMapLoading(false);
       });
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap',
-      }).addTo(map);
-
-      const markerIcon = L.divIcon({
-        className: 'check-location-pin',
-        html: `<div style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:${isIn ? '#059669' : '#f78c26'};color:#ffffff;box-shadow:0 4px 14px rgba(0,0,0,0.35);border:2.5px solid #ffffff;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            ${isIn ? '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>' : '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>'}
-          </svg>
-        </div>`,
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
-      });
-
-      const marker = L.marker([data.latitude, data.longitude], { icon: markerIcon }).addTo(map);
-      marker.bindPopup(`<b>${data.place || data.technicianName}</b><br><span style="font-size:12px;color:#64748b;">${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}</span>`);
-
-      mapRef.current = map;
-      resizeObserver = new ResizeObserver(() => map.invalidateSize({ pan: false }));
-      resizeObserver.observe(mapContainerRef.current);
-    } catch (err) {
-      console.error('Error initializing check location map:', err);
-    }
 
     return () => {
+      active = false;
       resizeObserver?.disconnect();
-      mapRef.current?.remove();
+      if (marker && 'map' in marker) {
+        marker.map = null;
+      }
+      infoWindow?.close();
       mapRef.current = null;
     };
-  }, [data.latitude, data.longitude, data.place, data.technicianName, isIn]);
+  }, [data.latitude, data.longitude, data.place, data.technicianName, data.time, isIn, language, t]);
 
   return (
     <div
@@ -109,45 +152,52 @@ export function CheckLocationModal({ data, onClose, onViewPhoto }: CheckLocation
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 transition-colors"
-            aria-label={t('Cerrar')}
-          >
-            <X size={18} />
-          </button>
-        </header>
-
-        {/* Body */}
-        <div className="p-5 flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg">
-              <MapPin size={14} className="text-brand-600 shrink-0" />
-              <span>{t('Coordenadas')}: {data.latitude.toFixed(6)}, {data.longitude.toFixed(6)}</span>
-            </div>
+          <div className="flex items-center gap-2">
             {data.photoUrl && onViewPhoto && (
               <button
                 type="button"
                 onClick={() => onViewPhoto(data.photoUrl!)}
-                className="text-xs font-semibold text-brand-600 hover:text-brand-700 underline cursor-pointer"
+                className="text-xs font-semibold text-brand-600 hover:text-brand-700 underline cursor-pointer mr-2"
               >
                 {t('Ver evidencia')}
               </button>
             )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 transition-colors"
+              aria-label={t('Cerrar')}
+            >
+              <X size={18} />
+            </button>
           </div>
+        </header>
 
+        {/* Body */}
+        <div className="p-5 flex flex-col gap-4">
           {data.comments && (
             <p className="text-xs text-slate-600 bg-amber-50/60 border border-amber-200/60 rounded-lg p-2.5">
               {data.comments}
             </p>
           )}
 
-          {/* Interactive Leaflet Map */}
-          <div
-            ref={mapContainerRef}
-            className="h-80 w-full rounded-xl overflow-hidden border border-slate-200 shadow-inner z-0"
-          />
+          {/* Interactive Google Map */}
+          <div className="relative h-80 w-full rounded-xl overflow-hidden border border-slate-200 shadow-inner z-0">
+            <div ref={mapContainerRef} className="h-full w-full" />
+            {mapLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-50/80 backdrop-blur-xs z-10">
+                <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+                  <span>{t('Cargando...')}</span>
+                </div>
+              </div>
+            )}
+            {mapError && (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-100 p-4 text-center z-10">
+                <p className="text-xs text-slate-600 max-w-sm">{mapError}</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
