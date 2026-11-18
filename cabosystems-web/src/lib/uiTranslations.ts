@@ -865,6 +865,12 @@ export const UI_TRANSLATIONS: Record<string, string> = {
   "Las contraseñas no coinciden.": "Passwords do not match.",
   "¡Registro completado con éxito! Iniciando sesión...": "Registration completed successfully! Signing in...",
   "Por favor ingresa tu nombre completo.": "Please enter your full name.",
+  "Limpiar búsqueda": "Clear search",
+  "Invitaciones": "Invitations",
+  "Invitaciones pendientes": "Pending invitations",
+  "Ver evidencia fotográfica": "View photo evidence",
+  "Abrir video": "Open video",
+  "Ver imagen": "View image",
 };
 
 export type TranslationParams = Record<string, string | number>;

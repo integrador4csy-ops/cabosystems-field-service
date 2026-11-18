@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowDownAZ, ArrowLeft, ArrowUpZA, Building2, Check, ChevronDown, ChevronRight, Filter, ListFilter, LocateFixed, Loader2, MapPin, Plus, RefreshCw, Search, Settings2, Trash2, UserRoundCog, Users, X } from 'lucide-react';
@@ -13,6 +13,7 @@ import type { Profile } from '../../types/fleet';
 import { AppSelect } from '../ui/AppSelect';
 import { useDialog } from '../ui/useDialog';
 import { useSidebar } from '../../context/SidebarContext';
+import { layoutViewport } from '../../lib/layoutViewport';
 import { VillaGeofenceMap } from './VillaGeofenceMap';
 import './ProjectDirectory.css';
 import { useSectionResources, type SectionResources } from '../../context/SectionResources';
@@ -339,7 +340,7 @@ function ColumnFilterMenu({
   allValues,
   selectedValues,
   sortOrder,
-  anchorRect,
+  triggerElement,
   onApplySort,
   onApplyFilter,
   onClose,
@@ -350,7 +351,7 @@ function ColumnFilterMenu({
   allValues: string[];
   selectedValues: Set<string> | null;
   sortOrder: 'asc' | 'desc' | null;
-  anchorRect: DOMRect;
+  triggerElement: HTMLElement;
   onApplySort: (order: 'asc' | 'desc') => void;
   onApplyFilter: (selected: Set<string> | null) => void;
   onClose: () => void;
@@ -362,31 +363,85 @@ function ColumnFilterMenu({
   const [searchValue, setSearchValue] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
 
+  useLayoutEffect(() => {
+    const position = () => {
+      const menu = menuRef.current;
+      if (!triggerElement || !menu) return;
+
+      const layout = layoutViewport();
+      const anchor = layout.rect(triggerElement);
+      const menuWidth = 270;
+      const menuHeight = menu.offsetHeight || 350;
+
+      // Available space in zoom-corrected layout pixels
+      const spaceLeft = anchor.right - 12;
+      const spaceRight = layout.width - anchor.left - 12;
+
+      let left: number;
+      let alignSide: 'left' | 'right';
+
+      // Google Sheets positioning:
+      // When clicking the filter icon at the right edge of a column header:
+      // - If space on the right is sufficient, anchor top-left corner to button's left corner (left = anchor.left).
+      // - If space on the right is tight (e.g. "Estatus" at the screen's right edge), anchor top-right corner to button's right corner (left = anchor.right - menuWidth).
+      if (spaceRight >= menuWidth) {
+        left = anchor.left;
+        alignSide = 'left';
+      } else if (spaceLeft >= menuWidth) {
+        left = anchor.right - menuWidth;
+        alignSide = 'right';
+      } else {
+        if (spaceLeft >= spaceRight) {
+          left = anchor.right - menuWidth;
+          alignSide = 'right';
+        } else {
+          left = anchor.left;
+          alignSide = 'left';
+        }
+      }
+
+      // Hard clamp within layout boundaries to prevent clipping on small viewports
+      left = Math.max(12, Math.min(left, layout.width - menuWidth - 12));
+
+      // Vertical positioning
+      const spaceBelow = layout.height - anchor.bottom - 12;
+      const spaceAbove = anchor.top - 12;
+      const upwards = spaceBelow < menuHeight && spaceAbove > spaceBelow;
+      const top = upwards
+        ? Math.max(12, anchor.top - menuHeight - 4)
+        : Math.min(anchor.bottom + 4, layout.height - menuHeight - 12);
+
+      menu.style.left = `${left}px`;
+      menu.style.top = `${top}px`;
+      menu.style.transformOrigin = `${upwards ? 'bottom' : 'top'} ${alignSide}`;
+      menu.style.visibility = 'visible';
+    };
+
+    position();
+    window.addEventListener('resize', position);
+    document.addEventListener('scroll', position, true);
+    return () => {
+      window.removeEventListener('resize', position);
+      document.removeEventListener('scroll', position, true);
+    };
+  }, [triggerElement]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node) && !triggerElement.contains(event.target as Node)) {
         onClose();
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
-    const handleScroll = (event: Event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        onClose();
-      }
-    };
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('resize', onClose);
-    window.addEventListener('scroll', handleScroll, true);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('resize', onClose);
-      window.removeEventListener('scroll', handleScroll, true);
     };
-  }, [onClose]);
+  }, [onClose, triggerElement]);
 
   const filteredValues = useMemo(() => {
     const q = searchValue.toLowerCase().trim();
@@ -428,64 +483,14 @@ function ColumnFilterMenu({
     onClose();
   };
 
-  const menuWidth = 270;
-  const spaceLeft = anchorRect.right - 16;
-  const spaceRight = window.innerWidth - anchorRect.left - 16;
-
-  let left: number;
-  let alignSide: 'left' | 'right';
-
-  // Google Sheets behavior:
-  // The filter button is at the right edge of each column header.
-  // By default, the menu extends to the LEFT with its top-right corner aligned directly
-  // with the button's right edge (left = anchorRect.right - menuWidth). This keeps the
-  // menu positioned cleanly underneath the column that was clicked (rather than spilling
-  // over adjacent columns to the right).
-  // If there is not enough space on the left (< menuWidth, e.g. very narrow first column),
-  // it adapts and extends to the RIGHT (left = anchorRect.left) with its top-left corner under the button.
-  if (spaceLeft >= menuWidth) {
-    left = anchorRect.right - menuWidth;
-    alignSide = 'right';
-  } else if (spaceRight >= menuWidth) {
-    left = anchorRect.left;
-    alignSide = 'left';
-  } else {
-    if (spaceLeft >= spaceRight) {
-      left = anchorRect.right - menuWidth;
-      alignSide = 'right';
-    } else {
-      left = anchorRect.left;
-      alignSide = 'left';
-    }
-  }
-
-  // Safety clamp to ensure 100% viewport containment
-  left = Math.max(16, Math.min(left, window.innerWidth - menuWidth - 16));
-
-  const estimatedHeight = 350;
-  let top = anchorRect.bottom + 4;
-  let openUpwards = false;
-  if (top + estimatedHeight > window.innerHeight - 16) {
-    if (anchorRect.top - 4 - estimatedHeight >= 16) {
-      top = anchorRect.top - 4 - estimatedHeight;
-      openUpwards = true;
-    } else {
-      top = Math.max(16, window.innerHeight - estimatedHeight - 16);
-    }
-  }
-
-  const transformOrigin = `${openUpwards ? 'bottom' : 'top'} ${alignSide}`;
-
   return createPortal(
     <div
       ref={menuRef}
-      className={`pd-sheets-filter-menu align-${alignSide}`}
+      className="pd-sheets-filter-menu"
       style={{
         position: 'fixed',
-        top: `${top}px`,
-        left: `${left}px`,
-        transformOrigin,
         zIndex: 9999,
+        visibility: 'hidden',
       }}
       role="dialog"
       aria-label={`${c.filterColumn}: ${columnTitle}`}
@@ -631,7 +636,7 @@ export function ProjectDirectoryView() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [columnFilters, setColumnFilters] = useState<Partial<Record<DirectoryColumnKey, Set<string>>>>({});
   const [activeMenuCol, setActiveMenuCol] = useState<DirectoryColumnKey | null>(null);
-  const [menuAnchorRect, setMenuAnchorRect] = useState<DOMRect | null>(null);
+  const [menuAnchorEl, setMenuAnchorEl] = useState<HTMLElement | null>(null);
   const request = useRef(0); const dirty = useRef(false); const setDirty = useCallback((value: boolean) => { dirty.current = value; }, []);
   const hasLoaded = useRef(Boolean(cached));
   const canLeave = () => { if (!dirty.current) { setNotice(''); return true; } if (!window.confirm(c.unsaved)) return false; dirty.current = false; setNotice(''); setEditorVersion(previous => previous + 1); return true; };
@@ -659,7 +664,7 @@ export function ProjectDirectoryView() {
     setColumnFilters({});
     setSortColumn(null);
     setActiveMenuCol(null);
-    setMenuAnchorRect(null);
+    setMenuAnchorEl(null);
   }, [developmentId]);
   const development = data.developments.find(d => d.id === developmentId);
   const selectedVilla = data.villas.find(v => v.id === villaId && v.desarrollo_id === development?.id && (!statusFilters.length || statusFilters.includes(v.estatus)));
@@ -756,10 +761,10 @@ export function ProjectDirectoryView() {
             e.stopPropagation();
             if (activeMenuCol === colKey) {
               setActiveMenuCol(null);
-              setMenuAnchorRect(null);
+              setMenuAnchorEl(null);
             } else {
               setActiveMenuCol(colKey);
-              setMenuAnchorRect(e.currentTarget.getBoundingClientRect());
+              setMenuAnchorEl(e.currentTarget);
             }
           }}
           aria-label={`${c.filterColumn}: ${title}`}
@@ -832,7 +837,7 @@ export function ProjectDirectoryView() {
               {!villas.length && <div className="pd-empty"><p>{directorySearchQuery ? c.emptySearch : c.emptyVillas}</p><p className="pd-muted pd-help">{c.viewInactive}</p></div>}
             </div>
           </div>
-          {activeMenuCol && menuAnchorRect && (
+          {activeMenuCol && menuAnchorEl && (
             <ColumnFilterMenu
               columnKey={activeMenuCol}
               columnTitle={
@@ -847,7 +852,7 @@ export function ProjectDirectoryView() {
               allValues={columnDistinctValues[activeMenuCol]}
               selectedValues={columnFilters[activeMenuCol] ?? null}
               sortOrder={sortColumn === activeMenuCol ? sortOrder : null}
-              anchorRect={menuAnchorRect}
+              triggerElement={menuAnchorEl}
               onApplySort={(order) => {
                 setSortColumn(activeMenuCol);
                 setSortOrder(order);
@@ -865,7 +870,7 @@ export function ProjectDirectoryView() {
               }}
               onClose={() => {
                 setActiveMenuCol(null);
-                setMenuAnchorRect(null);
+                setMenuAnchorEl(null);
               }}
               c={c}
             />
