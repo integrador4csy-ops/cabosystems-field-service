@@ -429,21 +429,26 @@ function ColumnFilterMenu({
   };
 
   const menuWidth = 270;
-  const spaceRight = window.innerWidth - anchorRect.left - 16;
   const spaceLeft = anchorRect.right - 16;
+  const spaceRight = window.innerWidth - anchorRect.left - 16;
 
   let left: number;
   let alignSide: 'left' | 'right';
 
   // Google Sheets behavior:
-  // - If space on right is sufficient for menu, anchor top-left of menu to bottom-left of icon (left = anchorRect.left).
-  // - If space on right is insufficient (e.g. rightmost column "Estatus"), anchor top-right of menu to bottom-right of icon (left = anchorRect.right - menuWidth).
-  if (spaceRight >= menuWidth) {
-    left = anchorRect.left;
-    alignSide = 'left';
-  } else if (spaceLeft >= menuWidth) {
+  // The filter button is at the right edge of each column header.
+  // By default, the menu extends to the LEFT with its top-right corner aligned directly
+  // with the button's right edge (left = anchorRect.right - menuWidth). This keeps the
+  // menu positioned cleanly underneath the column that was clicked (rather than spilling
+  // over adjacent columns to the right).
+  // If there is not enough space on the left (< menuWidth, e.g. very narrow first column),
+  // it adapts and extends to the RIGHT (left = anchorRect.left) with its top-left corner under the button.
+  if (spaceLeft >= menuWidth) {
     left = anchorRect.right - menuWidth;
     alignSide = 'right';
+  } else if (spaceRight >= menuWidth) {
+    left = anchorRect.left;
+    alignSide = 'left';
   } else {
     if (spaceLeft >= spaceRight) {
       left = anchorRect.right - menuWidth;
